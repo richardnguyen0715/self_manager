@@ -1,0 +1,3 @@
+-- Initial migration placeholder.
+-- Module agents will add their own numbered migration files alongside this one.
+-- SQLx runs migrations in lexicographic order of filename.

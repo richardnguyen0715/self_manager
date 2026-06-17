@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*) AS \"count!\"\n        FROM   tasks\n        WHERE  user_id     = $1\n          AND  status      = 'completed'\n          AND  completed_at::date = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "1eec3262488a1bdd3368bbb0c78645dcaaec2ca72ff2a61d54ad067211f42c31"
+}

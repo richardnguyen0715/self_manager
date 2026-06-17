@@ -1,0 +1,162 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE habits\n        SET\n            name            = $3,\n            description     = $4,\n            habit_type      = $5,\n            target_value    = $6::NUMERIC,\n            frequency       = $7,\n            frequency_days  = $8,\n            reminder_time   = $9,\n            color           = $10,\n            icon            = $11,\n            archived        = $12,\n            position        = $13,\n            updated_at      = now()\n        WHERE id = $1 AND user_id = $2\n        RETURNING\n            id,\n            user_id,\n            name,\n            description,\n            habit_type      AS \"habit_type: HabitType\",\n            target_value::DOUBLE PRECISION AS \"target_value!: f64\",\n            frequency       AS \"frequency: HabitFrequency\",\n            frequency_days,\n            reminder_time,\n            color,\n            icon,\n            archived,\n            position,\n            created_at,\n            updated_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "habit_type: HabitType",
+        "type_info": {
+          "Custom": {
+            "name": "habit_type",
+            "kind": {
+              "Enum": [
+                "check",
+                "count",
+                "duration"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "target_value!: f64",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 6,
+        "name": "frequency: HabitFrequency",
+        "type_info": {
+          "Custom": {
+            "name": "habit_frequency",
+            "kind": {
+              "Enum": [
+                "daily",
+                "weekly",
+                "custom"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "frequency_days",
+        "type_info": "Int4Array"
+      },
+      {
+        "ordinal": 8,
+        "name": "reminder_time",
+        "type_info": "Time"
+      },
+      {
+        "ordinal": 9,
+        "name": "color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "icon",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "archived",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 12,
+        "name": "position",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 13,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        {
+          "Custom": {
+            "name": "habit_type",
+            "kind": {
+              "Enum": [
+                "check",
+                "count",
+                "duration"
+              ]
+            }
+          }
+        },
+        "Numeric",
+        {
+          "Custom": {
+            "name": "habit_frequency",
+            "kind": {
+              "Enum": [
+                "daily",
+                "weekly",
+                "custom"
+              ]
+            }
+          }
+        },
+        "Int4Array",
+        "Time",
+        "Text",
+        "Text",
+        "Bool",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      null,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "649c168f301df3d8cb7b4bb486ae8a589a9d02a3634c3ea86dafeb3542421484"
+}

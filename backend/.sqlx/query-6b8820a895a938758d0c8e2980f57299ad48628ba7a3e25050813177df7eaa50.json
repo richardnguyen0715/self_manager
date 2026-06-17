@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE user_preferences\n        SET theme                = $2,\n            color_theme          = $3,\n            compact_mode         = $4,\n            show_completed_tasks = $5,\n            week_starts_on       = $6,\n            updated_at           = now()\n        WHERE user_id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Bool",
+        "Bool",
+        "Int2"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6b8820a895a938758d0c8e2980f57299ad48628ba7a3e25050813177df7eaa50"
+}

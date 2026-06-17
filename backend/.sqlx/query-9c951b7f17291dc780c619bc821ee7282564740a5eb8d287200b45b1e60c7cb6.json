@@ -1,0 +1,66 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n               tb.id,\n               tb.title,\n               tb.start_time,\n               tb.end_time,\n               tb.task_id,\n               t.title       AS task_title,\n               tb.color,\n               SUM(fs.duration_seconds)::bigint AS actual_focus_seconds\n           FROM time_blocks tb\n           LEFT JOIN tasks t\n               ON t.id = tb.task_id\n           LEFT JOIN focus_sessions fs\n               ON fs.time_block_id = tb.id\n               AND fs.ended_at IS NOT NULL\n           WHERE tb.user_id = $1\n             AND tb.start_time >= $2\n             AND tb.start_time <= $3\n           GROUP BY tb.id, tb.title, tb.start_time, tb.end_time,\n                    tb.task_id, t.title, tb.color\n           ORDER BY tb.start_time ASC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "start_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "end_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "task_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "task_title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "actual_focus_seconds",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      null
+    ]
+  },
+  "hash": "9c951b7f17291dc780c619bc821ee7282564740a5eb8d287200b45b1e60c7cb6"
+}

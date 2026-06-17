@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(*)\n           FROM tasks\n           WHERE user_id     = $1\n             AND status      = 'completed'\n             AND completed_at >= $2\n             AND completed_at <= $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "fd32f67ed9413405f1e8514bd16cae9d96eebe3c10b3ac51757bfb7c9b6b7a16"
+}

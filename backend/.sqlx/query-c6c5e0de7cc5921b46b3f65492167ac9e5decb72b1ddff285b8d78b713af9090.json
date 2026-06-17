@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO notifications\n                (user_id, type, title, body, entity_id, entity_table, sent_at)\n               VALUES ($1, $2, $3, $4, $5, 'tasks', now())\n               ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "notification_type",
+            "kind": {
+              "Enum": [
+                "deadline_1d",
+                "deadline_2h",
+                "deadline_30m",
+                "habit_reminder",
+                "time_block_reminder",
+                "goal_deadline",
+                "system"
+              ]
+            }
+          }
+        },
+        "Text",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c6c5e0de7cc5921b46b3f65492167ac9e5decb72b1ddff285b8d78b713af9090"
+}

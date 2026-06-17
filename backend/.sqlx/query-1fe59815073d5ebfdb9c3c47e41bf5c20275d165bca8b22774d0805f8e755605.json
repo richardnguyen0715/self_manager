@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n               h.id,\n               h.name,\n               h.habit_type                          AS \"habit_type: DashHabitType\",\n               h.target_value::DOUBLE PRECISION      AS \"target_value!: f64\",\n               h.color,\n               h.icon,\n               hl.value::DOUBLE PRECISION            AS \"logged_value: f64\",\n               hl.completed                          AS log_completed\n           FROM habits h\n           LEFT JOIN habit_logs hl\n               ON hl.habit_id = h.id\n               AND hl.log_date = $2\n           WHERE h.user_id = $1\n             AND h.archived = false\n           ORDER BY h.position ASC, h.created_at ASC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "habit_type: DashHabitType",
+        "type_info": {
+          "Custom": {
+            "name": "habit_type",
+            "kind": {
+              "Enum": [
+                "check",
+                "count",
+                "duration"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "target_value!: f64",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 4,
+        "name": "color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "icon",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "logged_value: f64",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 7,
+        "name": "log_completed",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      true,
+      true,
+      null,
+      false
+    ]
+  },
+  "hash": "1fe59815073d5ebfdb9c3c47e41bf5c20275d165bca8b22774d0805f8e755605"
+}

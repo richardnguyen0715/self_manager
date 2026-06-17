@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT habit_id, log_date, completed\n           FROM habit_logs\n           WHERE user_id   = $1\n             AND habit_id  = ANY($2)\n             AND log_date >= $3\n             AND log_date <= $4\n           ORDER BY habit_id ASC, log_date DESC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "habit_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "log_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 2,
+        "name": "completed",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6466764574d5ec39f30396cce106e2fb9192831ffb9eaf32e139f97586585c6b"
+}

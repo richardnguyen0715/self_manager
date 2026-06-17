@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE focus_sessions\n        SET ended_at         = now(),\n            paused_at        = NULL,\n            duration_seconds = $2,\n            updated_at       = now()\n        WHERE id = $1\n        RETURNING\n            id, user_id, time_block_id,\n            mode AS \"mode: crate::modules::timeblock::models::FocusMode\",\n            started_at, paused_at, ended_at,\n            duration_seconds, created_at, updated_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "time_block_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "mode: crate::modules::timeblock::models::FocusMode",
+        "type_info": {
+          "Custom": {
+            "name": "focus_mode",
+            "kind": {
+              "Enum": [
+                "pomodoro_25_5",
+                "deep_work_50_10",
+                "custom"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "paused_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "ended_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "duration_seconds",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "bacd23a40cfce2ad7702532258ea6090b5f5e21857fa8feee7e78651e3405907"
+}

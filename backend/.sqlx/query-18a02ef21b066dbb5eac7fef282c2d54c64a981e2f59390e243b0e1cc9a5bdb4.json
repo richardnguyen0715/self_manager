@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            COALESCE(SUM(tasks_completed), 0)              AS \"tasks_completed!: i64\",\n            COALESCE(SUM(tasks_created),   0)              AS \"tasks_created!: i64\",\n            COALESCE(SUM(focus_minutes),   0)              AS \"focus_minutes!: i64\",\n            COALESCE(SUM(pomodoro_sessions), 0)            AS \"pomodoro_sessions!: i64\",\n            COALESCE(AVG(habit_completion_rate)::float8, 0) AS \"avg_habit_rate!: f64\",\n            COUNT(*)                                        AS \"day_count!: i64\"\n        FROM   daily_stats\n        WHERE  user_id   = $1\n          AND  stat_date BETWEEN $2 AND $3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tasks_completed!: i64",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "tasks_created!: i64",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "focus_minutes!: i64",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "pomodoro_sessions!: i64",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "avg_habit_rate!: f64",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 5,
+        "name": "day_count!: i64",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "18a02ef21b066dbb5eac7fef282c2d54c64a981e2f59390e243b0e1cc9a5bdb4"
+}

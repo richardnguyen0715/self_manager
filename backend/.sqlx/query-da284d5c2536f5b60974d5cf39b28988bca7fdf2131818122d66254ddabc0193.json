@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*) AS \"count!\"\n        FROM time_blocks\n        WHERE user_id   = $1\n          AND ($2::timestamptz IS NULL OR start_time >= $2)\n          AND ($3::timestamptz IS NULL OR end_time   <= $3)\n          AND ($4::uuid        IS NULL OR task_id    = $4)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "da284d5c2536f5b60974d5cf39b28988bca7fdf2131818122d66254ddabc0193"
+}

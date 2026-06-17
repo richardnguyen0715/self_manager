@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE time_blocks\n        SET actual_start = now(), updated_at = now()\n        WHERE id = $1 AND actual_start IS NULL\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ebd0fb116865966427fbaf35696df0107a8c1bbbd9f36aee12590942e95a2616"
+}

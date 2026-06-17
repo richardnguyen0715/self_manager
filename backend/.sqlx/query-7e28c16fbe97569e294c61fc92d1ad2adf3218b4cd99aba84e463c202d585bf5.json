@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO notifications\n                (user_id, type, title, body, entity_id, entity_table, sent_at)\n               VALUES ($1, 'time_block_reminder', $2, $3, $4, 'time_blocks', now())\n               ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7e28c16fbe97569e294c61fc92d1ad2adf3218b4cd99aba84e463c202d585bf5"
+}

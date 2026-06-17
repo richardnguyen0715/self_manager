@@ -1,0 +1,93 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n               t.id,\n               t.title,\n               t.priority   AS \"priority: DashTaskPriority\",\n               t.status     AS \"status: DashTaskStatus\",\n               t.due_date,\n               t.estimated_time,\n               t.project_id,\n               p.name       AS project_name\n           FROM tasks t\n           LEFT JOIN projects p ON p.id = t.project_id\n           WHERE t.user_id = $1\n             AND t.status NOT IN ('completed', 'archived')\n             AND (\n                 -- due today\n                 (t.due_date >= $2 AND t.due_date <= $3)\n                 -- overdue\n                 OR t.due_date < $4\n                 -- in-progress regardless of due date\n                 OR t.status = 'in_progress'\n             )\n           ORDER BY\n               CASE t.priority\n                   WHEN 'critical' THEN 0\n                   WHEN 'high'     THEN 1\n                   WHEN 'medium'   THEN 2\n                   WHEN 'low'      THEN 3\n               END ASC,\n               t.due_date ASC NULLS LAST,\n               t.created_at DESC\n           LIMIT 50",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "priority: DashTaskPriority",
+        "type_info": {
+          "Custom": {
+            "name": "task_priority",
+            "kind": {
+              "Enum": [
+                "critical",
+                "high",
+                "medium",
+                "low"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "status: DashTaskStatus",
+        "type_info": {
+          "Custom": {
+            "name": "task_status",
+            "kind": {
+              "Enum": [
+                "inbox",
+                "planned",
+                "in_progress",
+                "waiting",
+                "completed",
+                "archived"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "due_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "estimated_time",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "project_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "project_name",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "54b6612f41e8f99b86515ebf1b81c1b42d70d85a96a6c51a78ede4933eeb5176"
+}

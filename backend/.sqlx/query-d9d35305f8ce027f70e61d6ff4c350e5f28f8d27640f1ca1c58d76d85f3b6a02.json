@@ -1,0 +1,67 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT\n                        id,\n                        name,\n                        description,\n                        habit_type::text  AS \"habit_type!\",\n                        frequency::text   AS \"frequency!\",\n                        archived,\n                        created_at,\n                        updated_at\n                    FROM habits\n                    WHERE user_id = $1\n                      AND archived = false\n                      AND (name ILIKE $2 OR description ILIKE $2)\n                    ORDER BY\n                        (name ILIKE $3) DESC,\n                        updated_at DESC\n                    LIMIT $4\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "habit_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "frequency!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "archived",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      null,
+      null,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d9d35305f8ce027f70e61d6ff4c350e5f28f8d27640f1ca1c58d76d85f3b6a02"
+}

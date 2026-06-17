@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            stat_date,\n            tasks_completed,\n            tasks_created,\n            CASE WHEN tasks_created = 0 THEN 0.0\n                 ELSE LEAST(tasks_completed::float8 / tasks_created::float8, 1.0)\n            END AS \"completion_rate!: f64\"\n        FROM   daily_stats\n        WHERE  user_id   = $1\n          AND  stat_date BETWEEN $2 AND $3\n        ORDER BY stat_date ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "stat_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 1,
+        "name": "tasks_completed",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "tasks_created",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "completion_rate!: f64",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "95d935bf1e4b096d5ee3f8d937705df63151e170563ab9e85d863921b985c591"
+}

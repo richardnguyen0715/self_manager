@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE time_blocks\n        SET actual_end = now(), updated_at = now()\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1a11f2a6bee2cb967b8bbdbbbdcc7a208994be582fa1aacc5b624bf85e14504b"
+}

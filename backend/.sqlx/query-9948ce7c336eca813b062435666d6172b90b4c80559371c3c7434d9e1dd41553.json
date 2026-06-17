@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO task_tags (task_id, tag_id)\n                   SELECT $1, t.id FROM tags t\n                   WHERE t.id = $2 AND t.user_id = $3\n                   ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9948ce7c336eca813b062435666d6172b90b4c80559371c3c7434d9e1dd41553"
+}

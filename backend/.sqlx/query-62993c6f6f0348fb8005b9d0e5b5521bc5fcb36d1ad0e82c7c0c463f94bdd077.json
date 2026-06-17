@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO kanban_columns (user_id, project_id, name, maps_to_status, position)\n        VALUES\n            ($1, NULL, 'Inbox',       'inbox'::task_status,       0),\n            ($1, NULL, 'To Do',       'planned'::task_status,     1),\n            ($1, NULL, 'In Progress', 'in_progress'::task_status, 2),\n            ($1, NULL, 'Done',        'completed'::task_status,   3)\n        ON CONFLICT DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "62993c6f6f0348fb8005b9d0e5b5521bc5fcb36d1ad0e82c7c0c463f94bdd077"
+}

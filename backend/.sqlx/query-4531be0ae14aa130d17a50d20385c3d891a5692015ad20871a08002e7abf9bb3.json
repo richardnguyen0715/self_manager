@@ -1,0 +1,82 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO daily_stats\n            (user_id, stat_date, tasks_completed, tasks_created,\n             focus_minutes, habit_completion_rate, pomodoro_sessions)\n        VALUES ($1, $2, $3, $4, $5, $6, $7)\n        ON CONFLICT (user_id, stat_date) DO UPDATE\n            SET tasks_completed       = EXCLUDED.tasks_completed,\n                tasks_created         = EXCLUDED.tasks_created,\n                focus_minutes         = EXCLUDED.focus_minutes,\n                habit_completion_rate = EXCLUDED.habit_completion_rate,\n                pomodoro_sessions     = EXCLUDED.pomodoro_sessions,\n                updated_at            = now()\n        RETURNING\n            id,\n            user_id,\n            stat_date,\n            tasks_completed,\n            tasks_created,\n            focus_minutes,\n            habit_completion_rate::float8 AS \"habit_completion_rate!: f64\",\n            pomodoro_sessions,\n            created_at,\n            updated_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "stat_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 3,
+        "name": "tasks_completed",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "tasks_created",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "focus_minutes",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "habit_completion_rate!: f64",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 7,
+        "name": "pomodoro_sessions",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Numeric",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4531be0ae14aa130d17a50d20385c3d891a5692015ad20871a08002e7abf9bb3"
+}

@@ -1,0 +1,105 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE notifications\n               SET read = $3\n               WHERE id = $1 AND user_id = $2\n               RETURNING\n                id,\n                user_id,\n                type AS \"notification_type: NotificationType\",\n                title,\n                body,\n                entity_id,\n                entity_table,\n                read,\n                scheduled_for,\n                sent_at,\n                created_at,\n                updated_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "notification_type: NotificationType",
+        "type_info": {
+          "Custom": {
+            "name": "notification_type",
+            "kind": {
+              "Enum": [
+                "deadline_1d",
+                "deadline_2h",
+                "deadline_30m",
+                "habit_reminder",
+                "time_block_reminder",
+                "goal_deadline",
+                "system"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "body",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "entity_table",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "read",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "scheduled_for",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "sent_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "8d6f2bca918406c180f2ad50ef0e43ffbb830a6d55098a9b51a1a42389dc9cad"
+}

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(*)\n           FROM tasks\n           WHERE user_id  = $1\n             AND due_date < $2\n             AND status NOT IN ('completed', 'archived')",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e36d30c527170300dd36208949389b35db97f3377564d85a1690d542c8bd8e93"
+}

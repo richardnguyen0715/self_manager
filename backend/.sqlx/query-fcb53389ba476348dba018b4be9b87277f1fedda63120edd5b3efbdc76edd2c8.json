@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(*)\n           FROM focus_sessions\n           WHERE user_id   = $1\n             AND ended_at >= $2\n             AND ended_at <= $3\n             AND ended_at IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "fcb53389ba476348dba018b4be9b87277f1fedda63120edd5b3efbdc76edd2c8"
+}

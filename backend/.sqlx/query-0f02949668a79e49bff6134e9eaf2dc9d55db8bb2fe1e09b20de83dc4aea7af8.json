@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            stat_date,\n            tasks_completed,\n            tasks_created,\n            focus_minutes,\n            habit_completion_rate::float8 AS \"habit_completion_rate!: f64\",\n            pomodoro_sessions\n        FROM   daily_stats\n        WHERE  user_id   = $1\n          AND  stat_date BETWEEN $2 AND $3\n        ORDER BY stat_date ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "stat_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 1,
+        "name": "tasks_completed",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "tasks_created",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "focus_minutes",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "habit_completion_rate!: f64",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 5,
+        "name": "pomodoro_sessions",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      false
+    ]
+  },
+  "hash": "0f02949668a79e49bff6134e9eaf2dc9d55db8bb2fe1e09b20de83dc4aea7af8"
+}

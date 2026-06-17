@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE user_preferences\n        SET notification_prefs = $2,\n            updated_at         = now()\n        WHERE user_id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "798d42dae6dde90cdfaad55d9b5b11feea4d12eb8662b3d265ebb7f9912fe4fc"
+}

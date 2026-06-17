@@ -1,0 +1,73 @@
+[package]
+name = "manage-my-life"
+version = "0.1.0"
+edition = "2021"
+authors = ["manage-my-life contributors"]
+description = "Manage My Life — modular-monolith backend"
+
+[[bin]]
+name = "server"
+path = "src/main.rs"
+
+[dependencies]
+# ── Web framework ──────────────────────────────────────────────────────────────
+axum = { version = "0.7", features = ["ws", "macros"] }
+tower = { version = "0.4", features = ["full"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "request-id", "timeout"] }
+
+# ── Async runtime ──────────────────────────────────────────────────────────────
+tokio = { version = "1", features = ["full"] }
+
+# ── Database ───────────────────────────────────────────────────────────────────
+sqlx = { version = "0.7", features = [
+    "runtime-tokio-rustls",
+    "postgres",
+    "macros",
+    "chrono",
+    "uuid",
+    "json",
+    "migrate",
+] }
+
+# ── Redis ──────────────────────────────────────────────────────────────────────
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+
+# ── Serialisation ──────────────────────────────────────────────────────────────
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# ── Time & identifiers ─────────────────────────────────────────────────────────
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# ── Auth ───────────────────────────────────────────────────────────────────────
+jsonwebtoken = "9"
+argon2 = "0.5"
+
+# ── Error handling ─────────────────────────────────────────────────────────────
+thiserror = "1"
+anyhow = "1"
+
+# ── Validation ─────────────────────────────────────────────────────────────────
+validator = { version = "0.18", features = ["derive"] }
+
+# ── Background jobs ────────────────────────────────────────────────────────────
+# apalis core: no built-in Redis feature — storage backends are wired by module
+# agents via the `redis` crate directly. Enabled features: tracing + retry.
+apalis = { version = "0.6", features = ["tracing", "retry", "timeout", "limit"] }
+
+# ── Observability ─────────────────────────────────────────────────────────────
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+
+# ── Environment ───────────────────────────────────────────────────────────────
+dotenvy = "0.15"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+[profile.dev]
+opt-level = 0
+debug = true

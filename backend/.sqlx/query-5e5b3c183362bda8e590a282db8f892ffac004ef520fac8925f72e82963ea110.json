@@ -1,0 +1,73 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            id,\n            habit_id,\n            user_id,\n            log_date,\n            value::DOUBLE PRECISION AS \"value!: f64\",\n            completed,\n            note,\n            created_at,\n            updated_at\n        FROM habit_logs\n        WHERE habit_id = $1\n          AND user_id  = $2\n          AND log_date BETWEEN $3 AND $4\n        ORDER BY log_date DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "habit_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "log_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 4,
+        "name": "value!: f64",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 5,
+        "name": "completed",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "note",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "5e5b3c183362bda8e590a282db8f892ffac004ef520fac8925f72e82963ea110"
+}

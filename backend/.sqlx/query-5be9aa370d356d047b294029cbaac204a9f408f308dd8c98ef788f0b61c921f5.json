@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            started_at::date           AS \"date!: NaiveDate\",\n            COALESCE(SUM(duration_seconds) / 60, 0) AS \"focus_minutes!: i64\"\n        FROM   focus_sessions\n        WHERE  user_id   = $1\n          AND  started_at::date BETWEEN $2 AND $3\n          AND  ended_at  IS NOT NULL\n        GROUP BY started_at::date\n        ORDER BY started_at::date ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "date!: NaiveDate",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 1,
+        "name": "focus_minutes!: i64",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "5be9aa370d356d047b294029cbaac204a9f408f308dd8c98ef788f0b61c921f5"
+}
