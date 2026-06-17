@@ -75,8 +75,10 @@ export function KanbanCard({ task, columnId, isOverlay = false }: KanbanCardProp
     isPast(parseISO(task.due_date)) &&
     task.status !== "completed";
 
-  const completedSubtasks = task.subtasks.filter((s) => s.is_done).length;
-  const totalSubtasks = task.subtasks.length;
+  const tags = task.tags ?? [];
+  const subtasks = task.subtasks ?? [];
+  const completedSubtasks = subtasks.filter((s) => s.is_done).length;
+  const totalSubtasks = subtasks.length;
 
   return (
     <div
@@ -109,9 +111,9 @@ export function KanbanCard({ task, columnId, isOverlay = false }: KanbanCardProp
 
       <div className="px-3 py-2.5 pl-7 space-y-2">
         {/* Tags row */}
-        {task.tags.length > 0 && (
+        {tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {task.tags.slice(0, 3).map((tag) => (
+            {tags.slice(0, 3).map((tag) => (
               <span
                 key={tag.id}
                 className="inline-flex items-center rounded-full px-1.5 py-0 text-[10px] font-medium"
@@ -123,9 +125,9 @@ export function KanbanCard({ task, columnId, isOverlay = false }: KanbanCardProp
                 {tag.name}
               </span>
             ))}
-            {task.tags.length > 3 && (
+            {tags.length > 3 && (
               <span className="inline-flex items-center rounded-full px-1.5 py-0 text-[10px] font-medium bg-muted text-muted-foreground">
-                +{task.tags.length - 3}
+                +{tags.length - 3}
               </span>
             )}
           </div>

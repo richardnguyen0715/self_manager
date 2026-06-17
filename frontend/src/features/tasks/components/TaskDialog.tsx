@@ -257,11 +257,11 @@ export function TaskDialog() {
         description: editingTask.description ?? "",
         priority: editingTask.priority,
         status: editingTask.status,
-        due_date: editingTask.due_date ?? null,
-        start_date: editingTask.start_date ?? null,
+        due_date: editingTask.due_date?.slice(0, 10) ?? null,
+        start_date: editingTask.start_date?.slice(0, 10) ?? null,
         estimated_time: editingTask.estimated_time ?? null,
         project_id: editingTask.project_id ?? null,
-        tag_ids: editingTask.tags.map((t) => t.id),
+        tag_ids: editingTask.tags?.map((t) => t.id) ?? [],
         recurrence_rule: editingTask.recurrence_rule ?? null,
       });
     } else if (!isEdit) {
@@ -280,15 +280,21 @@ export function TaskDialog() {
     }
   }, [editingTask, isEdit, reset]);
 
+  // Backend expects RFC3339 datetimes; <input type="date"> yields "YYYY-MM-DD".
+  function toIso(v: string | null | undefined): string | null {
+    if (!v) return null;
+    return v.length === 10 ? `${v}T00:00:00Z` : v;
+  }
+
   async function onSubmit(values: TaskFormValues) {
     const payload: CreateTaskPayload = {
       title: values.title,
       description: values.description || null,
       priority: values.priority,
       status: values.status,
-      due_date: values.due_date || null,
-      start_date: values.start_date || null,
-      estimated_time: values.estimated_time ?? null,
+      due_date: toIso(values.due_date),
+      start_date: toIso(values.start_date),
+      estimated_time: values.estimated_time ? values.estimated_time : null,
       project_id:
         values.project_id === "__none__" ? null : values.project_id ?? null,
       tag_ids: values.tag_ids,

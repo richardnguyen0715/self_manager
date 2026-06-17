@@ -149,9 +149,9 @@ export function TaskRow({ task }: TaskRowProps) {
             )}
 
             {/* Tag count badge — full tag objects not available in list items */}
-            {task.tag_ids.length > 0 && (
+            {(task.tag_ids?.length ?? 0) > 0 && (
               <Badge variant="outline" className="px-1.5 py-0 text-[10px] h-4">
-                {task.tag_ids.length} tag{task.tag_ids.length > 1 ? "s" : ""}
+                {task.tag_ids!.length} tag{task.tag_ids!.length > 1 ? "s" : ""}
               </Badge>
             )}
           </div>

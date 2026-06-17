@@ -254,11 +254,11 @@ export function CardDetailDialog() {
             </div>
 
             {/* Subtasks summary */}
-            {task && task.subtasks.length > 0 && (
+            {task && (task.subtasks?.length ?? 0) > 0 && (
               <div className="space-y-1.5">
                 <Label>Subtasks</Label>
                 <div className="space-y-1">
-                  {task.subtasks.map((sub) => (
+                  {task.subtasks!.map((sub) => (
                     <div key={sub.id} className="flex items-center gap-2 text-sm">
                       <span
                         className={
