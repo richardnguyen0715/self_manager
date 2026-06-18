@@ -179,3 +179,27 @@ prod-ps: ## Show production container status
 
 prod-psql: ## psql into the production database
 	$(PROD_COMPOSE) exec postgres psql -U $${POSTGRES_USER:-mml} -d $${POSTGRES_DB:-manage_my_life}
+
+# ── Server mode: Cloudflare Tunnel + host nginx (no built-in proxy) ──────────
+# docker/docker-compose.server.yml binds frontend/backend to 127.0.0.1 ports.
+SERVER_COMPOSE := docker compose --env-file .env -f docker/docker-compose.server.yml
+
+.PHONY: server-up server-down server-rebuild server-logs server-ps
+
+server-up: ## Build + start the loopback stack (for Cloudflare/nginx-fronted servers)
+	@test -f .env || { echo "ERROR: .env missing. Run 'make prod-env' first."; exit 1; }
+	$(SERVER_COMPOSE) up -d --build
+	@echo "$(BOLD)Up.$(RESET) frontend->127.0.0.1:$${WEB_PORT:-3100}  backend->127.0.0.1:$${API_PORT:-3101}"
+	@echo "  Install nginx vhost + cloudflared ingress for $$(grep ^DOMAIN= .env | cut -d= -f2), then reload."
+
+server-down: ## Stop the loopback stack (volumes preserved)
+	$(SERVER_COMPOSE) down
+
+server-rebuild: ## Rebuild images from current code and restart (no data loss)
+	$(SERVER_COMPOSE) up -d --build
+
+server-logs: ## Tail loopback stack logs
+	$(SERVER_COMPOSE) logs -f
+
+server-ps: ## Show loopback stack container status
+	$(SERVER_COMPOSE) ps
