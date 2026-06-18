@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            id,\n            user_id,\n            sprint_id,\n            went_well,\n            went_wrong,\n            action_items,\n            created_at,\n            updated_at\n        FROM retrospectives\n        WHERE sprint_id = $1 AND user_id = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "sprint_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "went_well",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "went_wrong",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "action_items",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c65f8ef0693eb360dce0825e5e97fb5c92f5ac2c280c1c91a5b6adbe93f3ea36"
+}

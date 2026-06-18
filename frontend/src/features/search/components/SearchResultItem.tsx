@@ -86,7 +86,7 @@ function buildSubText(result: SearchResult): string | null {
 function getHref(result: SearchResult): string {
   switch (result.kind) {
     case "task":
-      return `/tasks?id=${result.id}`;
+      return `/work-items?id=${result.id}`;
     case "project":
       return `/goals?project=${result.id}`;
     case "habit":

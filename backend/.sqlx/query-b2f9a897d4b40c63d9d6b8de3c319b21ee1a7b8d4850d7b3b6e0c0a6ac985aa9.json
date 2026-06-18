@@ -1,0 +1,101 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n               wi.id,\n               wi.epic_id,\n               wi.sprint_id,\n               wi.type::text                                             AS \"type!\",\n               wi.title,\n               wi.status::text                                           AS \"status!\",\n               wi.priority::text                                         AS \"priority!\",\n               wi.story_points,\n               wi.due_date,\n               wi.position,\n               COUNT(sub.id)                                             AS \"subtask_count!: i64\",\n               COUNT(sub.id) FILTER (WHERE sub.is_done = true)          AS \"done_subtask_count!: i64\",\n               wi.created_at,\n               wi.updated_at\n           FROM work_items wi\n           LEFT JOIN work_item_subtasks sub ON sub.work_item_id = wi.id\n           WHERE wi.user_id        = $1\n             AND wi.due_date      < $2\n             AND wi.status::text  != 'done'\n           GROUP BY wi.id\n           ORDER BY wi.due_date ASC NULLS LAST\n           LIMIT 50",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "epic_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "sprint_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "priority!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "story_points",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "due_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "position",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "subtask_count!: i64",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 11,
+        "name": "done_subtask_count!: i64",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 12,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      null,
+      false,
+      null,
+      null,
+      true,
+      true,
+      false,
+      null,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "b2f9a897d4b40c63d9d6b8de3c319b21ee1a7b8d4850d7b3b6e0c0a6ac985aa9"
+}

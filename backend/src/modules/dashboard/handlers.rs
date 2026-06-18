@@ -21,7 +21,7 @@ use crate::shared::{
 };
 
 use super::{
-    models::{DashboardDateQuery, DashboardResponse, QuickStats},
+    models::{DashboardDateQuery, DashboardResponse, QuickStats, SprintDashboardResponse},
     service,
 };
 
@@ -73,4 +73,31 @@ pub async fn get_stats(
     let date = parse_optional_date(params.date.as_deref())?;
     let stats = service::get_quick_stats(&state, auth.user_id, date).await?;
     Ok(Json(stats))
+}
+
+// ── GET /api/dashboard/sprint ─────────────────────────────────────────────────
+
+/// `GET /api/dashboard/sprint`
+///
+/// Returns the sprint-centric dashboard:
+/// - Active sprint (if any) with capacity / progress info.
+/// - `sprint_progress_pct` — percentage of sprint work items completed.
+/// - `goal_progress` — per-goal completion rates computed from the
+///   goals → initiatives → epics → work items hierarchy.
+/// - `today_time_blocks` — time blocks starting today, enriched with both
+///   legacy `task_id` and new `work_item_id`.
+/// - `overdue_work_items` — up to 50 work items past their due date and
+///   not yet done, ordered by oldest first.
+/// - `habits` — active habits with today's completion status and streak.
+///
+/// # Query parameters
+/// - `date` (optional, `YYYY-MM-DD`): target date; defaults to today (UTC).
+pub async fn get_sprint_dashboard(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Query(params): Query<DashboardDateQuery>,
+) -> AppResult<Json<SprintDashboardResponse>> {
+    let date = parse_optional_date(params.date.as_deref())?;
+    let snapshot = service::get_sprint_dashboard(&state, auth.user_id, date).await?;
+    Ok(Json(snapshot))
 }

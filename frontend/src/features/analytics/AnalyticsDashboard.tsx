@@ -3,6 +3,7 @@
 import { RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { useAnalyticsStore } from "./analytics.store";
 import { analyticsKeys } from "./hooks/useAnalytics";
 import {
@@ -11,6 +12,12 @@ import {
   useTimeUsage,
   useCompletionRate,
 } from "./hooks/useAnalytics";
+import {
+  useSprintVelocity,
+  useTimeByEpic,
+  useAnalyticsSprintList,
+  agileAnalyticsKeys,
+} from "./hooks/useAgileAnalytics";
 import { PeriodSelector } from "./components/PeriodSelector";
 import { KpiStrip } from "./components/KpiStrip";
 import { ProductivityChart } from "./components/ProductivityChart";
@@ -18,6 +25,9 @@ import { CompletionRateChart } from "./components/CompletionRateChart";
 import { TimeUsageChart } from "./components/TimeUsageChart";
 import { WeeklyReview } from "./components/WeeklyReview";
 import { HabitHeatmap } from "./components/HabitHeatmap";
+import { SprintVelocityChart } from "./components/SprintVelocityChart";
+import { BurndownChart } from "./components/BurndownChart";
+import { TimeByEpicChart } from "./components/TimeByEpicChart";
 
 export function AnalyticsDashboard() {
   const { dateRange } = useAnalyticsStore();
@@ -31,14 +41,22 @@ export function AnalyticsDashboard() {
   const timeUsageQuery = useTimeUsage(queryParams);
   const completionRateQuery = useCompletionRate(queryParams);
 
+  // Agile analytics — period-scoped where applicable
+  const velocityQuery = useSprintVelocity(6);
+  const timeByEpicQuery = useTimeByEpic(queryParams);
+  const sprintListQuery = useAnalyticsSprintList();
+
   const isFetching =
     summaryQuery.isFetching ||
     dailyQuery.isFetching ||
     timeUsageQuery.isFetching ||
-    completionRateQuery.isFetching;
+    completionRateQuery.isFetching ||
+    velocityQuery.isFetching ||
+    timeByEpicQuery.isFetching;
 
   function handleRefresh() {
     void queryClient.invalidateQueries({ queryKey: analyticsKeys.all });
+    void queryClient.invalidateQueries({ queryKey: agileAnalyticsKeys.all });
   }
 
   return (
@@ -115,6 +133,36 @@ export function AnalyticsDashboard() {
         data={dailyQuery.data}
         dateRange={dateRange}
         isLoading={dailyQuery.isLoading}
+      />
+
+      {/* ── Sprint / Agile analytics ─────────────────────────────────── */}
+      <Separator />
+
+      <div>
+        <h2 className="text-sm font-semibold text-foreground mb-1">
+          Sprint Analytics
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Velocity, burndown, and focus time per epic
+        </p>
+      </div>
+
+      {/* Velocity + time-by-epic side by side on wide screens */}
+      <div className="grid gap-6 xl:grid-cols-2">
+        <SprintVelocityChart
+          data={velocityQuery.data}
+          isLoading={velocityQuery.isLoading}
+        />
+        <TimeByEpicChart
+          data={timeByEpicQuery.data}
+          isLoading={timeByEpicQuery.isLoading}
+        />
+      </div>
+
+      {/* Burndown — full width (needs sprint picker) */}
+      <BurndownChart
+        sprintsData={sprintListQuery.data}
+        sprintsLoading={sprintListQuery.isLoading}
       />
     </div>
   );

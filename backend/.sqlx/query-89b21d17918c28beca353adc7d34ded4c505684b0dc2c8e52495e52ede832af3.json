@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT start_date, end_date\n        FROM   sprints\n        WHERE  id = $1 AND user_id = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "start_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 1,
+        "name": "end_date",
+        "type_info": "Date"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "89b21d17918c28beca353adc7d34ded4c505684b0dc2c8e52495e52ede832af3"
+}

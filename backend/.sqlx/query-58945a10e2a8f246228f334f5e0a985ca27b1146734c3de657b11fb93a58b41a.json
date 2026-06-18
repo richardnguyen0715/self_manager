@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            COUNT(*)                                        AS total_items,\n            COUNT(*) FILTER (WHERE status::text = 'done')  AS done_items,\n            COALESCE(SUM(story_points), 0)                 AS total_points,\n            COALESCE(SUM(story_points) FILTER (WHERE status::text = 'done'), 0) AS done_points\n        FROM work_items\n        WHERE epic_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "total_items",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "done_items",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "total_points",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "done_points",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "58945a10e2a8f246228f334f5e0a985ca27b1146734c3de657b11fb93a58b41a"
+}

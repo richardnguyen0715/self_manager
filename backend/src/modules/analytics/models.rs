@@ -148,3 +148,94 @@ pub struct RefreshStatsResponse {
     pub refreshed_date: NaiveDate,
     pub stats: DailyStat,
 }
+
+// ── Agile analytics response DTOs ─────────────────────────────────────────────
+
+/// Query parameters for the velocity endpoint.
+#[derive(Debug, Deserialize)]
+pub struct VelocityQuery {
+    /// Number of most-recent completed sprints to include. Defaults to 6.
+    pub last: Option<i64>,
+}
+
+/// Query parameters for the burndown endpoint.
+#[derive(Debug, Deserialize, Validate)]
+pub struct BurndownQuery {
+    /// UUID of the sprint to compute the burndown chart for.
+    #[validate(length(min = 36, max = 36, message = "sprint_id must be a UUID"))]
+    pub sprint_id: String,
+}
+
+/// Query parameters for the time-by-epic endpoint.
+#[derive(Debug, Deserialize, Validate)]
+pub struct TimeByEpicQuery {
+    /// Inclusive start date (`YYYY-MM-DD`).
+    #[validate(length(min = 10, max = 10))]
+    pub start: String,
+    /// Inclusive end date (`YYYY-MM-DD`).
+    #[validate(length(min = 10, max = 10))]
+    pub end: String,
+}
+
+/// One data point in the velocity chart — one per completed sprint.
+#[derive(Debug, Serialize)]
+pub struct VelocityPoint {
+    pub sprint_id: Uuid,
+    pub sprint_name: String,
+    /// Sum of story_points for all work items committed to the sprint at
+    /// completion time. Equals `sprint_reviews.planned_points`.
+    pub planned_points: i32,
+    /// Actual points delivered. Equals `sprint_reviews.completed_points`.
+    pub completed_points: i32,
+    /// Velocity percentage: `(completed / planned) * 100`, or `0` when
+    /// `planned_points = 0`.
+    pub velocity: f64,
+    /// Sprint start date for the x-axis label.
+    pub start_date: NaiveDate,
+    /// Sprint end date.
+    pub end_date: NaiveDate,
+}
+
+/// One daily point on the sprint burndown chart.
+#[derive(Debug, Serialize)]
+pub struct BurndownPoint {
+    /// Calendar date.
+    pub date: NaiveDate,
+    /// Remaining story points (items not yet `done`) at end of that day.
+    pub remaining_points: i32,
+    /// Ideal linear burn from total_points down to 0 across the sprint.
+    pub ideal_points: f64,
+}
+
+/// Full burndown chart for a single sprint.
+#[derive(Debug, Serialize)]
+pub struct BurndownResponse {
+    pub sprint_id: Uuid,
+    pub start_date: NaiveDate,
+    pub end_date: NaiveDate,
+    /// Total story points committed to the sprint.
+    pub total_points: i32,
+    /// One entry per calendar day of the sprint (inclusive start and end).
+    pub points: Vec<BurndownPoint>,
+}
+
+/// One row in the time-by-epic breakdown.
+#[derive(Debug, Serialize)]
+pub struct EpicTimePoint {
+    pub epic_id: Uuid,
+    pub epic_title: String,
+    /// Total minutes of focus time logged against work items in this epic.
+    pub focus_minutes: i64,
+}
+
+/// Wrapper for velocity list response.
+#[derive(Debug, Serialize)]
+pub struct VelocityResponse {
+    pub data: Vec<VelocityPoint>,
+}
+
+/// Wrapper for time-by-epic list response.
+#[derive(Debug, Serialize)]
+pub struct TimeByEpicResponse {
+    pub data: Vec<EpicTimePoint>,
+}

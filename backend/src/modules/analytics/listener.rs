@@ -136,6 +136,61 @@ async fn handle_event(
             .await?;
         }
 
+        // ── Agile OS events ───────────────────────────────────────────────────
+
+        DomainEvent::WorkItemCompleted {
+            work_item_id,
+            user_id,
+            sprint_id,
+        } => {
+            let metadata =
+                serde_json::json!({ "work_item_id": work_item_id, "sprint_id": sprint_id });
+            service::record_event(
+                &state.db,
+                user_id,
+                "work_item_completed",
+                Some(work_item_id),
+                Some(metadata),
+            )
+            .await?;
+
+            // Refresh daily stats so completion counts stay up-to-date.
+            let _ = service::refresh_today(&state.db, user_id).await;
+        }
+
+        DomainEvent::SprintStarted { sprint_id, user_id } => {
+            let metadata = serde_json::json!({ "sprint_id": sprint_id });
+            service::record_event(
+                &state.db,
+                user_id,
+                "sprint_started",
+                Some(sprint_id),
+                Some(metadata),
+            )
+            .await?;
+        }
+
+        DomainEvent::SprintCompleted {
+            sprint_id,
+            user_id,
+            completed_points,
+            velocity,
+        } => {
+            let metadata = serde_json::json!({
+                "sprint_id": sprint_id,
+                "completed_points": completed_points,
+                "velocity": velocity,
+            });
+            service::record_event(
+                &state.db,
+                user_id,
+                "sprint_completed",
+                Some(sprint_id),
+                Some(metadata),
+            )
+            .await?;
+        }
+
         // CalendarEventReminder is not analytically significant — skip.
         DomainEvent::CalendarEventReminder { .. } => {}
     }

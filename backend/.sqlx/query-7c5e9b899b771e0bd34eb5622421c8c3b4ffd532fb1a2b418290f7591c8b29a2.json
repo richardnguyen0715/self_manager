@@ -1,0 +1,102 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE sprints\n        SET\n            project_id      = $3,\n            name            = $4,\n            goal_text       = $5,\n            start_date      = $6,\n            end_date        = $7,\n            capacity_points = $8,\n            status          = ($9::text)::sprint_status,\n            updated_at      = now()\n        WHERE id = $1 AND user_id = $2\n        RETURNING\n            id, user_id, project_id, name, goal_text,\n            start_date, end_date, capacity_points,\n            status::text AS \"status!\",\n            velocity::float8 AS \"velocity?\", completed_points,\n            created_at, updated_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "project_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "goal_text",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "start_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 6,
+        "name": "end_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 7,
+        "name": "capacity_points",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "velocity?",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 10,
+        "name": "completed_points",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Date",
+        "Date",
+        "Int4",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      null,
+      null,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7c5e9b899b771e0bd34eb5622421c8c3b4ffd532fb1a2b418290f7591c8b29a2"
+}

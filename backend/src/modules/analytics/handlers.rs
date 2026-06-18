@@ -22,7 +22,7 @@ use crate::shared::{
 };
 
 use super::{
-    models::{PeriodQuery, TimeUsageQuery},
+    models::{BurndownQuery, PeriodQuery, TimeByEpicQuery, TimeUsageQuery, VelocityQuery},
     service,
 };
 
@@ -139,5 +139,72 @@ pub async fn refresh_date(
 ) -> AppResult<Json<super::models::RefreshStatsResponse>> {
     let target = parse_date(&date_str)?;
     let result = service::refresh_date(&state.db, auth.user_id, target).await?;
+    Ok(Json(result))
+}
+
+// ── Agile analytics handlers ──────────────────────────────────────────────────
+
+/// `GET /api/analytics/velocity?last=6`
+///
+/// Returns velocity data for the most-recent `last` completed sprints.
+/// Results are ordered chronologically (oldest first) for chart rendering.
+///
+/// Query params:
+/// - `last` — number of sprints to include; clamped to [1, 52], default 6.
+pub async fn get_velocity(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Query(params): Query<VelocityQuery>,
+) -> AppResult<Json<super::models::VelocityResponse>> {
+    let result = service::get_velocity(&state.db, auth.user_id, params.last).await?;
+    Ok(Json(result))
+}
+
+/// `GET /api/analytics/burndown?sprint_id=<uuid>`
+///
+/// Returns a daily burndown chart for the specified sprint.
+/// `sprint_id` is a required query parameter.
+///
+/// Returns 404 when the sprint does not exist or belongs to a different user.
+pub async fn get_burndown(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Query(params): Query<BurndownQuery>,
+) -> AppResult<Json<super::models::BurndownResponse>> {
+    use validator::Validate as _;
+    params
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    let sprint_id = params
+        .sprint_id
+        .parse::<uuid::Uuid>()
+        .map_err(|_| AppError::Validation("sprint_id must be a valid UUID".to_owned()))?;
+
+    let result = service::get_burndown(&state.db, auth.user_id, sprint_id).await?;
+    Ok(Json(result))
+}
+
+/// `GET /api/analytics/time-by-epic?start=YYYY-MM-DD&end=YYYY-MM-DD`
+///
+/// Returns focus minutes aggregated per epic for time blocks whose
+/// `start_at` falls within the requested date window.
+///
+/// Epics with no logged time are excluded from the response.
+pub async fn get_time_by_epic(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Query(params): Query<TimeByEpicQuery>,
+) -> AppResult<Json<super::models::TimeByEpicResponse>> {
+    use validator::Validate as _;
+    params
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    let start = parse_date(&params.start)?;
+    let end = parse_date(&params.end)?;
+    validate_range(start, end)?;
+
+    let result = service::get_time_by_epic(&state.db, auth.user_id, start, end).await?;
     Ok(Json(result))
 }

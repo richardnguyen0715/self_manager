@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  CheckSquare,
   Trello,
   Calendar,
   Clock,
@@ -16,6 +15,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
+  ListTodo,
+  Rocket,
+  SquareKanban,
+  Network,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -23,6 +26,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUIStore } from "@/stores";
+import { ProjectSwitcher } from "@/components/ui/project-switcher";
 
 interface NavItem {
   label: string;
@@ -32,12 +36,17 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Tasks", href: "/tasks", icon: CheckSquare },
-  { label: "Kanban", href: "/kanban", icon: Trello },
+  // ── Agile ────────────────────────────────────────────────────────────────
+  { label: "Backlog", href: "/backlog", icon: ListTodo },
+  { label: "Board", href: "/board", icon: SquareKanban },
+  { label: "Sprints", href: "/sprints", icon: Rocket },
+  { label: "Work Items", href: "/work-items", icon: Trello },
+  // ── Personal ─────────────────────────────────────────────────────────────
   { label: "Calendar", href: "/calendar", icon: Calendar },
   { label: "Time Blocking", href: "/timeblocking", icon: Clock },
   { label: "Habits", href: "/habits", icon: Repeat2 },
   { label: "Focus", href: "/focus", icon: Timer },
+  { label: "Hierarchy", href: "/hierarchy", icon: Network },
   { label: "Goals", href: "/goals", icon: Target },
   { label: "Analytics", href: "/analytics", icon: BarChart3 },
 ];
@@ -67,6 +76,11 @@ export function Sidebar() {
             </span>
           )}
         </Link>
+      </div>
+
+      {/* Project switcher */}
+      <div className={cn("px-2 py-2 border-b", !sidebarOpen && "px-1")}>
+        <ProjectSwitcher collapsed={!sidebarOpen} />
       </div>
 
       {/* Nav */}

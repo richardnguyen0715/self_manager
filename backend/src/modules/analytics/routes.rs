@@ -10,6 +10,9 @@
 //! | GET    | /completion-rate              | get_completion_rate      | yes  |
 //! | POST   | /refresh                      | refresh_today            | yes  |
 //! | POST   | /refresh/:date                | refresh_date             | yes  |
+//! | GET    | /velocity                     | get_velocity             | yes  |
+//! | GET    | /burndown                     | get_burndown             | yes  |
+//! | GET    | /time-by-epic                 | get_time_by_epic         | yes  |
 
 use axum::{
     routing::{get, post},
@@ -28,10 +31,15 @@ use super::handlers;
 /// ```
 pub fn router() -> Router<AppState> {
     Router::new()
+        // ── existing endpoints (unchanged) ───────────────────────────────────
         .route("/summary", get(handlers::get_summary))
         .route("/daily", get(handlers::get_daily_series))
         .route("/time-usage", get(handlers::get_time_usage))
         .route("/completion-rate", get(handlers::get_completion_rate))
         .route("/refresh", post(handlers::refresh_today))
         .route("/refresh/:date", post(handlers::refresh_date))
+        // ── agile analytics endpoints (new) ──────────────────────────────────
+        .route("/velocity", get(handlers::get_velocity))
+        .route("/burndown", get(handlers::get_burndown))
+        .route("/time-by-epic", get(handlers::get_time_by_epic))
 }

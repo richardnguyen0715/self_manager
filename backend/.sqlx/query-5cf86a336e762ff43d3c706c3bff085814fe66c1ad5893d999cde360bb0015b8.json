@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            l.id,\n            l.work_item_id,\n            l.target_work_item_id,\n            l.link_type,\n            t.title          AS \"target_title!\",\n            t.type::text     AS \"target_type!\",\n            t.status::text   AS \"target_status!\",\n            l.created_at\n        FROM work_item_links l\n        JOIN work_items t ON t.id = l.target_work_item_id\n        WHERE l.work_item_id = $1\n        ORDER BY l.created_at ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "work_item_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "target_work_item_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "link_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "target_title!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "target_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "target_status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      null,
+      false
+    ]
+  },
+  "hash": "5cf86a336e762ff43d3c706c3bff085814fe66c1ad5893d999cde360bb0015b8"
+}

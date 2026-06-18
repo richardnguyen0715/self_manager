@@ -32,6 +32,9 @@ Thumbs.db
 *.aof
 *.pid
 
+# ── User-uploaded files (do not commit) ─────────────────────────
+/backend/uploads/
+
 # ── Orchestration scratch (local only) ──────────────────────────
 
 
@@ -39,3 +42,6 @@ Thumbs.db
 
 # ── Extracted sample-ui artifacts (keep the source zip) ─────────
 design/sample-ui/_extracted/
+
+# all orchestration scratch scripts
+.*-workflow.js

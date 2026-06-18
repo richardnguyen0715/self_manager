@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            d.day::date AS \"day!\",\n            COALESCE(SUM(wi.story_points), 0) AS \"done_on_day!: i64\"\n        FROM generate_series($1::date, $2::date, '1 day'::interval) AS d(day)\n        LEFT JOIN work_items wi\n            ON wi.sprint_id = $3\n            AND wi.status::text = 'done'\n            AND wi.completed_at::date = d.day::date\n        GROUP BY d.day\n        ORDER BY d.day ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "day!",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 1,
+        "name": "done_on_day!: i64",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "8fd668421e69ecebb1c9506c1cb3f9250a518820dff5f42bbef0ca384b56eff2"
+}

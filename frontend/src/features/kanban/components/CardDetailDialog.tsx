@@ -134,7 +134,7 @@ export function CardDetailDialog() {
           <div className="flex items-start justify-between gap-2">
             <DialogTitle className="text-base">Card Details</DialogTitle>
             <div className="flex items-center gap-1">
-              {task?.tags.map((tag) => (
+              {(task?.tags ?? []).map((tag) => (
                 <span
                   key={tag.id}
                   className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"

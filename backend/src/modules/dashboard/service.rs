@@ -21,7 +21,9 @@ use crate::shared::{error::AppResult, state::AppState};
 // DashHabitType/DashTaskPriority/DashTaskStatus are sqlx type-override annotation targets
 use super::models::{
     DashHabitType, DashTaskPriority, DashTaskStatus, DashboardEvent, DashboardHabit,
-    DashboardResponse, DashboardTask, DashboardTimeBlock, HabitWithLog, QuickStats, StreakRow,
+    DashboardResponse, DashboardTask, DashboardTimeBlock, GoalProgress, GoalProgressRow,
+    HabitWithLog, QuickStats, RawSprintTimeBlock, SprintDashboardResponse, SprintDashboardTimeBlock,
+    SprintSummary, StreakRow, WorkItemListItem,
 };
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -468,4 +470,287 @@ async fn fetch_quick_stats(
         pomodoro_sessions_today,
         habit_completion_rate_today,
     })
+}
+
+// ── Sprint-centric dashboard ──────────────────────────────────────────────────
+
+/// Build the sprint-centric dashboard snapshot for `user_id` on `date`.
+///
+/// Aggregates:
+/// - The active sprint (if any) with derived `planned_points`, `done_count`.
+/// - Sprint progress percentage.
+/// - Goal progress rollup across the work-item hierarchy.
+/// - Today's time blocks (both legacy `task_id` and new `work_item_id`).
+/// - Overdue work items (past `due_date`, status != `done`).
+/// - Active habits with today's completion status.
+///
+/// # Errors
+///
+/// Returns [`crate::shared::error::AppError::Db`] on any database failure.
+pub async fn get_sprint_dashboard(
+    state: &AppState,
+    user_id: Uuid,
+    date: Option<NaiveDate>,
+) -> AppResult<SprintDashboardResponse> {
+    let target = date.unwrap_or_else(|| Utc::now().date_naive());
+
+    // Parallelise all sections — they are independent reads.
+    let (sprint_opt, goal_progress, today_blocks, overdue_items, habits) = tokio::try_join!(
+        fetch_active_sprint(state, user_id),
+        fetch_goal_progress(state, user_id),
+        fetch_sprint_time_blocks(state, user_id, target),
+        fetch_overdue_work_items(state, user_id),
+        fetch_habits(state, user_id, target),
+    )?;
+
+    // Compute sprint progress percentage from work items in the active sprint.
+    let sprint_progress_pct = if let Some(ref sprint) = sprint_opt {
+        compute_sprint_progress(state, sprint.id).await?
+    } else {
+        0.0_f64
+    };
+
+    Ok(SprintDashboardResponse {
+        date: target,
+        active_sprint: sprint_opt,
+        sprint_progress_pct,
+        goal_progress,
+        today_time_blocks: today_blocks,
+        overdue_work_items: overdue_items,
+        habits,
+    })
+}
+
+// ── Section fetchers ──────────────────────────────────────────────────────────
+
+/// Fetch the single active sprint for `user_id`, or `None` when no sprint is
+/// active.
+async fn fetch_active_sprint(
+    state: &AppState,
+    user_id: Uuid,
+) -> AppResult<Option<SprintSummary>> {
+    // velocity is stored as NUMERIC(5,2); cast to f64 for the response.
+    let row = sqlx::query_as!(
+        SprintSummary,
+        r#"SELECT
+               id,
+               user_id,
+               name,
+               goal_text,
+               start_date,
+               end_date,
+               capacity_points,
+               status::text        AS "status!",
+               velocity::float8    AS "velocity: f64",
+               completed_points,
+               created_at,
+               updated_at
+           FROM sprints
+           WHERE user_id = $1
+             AND status::text = 'active'
+           LIMIT 1"#,
+        user_id,
+    )
+    .fetch_optional(&state.db)
+    .await?;
+
+    Ok(row)
+}
+
+/// Compute the completion percentage of work items belonging to a sprint.
+///
+/// Returns a value in [0.0, 100.0].  Returns 0.0 when the sprint has no items.
+async fn compute_sprint_progress(state: &AppState, sprint_id: Uuid) -> AppResult<f64> {
+    struct Counts {
+        total: i64,
+        done: i64,
+    }
+
+    let row = sqlx::query!(
+        r#"SELECT
+               COUNT(*)                                         AS "total!: i64",
+               COUNT(*) FILTER (WHERE status::text = 'done')   AS "done!: i64"
+           FROM work_items
+           WHERE sprint_id = $1"#,
+        sprint_id,
+    )
+    .fetch_one(&state.db)
+    .await?;
+
+    let counts = Counts {
+        total: row.total,
+        done: row.done,
+    };
+
+    if counts.total == 0 {
+        return Ok(0.0);
+    }
+
+    Ok((counts.done as f64 / counts.total as f64) * 100.0)
+}
+
+/// Compute per-goal completion rate from work items under goals → initiatives
+/// → epics → work_items.
+///
+/// Only `active` goals for the user are included.
+async fn fetch_goal_progress(
+    state: &AppState,
+    user_id: Uuid,
+) -> AppResult<Vec<GoalProgress>> {
+    // Aggregate done/total work items for each goal via the
+    // goals → initiatives → epics → work_items chain.
+    let rows: Vec<GoalProgressRow> = sqlx::query_as!(
+        GoalProgressRow,
+        r#"SELECT
+               g.id                                             AS "goal_id!",
+               g.title                                          AS "title!",
+               COUNT(wi.id)                                     AS "total_items!: i64",
+               COUNT(wi.id) FILTER (WHERE wi.status::text = 'done')
+                                                                AS "done_items!: i64"
+           FROM goals g
+           LEFT JOIN initiatives ini
+               ON ini.goal_id = g.id AND ini.user_id = g.user_id
+           LEFT JOIN epics e
+               ON e.initiative_id = ini.id AND e.user_id = g.user_id
+           LEFT JOIN work_items wi
+               ON wi.epic_id = e.id AND wi.user_id = g.user_id
+           WHERE g.user_id    = $1
+             AND g.status::text = 'active'
+           GROUP BY g.id, g.title
+           ORDER BY g.position ASC, g.created_at ASC"#,
+        user_id,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    let progress = rows
+        .into_iter()
+        .map(|r| {
+            let completion_rate = if r.total_items == 0 {
+                0.0_f64
+            } else {
+                r.done_items as f64 / r.total_items as f64
+            };
+            GoalProgress {
+                goal_id: r.goal_id,
+                title: r.title,
+                completion_rate,
+            }
+        })
+        .collect();
+
+    Ok(progress)
+}
+
+/// Fetch time blocks that start on `date` (UTC), joining both the legacy
+/// `tasks` table (via `task_id`) and the new `work_items` table (via
+/// `work_item_id` added in 0003).
+async fn fetch_sprint_time_blocks(
+    state: &AppState,
+    user_id: Uuid,
+    date: NaiveDate,
+) -> AppResult<Vec<SprintDashboardTimeBlock>> {
+    let day_start = date.and_hms_opt(0, 0, 0).expect("valid time").and_utc();
+    let day_end = date.and_hms_opt(23, 59, 59).expect("valid time").and_utc();
+
+    let raw: Vec<RawSprintTimeBlock> = sqlx::query_as!(
+        RawSprintTimeBlock,
+        r#"SELECT
+               tb.id,
+               tb.title,
+               tb.start_time,
+               tb.end_time,
+               tb.task_id,
+               t.title          AS task_title,
+               tb.work_item_id,
+               wi.title         AS work_item_title,
+               tb.color,
+               SUM(fs.duration_seconds)::bigint AS actual_focus_seconds
+           FROM time_blocks tb
+           LEFT JOIN tasks t
+               ON t.id = tb.task_id
+           LEFT JOIN work_items wi
+               ON wi.id = tb.work_item_id
+           LEFT JOIN focus_sessions fs
+               ON fs.time_block_id = tb.id
+               AND fs.ended_at IS NOT NULL
+           WHERE tb.user_id      = $1
+             AND tb.start_time  >= $2
+             AND tb.start_time  <= $3
+           GROUP BY tb.id, tb.title, tb.start_time, tb.end_time,
+                    tb.task_id, t.title,
+                    tb.work_item_id, wi.title,
+                    tb.color
+           ORDER BY tb.start_time ASC"#,
+        user_id,
+        day_start,
+        day_end,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    let blocks = raw
+        .into_iter()
+        .map(|r| {
+            let estimated_minutes = (r.end_time - r.start_time).num_minutes();
+            let actual_focus_minutes = r.actual_focus_seconds.map(|s| s / 60);
+            SprintDashboardTimeBlock {
+                id: r.id,
+                title: r.title,
+                start_time: r.start_time,
+                end_time: r.end_time,
+                estimated_minutes,
+                actual_focus_minutes,
+                task_id: r.task_id,
+                task_title: r.task_title,
+                work_item_id: r.work_item_id,
+                work_item_title: r.work_item_title,
+                color: r.color,
+            }
+        })
+        .collect();
+
+    Ok(blocks)
+}
+
+/// Fetch work items that are past their `due_date` and not yet `done`,
+/// capped at 50, ordered by `due_date ASC` (most overdue first).
+async fn fetch_overdue_work_items(
+    state: &AppState,
+    user_id: Uuid,
+) -> AppResult<Vec<WorkItemListItem>> {
+    let now = Utc::now();
+
+    let rows = sqlx::query_as!(
+        WorkItemListItem,
+        r#"SELECT
+               wi.id,
+               wi.epic_id,
+               wi.sprint_id,
+               wi.type::text                                             AS "type!",
+               wi.title,
+               wi.status::text                                           AS "status!",
+               wi.priority::text                                         AS "priority!",
+               wi.story_points,
+               wi.due_date,
+               wi.position,
+               COUNT(sub.id)                                             AS "subtask_count!: i64",
+               COUNT(sub.id) FILTER (WHERE sub.is_done = true)          AS "done_subtask_count!: i64",
+               wi.created_at,
+               wi.updated_at
+           FROM work_items wi
+           LEFT JOIN work_item_subtasks sub ON sub.work_item_id = wi.id
+           WHERE wi.user_id        = $1
+             AND wi.due_date      < $2
+             AND wi.status::text  != 'done'
+           GROUP BY wi.id
+           ORDER BY wi.due_date ASC NULLS LAST
+           LIMIT 50"#,
+        user_id,
+        now,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(rows)
 }

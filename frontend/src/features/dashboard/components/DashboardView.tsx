@@ -7,6 +7,8 @@ import { StatCardsSkeleton } from "./StatCardsSkeleton";
 import { TodayPanel } from "./TodayPanel";
 import { TodayPanelSkeleton } from "./TodayPanelSkeleton";
 import { DashboardError } from "./DashboardError";
+import { SprintDashboardSection } from "./SprintDashboardSection";
+import { Separator } from "@/components/ui/separator";
 
 export function DashboardView() {
   const { data, isLoading, isError, error, refetch } = useDashboardSummary();
@@ -16,6 +18,12 @@ export function DashboardView() {
       {/* Greeting row */}
       <DashboardGreeting />
 
+      {/* ── Sprint-centric section ─────────────────────────────────────── */}
+      <SprintDashboardSection />
+
+      <Separator />
+
+      {/* ── Legacy daily summary ───────────────────────────────────────── */}
       {/* Stat cards row */}
       {isLoading ? (
         <StatCardsSkeleton />

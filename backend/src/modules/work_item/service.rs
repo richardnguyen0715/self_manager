@@ -1,0 +1,1725 @@
+//! Business logic for the `work_item` module.
+//!
+//! All public functions accept a reference to [`AppState`] and execute SQL
+//! via `sqlx::query!` / `sqlx::query_as!` (compile-time checked).
+//!
+//! Enum columns use the **enum-as-text** pattern:
+//! - SELECT: `col::text AS "col!"`
+//! - Filter: `col::text = $n`
+//! - Bind:   `($n::text)::enum_name`
+//!
+//! Domain events are emitted best-effort (`let _ = state.events.send(...)`).
+
+use chrono::Utc;
+use uuid::Uuid;
+
+use crate::shared::{
+    error::{AppError, AppResult},
+    events::DomainEvent,
+    state::AppState,
+};
+
+use super::models::{
+    Attachment, AttachmentRow, CreateLinkRequest, CreateSubtaskRequest, CreateWebLinkRequest,
+    CreateWorkItemRequest, ListWorkItemsQuery, MoveToBacklogRequest, MoveToSprintRequest,
+    SetPointsRequest, SetStatusRequest, UpdateSubtaskRequest, UpdateWorkItemRequest, WebLink,
+    WorkItem, WorkItemLink, WorkItemListItem, WorkItemListResponse, WorkItemResponse, WorkItemSubtask,
+};
+
+// ── helpers ────────────────────────────────────────────────────────────────────
+
+#[inline]
+fn clamp_limit(raw: Option<i64>) -> i64 {
+    raw.unwrap_or(50).clamp(1, 200)
+}
+
+#[inline]
+fn clamp_offset(raw: Option<i64>) -> i64 {
+    raw.unwrap_or(0).max(0)
+}
+
+/// Validate that `story_points` is one of {1, 3, 5, 8} or `None`.
+fn validate_story_points(points: Option<i32>) -> AppResult<()> {
+    match points {
+        None | Some(1) | Some(3) | Some(5) | Some(8) => Ok(()),
+        Some(v) => Err(AppError::Validation(format!(
+            "story_points must be 1, 3, 5, 8, or null; got {v}"
+        ))),
+    }
+}
+
+/// Fetch the full `WorkItemResponse` (with subtasks) for a given `id` owned
+/// by `user_id`. Used internally after mutations.
+async fn fetch_work_item_with_subtasks(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+) -> AppResult<WorkItemResponse> {
+    let item = sqlx::query_as!(
+        WorkItem,
+        r#"
+        SELECT
+            id, user_id, project_id, epic_id, sprint_id,
+            type::text  AS "item_type!",
+            title, description,
+            status::text   AS "status!",
+            priority::text AS "priority!",
+            story_points, position,
+            due_date, recurrence_rule, completed_at,
+            created_at, updated_at
+        FROM work_items
+        WHERE id = $1 AND user_id = $2
+        "#,
+        item_id,
+        user_id,
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    let subtasks = sqlx::query_as!(
+        WorkItemSubtask,
+        r#"
+        SELECT id, work_item_id, title, is_done, position, created_at, updated_at
+        FROM work_item_subtasks
+        WHERE work_item_id = $1
+        ORDER BY position ASC, created_at ASC
+        "#,
+        item_id,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(work_item_into_response(item, subtasks))
+}
+
+/// Convert a raw [`WorkItem`] row and its subtasks into a [`WorkItemResponse`].
+fn work_item_into_response(item: WorkItem, subtasks: Vec<WorkItemSubtask>) -> WorkItemResponse {
+    WorkItemResponse {
+        id: item.id,
+        user_id: item.user_id,
+        project_id: item.project_id,
+        epic_id: item.epic_id,
+        sprint_id: item.sprint_id,
+        item_type: item.item_type,
+        title: item.title,
+        description: item.description,
+        status: item.status,
+        priority: item.priority,
+        story_points: item.story_points,
+        position: item.position,
+        due_date: item.due_date,
+        recurrence_rule: item.recurrence_rule,
+        completed_at: item.completed_at,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        subtasks,
+    }
+}
+
+// ── Work Item CRUD ─────────────────────────────────────────────────────────────
+
+/// Return a paginated list of work items for the authenticated user,
+/// with optional filters for `sprint_id`, `epic_id`, `status`, `type`, and `priority`.
+///
+/// Each row includes `subtask_count` and `done_subtask_count` aggregates but
+/// omits the subtask list for efficiency.
+///
+/// # Errors
+///
+/// Returns [`AppError::Db`] on database failure.
+pub async fn list_work_items(
+    state: &AppState,
+    user_id: Uuid,
+    query: &ListWorkItemsQuery,
+) -> AppResult<WorkItemListResponse> {
+    let limit = clamp_limit(query.limit);
+    let offset = clamp_offset(query.offset);
+
+    // Convert typed filter enums to &str; `None` = no filter.
+    let status_str = query.status.as_ref().map(|s| s.as_str());
+    let type_str = query.item_type.as_ref().map(|t| t.as_str());
+    let priority_str = query.priority.as_ref().map(|p| p.as_str());
+
+    // Dynamic filtering is not natively supported by `query_as!` when columns
+    // are optional. We implement the three most-common filter combinations
+    // (all-no-filter, sprint_id, epic_id) with explicit query branches, then
+    // handle status/type/priority as optional text comparisons inside a single
+    // general query that covers all remaining cases.
+    //
+    // To keep the code maintainable we use one parameterised query that accepts
+    // nullable filter values; Postgres treats `$n IS NULL OR col::text = $n`
+    // as "skip this filter when NULL".
+
+    let rows = sqlx::query_as!(
+        WorkItemListItem,
+        r#"
+        SELECT
+            wi.id,
+            wi.project_id,
+            wi.epic_id,
+            wi.sprint_id,
+            wi.type::text      AS "item_type!",
+            wi.title,
+            wi.status::text    AS "status!",
+            wi.priority::text  AS "priority!",
+            wi.story_points,
+            wi.due_date,
+            wi.position,
+            COUNT(s.id)                         AS "subtask_count!: i64",
+            COUNT(s.id) FILTER (WHERE s.is_done) AS "done_subtask_count!: i64",
+            wi.created_at,
+            wi.updated_at
+        FROM work_items wi
+        LEFT JOIN work_item_subtasks s ON s.work_item_id = wi.id
+        WHERE wi.user_id = $1
+          AND ($2::uuid IS NULL OR wi.project_id = $2)
+          AND ($3::uuid IS NULL OR wi.sprint_id  = $3)
+          AND ($4::uuid IS NULL OR wi.epic_id    = $4)
+          AND ($5::text IS NULL OR wi.status::text   = $5)
+          AND ($6::text IS NULL OR wi.type::text     = $6)
+          AND ($7::text IS NULL OR wi.priority::text = $7)
+        GROUP BY wi.id
+        ORDER BY wi.position ASC, wi.created_at ASC
+        LIMIT $8 OFFSET $9
+        "#,
+        user_id,
+        query.project_id as Option<Uuid>,
+        query.sprint_id  as Option<Uuid>,
+        query.epic_id    as Option<Uuid>,
+        status_str   as Option<&str>,
+        type_str     as Option<&str>,
+        priority_str as Option<&str>,
+        limit,
+        offset,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    let total: i64 = sqlx::query_scalar!(
+        r#"
+        SELECT COUNT(*)
+        FROM work_items wi
+        WHERE wi.user_id = $1
+          AND ($2::uuid IS NULL OR wi.project_id = $2)
+          AND ($3::uuid IS NULL OR wi.sprint_id  = $3)
+          AND ($4::uuid IS NULL OR wi.epic_id    = $4)
+          AND ($5::text IS NULL OR wi.status::text   = $5)
+          AND ($6::text IS NULL OR wi.type::text     = $6)
+          AND ($7::text IS NULL OR wi.priority::text = $7)
+        "#,
+        user_id,
+        query.project_id as Option<Uuid>,
+        query.sprint_id  as Option<Uuid>,
+        query.epic_id    as Option<Uuid>,
+        status_str   as Option<&str>,
+        type_str     as Option<&str>,
+        priority_str as Option<&str>,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(0);
+
+    Ok(WorkItemListResponse { data: rows, total })
+}
+
+/// Create a new work item for the authenticated user.
+///
+/// Validates story points (must be 1, 3, 5, 8, or `None`) and returns
+/// the full item with an empty subtasks list.
+///
+/// # Errors
+///
+/// - [`AppError::Validation`] — invalid story_points value.
+/// - [`AppError::Db`] — database failure.
+pub async fn create_work_item(
+    state: &AppState,
+    user_id: Uuid,
+    req: CreateWorkItemRequest,
+) -> AppResult<WorkItemResponse> {
+    validate_story_points(req.story_points)?;
+
+    let item_type = req
+        .item_type
+        .as_ref()
+        .map(|t| t.as_str())
+        .unwrap_or("task");
+    let status = req
+        .status
+        .as_ref()
+        .map(|s| s.as_str())
+        .unwrap_or("backlog");
+    let priority = req
+        .priority
+        .as_ref()
+        .map(|p| p.as_str())
+        .unwrap_or("medium");
+    let position = 0_i32;
+
+    let item = sqlx::query_as!(
+        WorkItem,
+        r#"
+        INSERT INTO work_items (
+            user_id, project_id, epic_id, sprint_id, type, title, description,
+            status, priority, story_points, position, due_date, recurrence_rule
+        )
+        VALUES (
+            $1, $2, $3, $4,
+            ($5::text)::work_item_type,
+            $6, $7,
+            ($8::text)::work_item_status,
+            ($9::text)::task_priority,
+            $10, $11, $12, $13
+        )
+        RETURNING
+            id, user_id, project_id, epic_id, sprint_id,
+            type::text     AS "item_type!",
+            title, description,
+            status::text   AS "status!",
+            priority::text AS "priority!",
+            story_points, position,
+            due_date, recurrence_rule, completed_at,
+            created_at, updated_at
+        "#,
+        user_id,
+        req.project_id as Option<Uuid>,
+        req.epic_id    as Option<Uuid>,
+        req.sprint_id  as Option<Uuid>,
+        item_type,
+        req.title,
+        req.description,
+        status,
+        priority,
+        req.story_points,
+        position,
+        req.due_date,
+        req.recurrence_rule,
+    )
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(work_item_into_response(item, vec![]))
+}
+
+/// Fetch a single work item with its subtasks, enforcing ownership.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — item not found or owned by a different user.
+/// - [`AppError::Db`] — database failure.
+pub async fn get_work_item(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+) -> AppResult<WorkItemResponse> {
+    fetch_work_item_with_subtasks(state, user_id, item_id).await
+}
+
+/// Partially update a work item; only provided fields are mutated.
+///
+/// Emits [`DomainEvent::WorkItemCompleted`] when `status` transitions to `done`.
+///
+/// # Errors
+///
+/// - [`AppError::Validation`] — invalid story_points.
+/// - [`AppError::NotFound`] — item not found or owned by a different user.
+/// - [`AppError::Db`] — database failure.
+pub async fn update_work_item(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    req: UpdateWorkItemRequest,
+) -> AppResult<WorkItemResponse> {
+    validate_story_points(req.story_points)?;
+
+    // Fetch current row for coalescing.
+    let current = sqlx::query_as!(
+        WorkItem,
+        r#"
+        SELECT
+            id, user_id, project_id, epic_id, sprint_id,
+            type::text     AS "item_type!",
+            title, description,
+            status::text   AS "status!",
+            priority::text AS "priority!",
+            story_points, position,
+            due_date, recurrence_rule, completed_at,
+            created_at, updated_at
+        FROM work_items
+        WHERE id = $1 AND user_id = $2
+        "#,
+        item_id,
+        user_id,
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    let new_title = req
+        .title
+        .as_deref()
+        .unwrap_or(current.title.as_str())
+        .to_owned();
+    let new_description = if req.description.is_some() {
+        req.description.clone()
+    } else {
+        current.description.clone()
+    };
+    let new_type = req
+        .item_type
+        .as_ref()
+        .map(|t| t.as_str())
+        .unwrap_or(current.item_type.as_str())
+        .to_owned();
+    let new_status = req
+        .status
+        .as_ref()
+        .map(|s| s.as_str())
+        .unwrap_or(current.status.as_str())
+        .to_owned();
+    let new_priority = req
+        .priority
+        .as_ref()
+        .map(|p| p.as_str())
+        .unwrap_or(current.priority.as_str())
+        .to_owned();
+    let new_story_points = if req.story_points.is_some() {
+        req.story_points
+    } else {
+        current.story_points
+    };
+    let new_position = req.position.unwrap_or(current.position);
+    let new_due_date = if req.due_date.is_some() {
+        req.due_date
+    } else {
+        current.due_date
+    };
+    let new_recurrence = if req.recurrence_rule.is_some() {
+        req.recurrence_rule.clone()
+    } else {
+        current.recurrence_rule.clone()
+    };
+
+    // project_id / epic_id / sprint_id: explicit null vs absent is ambiguous in
+    // JSON PATCH.  We treat a provided UUID as a change and absence as "keep
+    // current".  Frontend must explicitly send `null` to clear the field.
+    // serde deserialises absent keys as `None`, but we cannot distinguish
+    // "absent" from "explicitly null" without `Option<Option<Uuid>>`.
+    // For simplicity (matching goal module pattern), we keep current if None.
+    let new_project_id = if req.project_id.is_some() {
+        req.project_id
+    } else {
+        current.project_id
+    };
+    let new_epic_id = if req.epic_id.is_some() {
+        req.epic_id
+    } else {
+        current.epic_id
+    };
+    let new_sprint_id = if req.sprint_id.is_some() {
+        req.sprint_id
+    } else {
+        current.sprint_id
+    };
+
+    // Set `completed_at` when transitioning TO done; clear when transitioning away.
+    let new_completed_at = if new_status == "done" && current.status != "done" {
+        Some(Utc::now())
+    } else if new_status != "done" {
+        None
+    } else {
+        current.completed_at
+    };
+
+    let updated = sqlx::query_as!(
+        WorkItem,
+        r#"
+        UPDATE work_items
+        SET
+            project_id      = $3,
+            epic_id         = $4,
+            sprint_id       = $5,
+            type            = ($6::text)::work_item_type,
+            title           = $7,
+            description     = $8,
+            status          = ($9::text)::work_item_status,
+            priority        = ($10::text)::task_priority,
+            story_points    = $11,
+            position        = $12,
+            due_date        = $13,
+            recurrence_rule = $14,
+            completed_at    = $15,
+            updated_at      = now()
+        WHERE id = $1 AND user_id = $2
+        RETURNING
+            id, user_id, project_id, epic_id, sprint_id,
+            type::text     AS "item_type!",
+            title, description,
+            status::text   AS "status!",
+            priority::text AS "priority!",
+            story_points, position,
+            due_date, recurrence_rule, completed_at,
+            created_at, updated_at
+        "#,
+        item_id,
+        user_id,
+        new_project_id as Option<Uuid>,
+        new_epic_id    as Option<Uuid>,
+        new_sprint_id  as Option<Uuid>,
+        new_type,
+        new_title,
+        new_description,
+        new_status,
+        new_priority,
+        new_story_points,
+        new_position,
+        new_due_date,
+        new_recurrence,
+        new_completed_at,
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    // Emit domain event when transitioning to done.
+    if current.status != "done" && updated.status == "done" {
+        let _ = state.events.send(DomainEvent::WorkItemCompleted {
+            work_item_id: updated.id,
+            user_id,
+            sprint_id: updated.sprint_id,
+        });
+    }
+
+    let subtasks = sqlx::query_as!(
+        WorkItemSubtask,
+        r#"
+        SELECT id, work_item_id, title, is_done, position, created_at, updated_at
+        FROM work_item_subtasks
+        WHERE work_item_id = $1
+        ORDER BY position ASC, created_at ASC
+        "#,
+        item_id,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(work_item_into_response(updated, subtasks))
+}
+
+/// Delete a work item, enforcing ownership.
+///
+/// Cascade deletes subtasks via the database FK constraint.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — item not found or owned by a different user.
+/// - [`AppError::Db`] — database failure.
+pub async fn delete_work_item(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+) -> AppResult<()> {
+    let result = sqlx::query!(
+        "DELETE FROM work_items WHERE id = $1 AND user_id = $2",
+        item_id,
+        user_id,
+    )
+    .execute(&state.db)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+
+    Ok(())
+}
+
+// ── Status / Points / Sprint transitions ──────────────────────────────────────
+
+/// Set the status of a work item.
+///
+/// Automatically sets `completed_at = now()` when transitioning to `done`
+/// and clears it when moving away from `done`.
+/// Emits [`DomainEvent::WorkItemCompleted`] on `done` transition.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — item not found or owned by a different user.
+/// - [`AppError::Db`] — database failure.
+pub async fn set_status(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    req: SetStatusRequest,
+) -> AppResult<WorkItemResponse> {
+    let new_status = req.status.as_str();
+
+    // Fetch current status for transition detection.
+    let current_status: String = sqlx::query_scalar!(
+        r#"SELECT status::text AS "status!" FROM work_items WHERE id = $1 AND user_id = $2"#,
+        item_id,
+        user_id,
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    let completed_at = if new_status == "done" && current_status != "done" {
+        Some(Utc::now())
+    } else if new_status != "done" {
+        None
+    } else {
+        // Already done — preserve existing completed_at.
+        sqlx::query_scalar!(
+            "SELECT completed_at FROM work_items WHERE id = $1",
+            item_id,
+        )
+        .fetch_one(&state.db)
+        .await?
+    };
+
+    let updated = sqlx::query_as!(
+        WorkItem,
+        r#"
+        UPDATE work_items
+        SET
+            status       = ($3::text)::work_item_status,
+            completed_at = $4,
+            updated_at   = now()
+        WHERE id = $1 AND user_id = $2
+        RETURNING
+            id, user_id, project_id, epic_id, sprint_id,
+            type::text     AS "item_type!",
+            title, description,
+            status::text   AS "status!",
+            priority::text AS "priority!",
+            story_points, position,
+            due_date, recurrence_rule, completed_at,
+            created_at, updated_at
+        "#,
+        item_id,
+        user_id,
+        new_status,
+        completed_at,
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    if current_status != "done" && updated.status == "done" {
+        let _ = state.events.send(DomainEvent::WorkItemCompleted {
+            work_item_id: updated.id,
+            user_id,
+            sprint_id: updated.sprint_id,
+        });
+    }
+
+    let subtasks = sqlx::query_as!(
+        WorkItemSubtask,
+        r#"
+        SELECT id, work_item_id, title, is_done, position, created_at, updated_at
+        FROM work_item_subtasks
+        WHERE work_item_id = $1
+        ORDER BY position ASC, created_at ASC
+        "#,
+        item_id,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(work_item_into_response(updated, subtasks))
+}
+
+/// Set story points on a work item.
+///
+/// Accepts 1, 3, 5, 8, or `null` (unestimated). Any other value returns 422.
+///
+/// # Errors
+///
+/// - [`AppError::Validation`] — invalid points value.
+/// - [`AppError::NotFound`] — item not found or owned by a different user.
+/// - [`AppError::Db`] — database failure.
+pub async fn set_points(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    req: SetPointsRequest,
+) -> AppResult<WorkItemResponse> {
+    validate_story_points(req.story_points)?;
+
+    let updated = sqlx::query_as!(
+        WorkItem,
+        r#"
+        UPDATE work_items
+        SET story_points = $3, updated_at = now()
+        WHERE id = $1 AND user_id = $2
+        RETURNING
+            id, user_id, project_id, epic_id, sprint_id,
+            type::text     AS "item_type!",
+            title, description,
+            status::text   AS "status!",
+            priority::text AS "priority!",
+            story_points, position,
+            due_date, recurrence_rule, completed_at,
+            created_at, updated_at
+        "#,
+        item_id,
+        user_id,
+        req.story_points,
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    let subtasks = sqlx::query_as!(
+        WorkItemSubtask,
+        r#"
+        SELECT id, work_item_id, title, is_done, position, created_at, updated_at
+        FROM work_item_subtasks
+        WHERE work_item_id = $1
+        ORDER BY position ASC, created_at ASC
+        "#,
+        item_id,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(work_item_into_response(updated, subtasks))
+}
+
+/// Move a work item to a sprint.
+///
+/// Validates sprint ownership and, when the sprint has `capacity_points > 0`,
+/// checks that adding this item does not exceed capacity. Returns **409** if it
+/// would overflow.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — work item or sprint not found / not owned.
+/// - [`AppError::Conflict`] — sprint capacity would be exceeded.
+/// - [`AppError::Db`] — database failure.
+pub async fn move_to_sprint(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    req: MoveToSprintRequest,
+) -> AppResult<WorkItemResponse> {
+    let sprint_id = req.sprint_id;
+
+    // Verify sprint ownership and load capacity.
+    let sprint = sqlx::query!(
+        r#"
+        SELECT capacity_points, status::text AS "status!"
+        FROM sprints
+        WHERE id = $1 AND user_id = $2
+        "#,
+        sprint_id,
+        user_id,
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    // Load the item to know its story points and current sprint.
+    let item = sqlx::query!(
+        r#"
+        SELECT sprint_id, story_points
+        FROM work_items
+        WHERE id = $1 AND user_id = $2
+        "#,
+        item_id,
+        user_id,
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    // Capacity check: only enforce when capacity > 0 AND the item is not already
+    // assigned to this sprint (re-ordering within the same sprint is allowed).
+    if sprint.capacity_points > 0 && item.sprint_id != Some(sprint_id) {
+        let item_points = item.story_points.unwrap_or(0);
+
+        let planned: i64 = sqlx::query_scalar!(
+            r#"
+            SELECT COALESCE(SUM(COALESCE(story_points, 0)), 0)
+            FROM work_items
+            WHERE sprint_id = $1
+            "#,
+            sprint_id,
+        )
+        .fetch_one(&state.db)
+        .await?
+        .unwrap_or(0);
+
+        if planned + i64::from(item_points) > i64::from(sprint.capacity_points) {
+            return Err(AppError::Conflict(format!(
+                "adding this item ({item_points} pts) would exceed the sprint capacity \
+                 ({} pts planned, {} pts cap)",
+                planned, sprint.capacity_points
+            )));
+        }
+    }
+
+    let position = req.position.unwrap_or(0);
+
+    let updated = sqlx::query_as!(
+        WorkItem,
+        r#"
+        UPDATE work_items
+        SET sprint_id = $3, position = $4, updated_at = now()
+        WHERE id = $1 AND user_id = $2
+        RETURNING
+            id, user_id, project_id, epic_id, sprint_id,
+            type::text     AS "item_type!",
+            title, description,
+            status::text   AS "status!",
+            priority::text AS "priority!",
+            story_points, position,
+            due_date, recurrence_rule, completed_at,
+            created_at, updated_at
+        "#,
+        item_id,
+        user_id,
+        sprint_id as Uuid,
+        position,
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    let subtasks = sqlx::query_as!(
+        WorkItemSubtask,
+        r#"
+        SELECT id, work_item_id, title, is_done, position, created_at, updated_at
+        FROM work_item_subtasks
+        WHERE work_item_id = $1
+        ORDER BY position ASC, created_at ASC
+        "#,
+        item_id,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(work_item_into_response(updated, subtasks))
+}
+
+/// Move a work item to the backlog (sets `sprint_id = NULL`).
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — item not found or owned by a different user.
+/// - [`AppError::Db`] — database failure.
+pub async fn move_to_backlog(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    req: MoveToBacklogRequest,
+) -> AppResult<WorkItemResponse> {
+    let position = req.position.unwrap_or(0);
+
+    let updated = sqlx::query_as!(
+        WorkItem,
+        r#"
+        UPDATE work_items
+        SET sprint_id = NULL, position = $3, updated_at = now()
+        WHERE id = $1 AND user_id = $2
+        RETURNING
+            id, user_id, project_id, epic_id, sprint_id,
+            type::text     AS "item_type!",
+            title, description,
+            status::text   AS "status!",
+            priority::text AS "priority!",
+            story_points, position,
+            due_date, recurrence_rule, completed_at,
+            created_at, updated_at
+        "#,
+        item_id,
+        user_id,
+        position,
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    let subtasks = sqlx::query_as!(
+        WorkItemSubtask,
+        r#"
+        SELECT id, work_item_id, title, is_done, position, created_at, updated_at
+        FROM work_item_subtasks
+        WHERE work_item_id = $1
+        ORDER BY position ASC, created_at ASC
+        "#,
+        item_id,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(work_item_into_response(updated, subtasks))
+}
+
+// ── Subtasks ───────────────────────────────────────────────────────────────────
+
+/// List all subtasks for a work item, verifying item ownership.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — work item not found or owned by a different user.
+/// - [`AppError::Db`] — database failure.
+pub async fn list_subtasks(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+) -> AppResult<Vec<WorkItemSubtask>> {
+    // Ownership check.
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    let rows = sqlx::query_as!(
+        WorkItemSubtask,
+        r#"
+        SELECT id, work_item_id, title, is_done, position, created_at, updated_at
+        FROM work_item_subtasks
+        WHERE work_item_id = $1
+        ORDER BY position ASC, created_at ASC
+        "#,
+        item_id,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(rows)
+}
+
+/// Add a subtask to a work item.
+///
+/// The new subtask is appended at `position = (max existing position) + 1`.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — work item not found or owned by a different user.
+/// - [`AppError::Db`] — database failure.
+pub async fn add_subtask(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    req: CreateSubtaskRequest,
+) -> AppResult<WorkItemSubtask> {
+    // Ownership check.
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    // Position = next available slot.
+    let next_position: i32 = sqlx::query_scalar!(
+        "SELECT COALESCE(MAX(position), -1) + 1 FROM work_item_subtasks WHERE work_item_id = $1",
+        item_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(0);
+
+    let subtask = sqlx::query_as!(
+        WorkItemSubtask,
+        r#"
+        INSERT INTO work_item_subtasks (work_item_id, title, position)
+        VALUES ($1, $2, $3)
+        RETURNING id, work_item_id, title, is_done, position, created_at, updated_at
+        "#,
+        item_id,
+        req.title,
+        next_position,
+    )
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(subtask)
+}
+
+/// Update a subtask, verifying that the parent item belongs to the user.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — subtask or parent item not found / not owned.
+/// - [`AppError::Db`] — database failure.
+pub async fn update_subtask(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    subtask_id: Uuid,
+    req: UpdateSubtaskRequest,
+) -> AppResult<WorkItemSubtask> {
+    // Verify item ownership.
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    // Fetch current subtask.
+    let current = sqlx::query_as!(
+        WorkItemSubtask,
+        r#"
+        SELECT id, work_item_id, title, is_done, position, created_at, updated_at
+        FROM work_item_subtasks
+        WHERE id = $1 AND work_item_id = $2
+        "#,
+        subtask_id,
+        item_id,
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    let new_title = req
+        .title
+        .as_deref()
+        .unwrap_or(current.title.as_str())
+        .to_owned();
+    let new_is_done = req.is_done.unwrap_or(current.is_done);
+    let new_position = req.position.unwrap_or(current.position);
+
+    let updated = sqlx::query_as!(
+        WorkItemSubtask,
+        r#"
+        UPDATE work_item_subtasks
+        SET title = $3, is_done = $4, position = $5, updated_at = now()
+        WHERE id = $1 AND work_item_id = $2
+        RETURNING id, work_item_id, title, is_done, position, created_at, updated_at
+        "#,
+        subtask_id,
+        item_id,
+        new_title,
+        new_is_done,
+        new_position,
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    Ok(updated)
+}
+
+/// Delete a subtask, verifying that the parent item belongs to the user.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — subtask or parent item not found / not owned.
+/// - [`AppError::Db`] — database failure.
+pub async fn delete_subtask(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    subtask_id: Uuid,
+) -> AppResult<()> {
+    // Verify item ownership.
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    let result = sqlx::query!(
+        "DELETE FROM work_item_subtasks WHERE id = $1 AND work_item_id = $2",
+        subtask_id,
+        item_id,
+    )
+    .execute(&state.db)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+
+    Ok(())
+}
+
+// ── Nested list helpers (called by epic/sprint modules) ───────────────────────
+
+/// List work items belonging to a specific sprint, verifying sprint ownership.
+///
+/// Accepts an optional `status` text filter. Returns the same
+/// `{ data, total }` envelope as `list_work_items`.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — sprint not found or not owned by the user.
+/// - [`AppError::Db`] — database failure.
+pub async fn list_items_for_sprint(
+    state: &AppState,
+    user_id: Uuid,
+    sprint_id: Uuid,
+    status_filter: Option<&str>,
+) -> AppResult<WorkItemListResponse> {
+    // Ownership check on the sprint.
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM sprints WHERE id = $1 AND user_id = $2)",
+        sprint_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    let rows = sqlx::query_as!(
+        WorkItemListItem,
+        r#"
+        SELECT
+            wi.id,
+            wi.project_id,
+            wi.epic_id,
+            wi.sprint_id,
+            wi.type::text      AS "item_type!",
+            wi.title,
+            wi.status::text    AS "status!",
+            wi.priority::text  AS "priority!",
+            wi.story_points,
+            wi.due_date,
+            wi.position,
+            COUNT(s.id)                          AS "subtask_count!: i64",
+            COUNT(s.id) FILTER (WHERE s.is_done) AS "done_subtask_count!: i64",
+            wi.created_at,
+            wi.updated_at
+        FROM work_items wi
+        LEFT JOIN work_item_subtasks s ON s.work_item_id = wi.id
+        WHERE wi.sprint_id = $1
+          AND ($2::text IS NULL OR wi.status::text = $2)
+        GROUP BY wi.id
+        ORDER BY wi.position ASC, wi.created_at ASC
+        "#,
+        sprint_id,
+        status_filter as Option<&str>,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    let total: i64 = sqlx::query_scalar!(
+        r#"
+        SELECT COUNT(*)
+        FROM work_items wi
+        WHERE wi.sprint_id = $1
+          AND ($2::text IS NULL OR wi.status::text = $2)
+        "#,
+        sprint_id,
+        status_filter as Option<&str>,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(0);
+
+    Ok(WorkItemListResponse { data: rows, total })
+}
+
+/// List work items belonging to a specific epic, verifying epic ownership.
+///
+/// Accepts an optional `status` text filter.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — epic not found or not owned by the user.
+/// - [`AppError::Db`] — database failure.
+pub async fn list_items_for_epic(
+    state: &AppState,
+    user_id: Uuid,
+    epic_id: Uuid,
+    status_filter: Option<&str>,
+) -> AppResult<WorkItemListResponse> {
+    // Ownership check on the epic.
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM epics WHERE id = $1 AND user_id = $2)",
+        epic_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    let rows = sqlx::query_as!(
+        WorkItemListItem,
+        r#"
+        SELECT
+            wi.id,
+            wi.project_id,
+            wi.epic_id,
+            wi.sprint_id,
+            wi.type::text      AS "item_type!",
+            wi.title,
+            wi.status::text    AS "status!",
+            wi.priority::text  AS "priority!",
+            wi.story_points,
+            wi.due_date,
+            wi.position,
+            COUNT(s.id)                          AS "subtask_count!: i64",
+            COUNT(s.id) FILTER (WHERE s.is_done) AS "done_subtask_count!: i64",
+            wi.created_at,
+            wi.updated_at
+        FROM work_items wi
+        LEFT JOIN work_item_subtasks s ON s.work_item_id = wi.id
+        WHERE wi.epic_id = $1
+          AND ($2::text IS NULL OR wi.status::text = $2)
+        GROUP BY wi.id
+        ORDER BY wi.position ASC, wi.created_at ASC
+        "#,
+        epic_id,
+        status_filter as Option<&str>,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    let total: i64 = sqlx::query_scalar!(
+        r#"
+        SELECT COUNT(*)
+        FROM work_items wi
+        WHERE wi.epic_id = $1
+          AND ($2::text IS NULL OR wi.status::text = $2)
+        "#,
+        epic_id,
+        status_filter as Option<&str>,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(0);
+
+    Ok(WorkItemListResponse { data: rows, total })
+}
+
+
+// ── Work-item links ────────────────────────────────────────────────────────────
+
+/// List all links attached to a work item, enforcing ownership.
+///
+/// Each result row is denormalised with the target item's title, type and status.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — work item not found or not owned by the user.
+/// - [`AppError::Db`] — database failure.
+pub async fn list_links(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+) -> AppResult<Vec<WorkItemLink>> {
+    // Ownership check.
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    let rows = sqlx::query_as!(
+        WorkItemLink,
+        r#"
+        SELECT
+            l.id,
+            l.work_item_id,
+            l.target_work_item_id,
+            l.link_type,
+            t.title          AS "target_title!",
+            t.type::text     AS "target_type!",
+            t.status::text   AS "target_status!",
+            l.created_at
+        FROM work_item_links l
+        JOIN work_items t ON t.id = l.target_work_item_id
+        WHERE l.work_item_id = $1
+        ORDER BY l.created_at ASC
+        "#,
+        item_id,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(rows)
+}
+
+/// Create a link between two work items.
+///
+/// Validates:
+/// - The source work item is owned by `user_id`.
+/// - The target work item is owned by `user_id`.
+/// - Source and target are not the same item.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — source or target work item not found / not owned.
+/// - [`AppError::Validation`] — target equals source.
+/// - [`AppError::Conflict`] — link already exists.
+/// - [`AppError::Db`] — database failure.
+pub async fn create_link(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    req: CreateLinkRequest,
+) -> AppResult<WorkItemLink> {
+    if item_id == req.target_work_item_id {
+        return Err(AppError::Validation(
+            "a work item cannot be linked to itself".to_owned(),
+        ));
+    }
+
+    // Source ownership check.
+    let source_exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !source_exists {
+        return Err(AppError::NotFound);
+    }
+
+    // Target ownership check.
+    let target_exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        req.target_work_item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !target_exists {
+        return Err(AppError::NotFound);
+    }
+
+    let link_type = req
+        .link_type
+        .as_deref()
+        .unwrap_or("relates_to")
+        .to_owned();
+
+    let link = sqlx::query_as!(
+        WorkItemLink,
+        r#"
+        WITH ins AS (
+            INSERT INTO work_item_links (user_id, work_item_id, target_work_item_id, link_type)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id, work_item_id, target_work_item_id, link_type, created_at
+        )
+        SELECT
+            ins.id,
+            ins.work_item_id,
+            ins.target_work_item_id,
+            ins.link_type,
+            t.title         AS "target_title!",
+            t.type::text    AS "target_type!",
+            t.status::text  AS "target_status!",
+            ins.created_at
+        FROM ins
+        JOIN work_items t ON t.id = ins.target_work_item_id
+        "#,
+        user_id,
+        item_id,
+        req.target_work_item_id as Uuid,
+        link_type,
+    )
+    .fetch_one(&state.db)
+    .await
+    .map_err(|e| {
+        if let sqlx::Error::Database(ref db_err) = e {
+            // Unique-constraint violation = 23505.
+            if db_err.code().as_deref() == Some("23505") {
+                return AppError::Conflict("link already exists".to_owned());
+            }
+        }
+        AppError::Db(e)
+    })?;
+
+    Ok(link)
+}
+
+/// Delete a link by its id, enforcing ownership via the parent work item.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — link or work item not found / not owned.
+/// - [`AppError::Db`] — database failure.
+pub async fn delete_link(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    link_id: Uuid,
+) -> AppResult<()> {
+    // Ownership check on the source work item.
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    let result = sqlx::query!(
+        "DELETE FROM work_item_links WHERE id = $1 AND work_item_id = $2",
+        link_id,
+        item_id,
+    )
+    .execute(&state.db)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+
+    Ok(())
+}
+
+// ── Web links ─────────────────────────────────────────────────────────────────
+
+/// List all web links attached to a work item.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — work item not found or not owned.
+/// - [`AppError::Db`] — database failure.
+pub async fn list_web_links(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+) -> AppResult<Vec<WebLink>> {
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    let rows = sqlx::query_as!(
+        WebLink,
+        r#"
+        SELECT id, work_item_id, url, title, created_at
+        FROM work_item_web_links
+        WHERE work_item_id = $1
+        ORDER BY created_at ASC
+        "#,
+        item_id,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(rows)
+}
+
+/// Attach a web link to a work item.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — work item not found or not owned.
+/// - [`AppError::Db`] — database failure.
+pub async fn create_web_link(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    req: CreateWebLinkRequest,
+) -> AppResult<WebLink> {
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    let link = sqlx::query_as!(
+        WebLink,
+        r#"
+        INSERT INTO work_item_web_links (user_id, work_item_id, url, title)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, work_item_id, url, title, created_at
+        "#,
+        user_id,
+        item_id,
+        req.url,
+        req.title,
+    )
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(link)
+}
+
+/// Delete a web link by its id.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — link or work item not found / not owned.
+/// - [`AppError::Db`] — database failure.
+pub async fn delete_web_link(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    link_id: Uuid,
+) -> AppResult<()> {
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    let result = sqlx::query!(
+        "DELETE FROM work_item_web_links WHERE id = $1 AND work_item_id = $2",
+        link_id,
+        item_id,
+    )
+    .execute(&state.db)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+
+    Ok(())
+}
+
+// ── Attachments ───────────────────────────────────────────────────────────────
+
+/// List all file attachments for a work item.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — work item not found or not owned.
+/// - [`AppError::Db`] — database failure.
+pub async fn list_attachments(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+) -> AppResult<Vec<Attachment>> {
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    let rows = sqlx::query_as!(
+        AttachmentRow,
+        r#"
+        SELECT id, work_item_id, filename, stored_path, mime_type, size_bytes, created_at
+        FROM work_item_attachments
+        WHERE work_item_id = $1
+        ORDER BY created_at ASC
+        "#,
+        item_id,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(rows.into_iter().map(AttachmentRow::into_response).collect())
+}
+
+/// Store an uploaded file on disk and record the attachment in the database.
+///
+/// `uploads_dir` must be an absolute path to the uploads directory.
+/// The file is saved as `<uuid>-<sanitized filename>` within that directory.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — work item not found or not owned.
+/// - [`AppError::InternalMsg`] — I/O failure while writing the file.
+/// - [`AppError::Db`] — database failure.
+pub async fn create_attachment(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    uploads_dir: &std::path::Path,
+    original_filename: String,
+    mime_type: Option<String>,
+    bytes: bytes::Bytes,
+) -> AppResult<Attachment> {
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    // Sanitize: keep only safe characters, collapse whitespace.
+    let sanitized: String = original_filename
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '.' || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let sanitized = sanitized.trim_matches('_').to_owned();
+    let sanitized = if sanitized.is_empty() {
+        "file".to_owned()
+    } else {
+        sanitized
+    };
+
+    let file_id = Uuid::new_v4();
+    let stored_path = format!("{file_id}-{sanitized}");
+    let full_path = uploads_dir.join(&stored_path);
+    let size_bytes = bytes.len() as i64;
+
+    // Ensure uploads directory exists.
+    std::fs::create_dir_all(uploads_dir).map_err(|e| {
+        AppError::InternalMsg(anyhow::anyhow!("failed to create uploads directory: {e}"))
+    })?;
+
+    tokio::fs::write(&full_path, &bytes).await.map_err(|e| {
+        AppError::InternalMsg(anyhow::anyhow!(
+            "failed to write upload file {}: {e}",
+            full_path.display()
+        ))
+    })?;
+
+    let row = sqlx::query_as!(
+        AttachmentRow,
+        r#"
+        INSERT INTO work_item_attachments
+            (user_id, work_item_id, filename, stored_path, mime_type, size_bytes)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, work_item_id, filename, stored_path, mime_type, size_bytes, created_at
+        "#,
+        user_id,
+        item_id,
+        original_filename,
+        stored_path,
+        mime_type,
+        size_bytes,
+    )
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(row.into_response())
+}
+
+/// Delete an attachment record and remove the file from disk (best-effort).
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — attachment or work item not found / not owned.
+/// - [`AppError::Db`] — database failure.
+pub async fn delete_attachment(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    att_id: Uuid,
+    uploads_dir: &std::path::Path,
+) -> AppResult<()> {
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    // Fetch stored_path before deletion so we can remove the file.
+    let row = sqlx::query!(
+        "SELECT stored_path FROM work_item_attachments WHERE id = $1 AND work_item_id = $2",
+        att_id,
+        item_id,
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    sqlx::query!(
+        "DELETE FROM work_item_attachments WHERE id = $1 AND work_item_id = $2",
+        att_id,
+        item_id,
+    )
+    .execute(&state.db)
+    .await?;
+
+    // Best-effort file removal — ignore errors so the DB row is still gone.
+    let full_path = uploads_dir.join(&row.stored_path);
+    let _ = tokio::fs::remove_file(&full_path).await;
+
+    Ok(())
+}

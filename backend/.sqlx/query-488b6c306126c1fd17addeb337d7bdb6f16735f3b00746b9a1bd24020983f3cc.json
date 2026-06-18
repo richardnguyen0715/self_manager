@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM work_item_subtasks WHERE id = $1 AND work_item_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "488b6c306126c1fd17addeb337d7bdb6f16735f3b00746b9a1bd24020983f3cc"
+}

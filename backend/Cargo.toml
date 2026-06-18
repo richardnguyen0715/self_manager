@@ -11,9 +11,10 @@ path = "src/main.rs"
 
 [dependencies]
 # ── Web framework ──────────────────────────────────────────────────────────────
-axum = { version = "0.7", features = ["ws", "macros"] }
+axum = { version = "0.7", features = ["ws", "macros", "multipart"] }
+bytes = "1"
 tower = { version = "0.4", features = ["full"] }
-tower-http = { version = "0.5", features = ["cors", "trace", "request-id", "timeout"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "request-id", "timeout", "fs"] }
 
 # ── Async runtime ──────────────────────────────────────────────────────────────
 tokio = { version = "1", features = ["full"] }

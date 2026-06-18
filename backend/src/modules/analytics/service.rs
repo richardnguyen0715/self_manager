@@ -13,11 +13,12 @@ use chrono::{NaiveDate, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::shared::error::AppResult;
+use crate::shared::error::{AppError, AppResult};
 
 use super::models::{
-    CompletionRateResponse, DailyCompletionPoint, DailyStat, DailyStatPoint, DayFocusPoint,
-    PeriodSummaryResponse, RefreshStatsResponse, TimeUsageResponse,
+    BurndownPoint, BurndownResponse, CompletionRateResponse, DailyCompletionPoint, DailyStat,
+    DailyStatPoint, DayFocusPoint, EpicTimePoint, PeriodSummaryResponse, RefreshStatsResponse,
+    TimeByEpicResponse, TimeUsageResponse, VelocityPoint, VelocityResponse,
 };
 
 // ── Event ingestion ───────────────────────────────────────────────────────────
@@ -417,3 +418,237 @@ pub async fn refresh_date(
         stats,
     })
 }
+
+// ── Agile analytics ───────────────────────────────────────────────────────────
+
+/// Fetch velocity data for the `last` N completed sprints for the user.
+///
+/// Reads `sprint_reviews` joined with `sprints` and returns them in
+/// chronological order (oldest → newest) so the frontend can render a left-to-
+/// right line chart.
+///
+/// `last` is clamped to [1, 52].
+pub async fn get_velocity(
+    db: &PgPool,
+    user_id: Uuid,
+    last: Option<i64>,
+) -> AppResult<VelocityResponse> {
+    let n: i64 = last.unwrap_or(6).clamp(1, 52);
+
+    // Subquery selects the most-recent N completed sprints; outer query joins the
+    // review to get planned / completed / velocity figures.
+    let rows = sqlx::query!(
+        r#"
+        SELECT
+            s.id              AS "sprint_id!: Uuid",
+            s.name            AS "sprint_name!",
+            s.start_date      AS "start_date!",
+            s.end_date        AS "end_date!",
+            sr.planned_points   AS "planned_points!: i32",
+            sr.completed_points AS "completed_points!: i32",
+            sr.velocity::float8 AS "velocity!: f64"
+        FROM (
+            SELECT id, name, start_date, end_date
+            FROM   sprints
+            WHERE  user_id     = $1
+              AND  status::text = 'completed'
+            ORDER BY end_date DESC
+            LIMIT  $2
+        ) s
+        JOIN sprint_reviews sr ON sr.sprint_id = s.id
+        ORDER BY s.start_date ASC
+        "#,
+        user_id,
+        n,
+    )
+    .fetch_all(db)
+    .await?;
+
+    let data = rows
+        .into_iter()
+        .map(|r| VelocityPoint {
+            sprint_id: r.sprint_id,
+            sprint_name: r.sprint_name,
+            planned_points: r.planned_points,
+            completed_points: r.completed_points,
+            velocity: r.velocity,
+            start_date: r.start_date,
+            end_date: r.end_date,
+        })
+        .collect();
+
+    Ok(VelocityResponse { data })
+}
+
+/// Compute a burndown chart for the given sprint.
+///
+/// The chart covers every calendar day from `sprint.start_date` through
+/// `sprint.end_date` (inclusive).  For each day:
+///
+/// - `remaining_points` = sum of `story_points` for work items in the sprint
+///   that were **not** done by end-of-day (`completed_at::date > day` or
+///   `completed_at IS NULL`).
+/// - `ideal_points` = linear interpolation from `total_points` (day 0) down to
+///   0 (sprint end).
+///
+/// # Errors
+///
+/// Returns [`AppError::NotFound`] when the sprint is not found or belongs to a
+/// different user.
+pub async fn get_burndown(
+    db: &PgPool,
+    user_id: Uuid,
+    sprint_id: Uuid,
+) -> AppResult<BurndownResponse> {
+    // Fetch sprint header — enforces ownership.
+    let sprint = sqlx::query!(
+        r#"
+        SELECT start_date, end_date
+        FROM   sprints
+        WHERE  id = $1 AND user_id = $2
+        "#,
+        sprint_id,
+        user_id,
+    )
+    .fetch_optional(db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    let start = sprint.start_date;
+    let end = sprint.end_date;
+
+    // Total committed story points (NULL story_points treated as 0).
+    let total_points: i64 = sqlx::query_scalar!(
+        r#"
+        SELECT COALESCE(SUM(COALESCE(story_points, 0)), 0) AS "total!"
+        FROM   work_items
+        WHERE  sprint_id = $1
+          AND  user_id   = $2
+        "#,
+        sprint_id,
+        user_id,
+    )
+    .fetch_one(db)
+    .await?;
+
+    let total_points_i32 = total_points as i32;
+
+    // Enumerate every calendar day in [start, end].
+    let sprint_days = (end - start).num_days() + 1; // inclusive
+    let sprint_days = sprint_days.max(1);
+
+    // For each day, count remaining points as:
+    // SUM(story_points) WHERE (completed_at IS NULL OR completed_at::date > day)
+    // We generate a VALUES list in-query using generate_series.
+    let rows = sqlx::query!(
+        r#"
+        SELECT
+            day::date AS "day!: NaiveDate",
+            COALESCE(
+                SUM(COALESCE(wi.story_points, 0))
+                    FILTER (WHERE wi.completed_at IS NULL OR wi.completed_at::date > day::date),
+                0
+            )::int AS "remaining_points!: i32"
+        FROM generate_series($3::date, $4::date, '1 day'::interval) AS day
+        LEFT JOIN work_items wi
+               ON wi.sprint_id = $1
+              AND wi.user_id   = $2
+        GROUP BY day
+        ORDER BY day ASC
+        "#,
+        sprint_id,
+        user_id,
+        start,
+        end,
+    )
+    .fetch_all(db)
+    .await?;
+
+    let points = rows
+        .into_iter()
+        .enumerate()
+        .map(|(i, r)| {
+            // Ideal burn: linear from total_points on day 0 down to 0 on the last day.
+            let ideal = if sprint_days <= 1 {
+                0.0_f64
+            } else {
+                #[allow(clippy::cast_precision_loss)]
+                let ratio = i as f64 / (sprint_days - 1) as f64;
+                #[allow(clippy::cast_precision_loss)]
+                let ideal = total_points_i32 as f64 * (1.0 - ratio);
+                ideal
+            };
+            BurndownPoint {
+                date: r.day,
+                remaining_points: r.remaining_points,
+                ideal_points: ideal,
+            }
+        })
+        .collect();
+
+    Ok(BurndownResponse {
+        sprint_id,
+        start_date: start,
+        end_date: end,
+        total_points: total_points_i32,
+        points,
+    })
+}
+
+/// Aggregate focus minutes logged against work items grouped by epic.
+///
+/// Joins `time_blocks` (via `work_item_id`) → `work_items` → `epics` for the
+/// authenticated user within the given date window.
+///
+/// Epics with no associated time blocks are excluded. Results are ordered by
+/// `focus_minutes DESC`.
+pub async fn get_time_by_epic(
+    db: &PgPool,
+    user_id: Uuid,
+    start: NaiveDate,
+    end: NaiveDate,
+) -> AppResult<TimeByEpicResponse> {
+    // Clamp end to start when start > end would slip through caller validation.
+    let end = end.max(start);
+
+    let rows = sqlx::query!(
+        r#"
+        SELECT
+            e.id    AS "epic_id!: Uuid",
+            e.title AS "epic_title!",
+            COALESCE(
+                SUM(
+                    EXTRACT(EPOCH FROM (tb.end_time - tb.start_time)) / 60.0
+                )::bigint,
+                0
+            ) AS "focus_minutes!: i64"
+        FROM       time_blocks  tb
+        JOIN       work_items   wi ON wi.id      = tb.work_item_id
+        JOIN       epics         e  ON e.id       = wi.epic_id
+        WHERE      tb.user_id   = $1
+          AND      tb.end_time    IS NOT NULL
+          AND      tb.start_time::date BETWEEN $2 AND $3
+          AND      wi.user_id   = $1
+          AND      e.user_id    = $1
+        GROUP BY   e.id, e.title
+        ORDER BY   3 DESC
+        "#,
+        user_id,
+        start,
+        end,
+    )
+    .fetch_all(db)
+    .await?;
+
+    let data = rows
+        .into_iter()
+        .map(|r| EpicTimePoint {
+            epic_id: r.epic_id,
+            epic_title: r.epic_title,
+            focus_minutes: r.focus_minutes,
+        })
+        .collect();
+
+    Ok(TimeByEpicResponse { data })
+}
+

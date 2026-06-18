@@ -4,7 +4,8 @@ import { DashboardView } from "@/features/dashboard";
 
 export const metadata: Metadata = {
   title: "Dashboard",
-  description: "Your daily overview — tasks, habits, events and focus time.",
+  description:
+    "Sprint progress, goal tracking, burndown, today's time blocks, overdue work items, and habits.",
 };
 
 export default function DashboardPage() {

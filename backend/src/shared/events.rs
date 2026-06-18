@@ -40,4 +40,33 @@ pub enum DomainEvent {
 
     /// Emitted when a goal's status transitions to `completed`.
     GoalCompleted { goal_id: Uuid, user_id: Uuid },
+
+    // ── Agile OS events ───────────────────────────────────────────────────────
+
+    /// A work item transitioned to `done`.
+    ///
+    /// Emitted by `work_item::service` when the item status is set to done.
+    /// `sprint_id` is `None` when the item was in the backlog.
+    WorkItemCompleted {
+        work_item_id: Uuid,
+        user_id: Uuid,
+        sprint_id: Option<Uuid>,
+    },
+
+    /// A sprint was activated (status `planned` → `active`).
+    ///
+    /// Emitted by `sprint::service` on the activate action.
+    /// At most one active sprint per user is enforced before this fires.
+    SprintStarted { sprint_id: Uuid, user_id: Uuid },
+
+    /// A sprint was completed and its review auto-created.
+    ///
+    /// Emitted by `sprint::service` on the complete action.
+    /// `velocity` is the completion ratio in the range `[0.0, 100.0]`.
+    SprintCompleted {
+        sprint_id: Uuid,
+        user_id: Uuid,
+        completed_points: i32,
+        velocity: f64,
+    },
 }

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM work_item_attachments WHERE id = $1 AND work_item_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "81d62c2f4eb84b85b59238f2d832c75dcbfc15a8ea9c9b97cdcde2de60e97cc3"
+}

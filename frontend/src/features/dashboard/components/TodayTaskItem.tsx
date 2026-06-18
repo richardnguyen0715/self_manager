@@ -98,7 +98,7 @@ export function TodayTaskItem({ task }: TodayTaskItemProps) {
           </p>
           {/* Link to tasks with this task highlighted */}
           <Link
-            href={`/tasks?id=${task.id}`}
+            href={`/work-items?id=${task.id}`}
             className="invisible shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:visible group-hover:opacity-100"
             aria-label="Open task details"
           >

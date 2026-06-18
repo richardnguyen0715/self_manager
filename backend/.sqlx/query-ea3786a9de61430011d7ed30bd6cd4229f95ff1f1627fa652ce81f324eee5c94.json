@@ -1,0 +1,71 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            id,\n            user_id,\n            sprint_id,\n            planned_points,\n            completed_points,\n            velocity::float8 AS \"velocity!: f64\",\n            summary,\n            created_at,\n            updated_at\n        FROM sprint_reviews\n        WHERE sprint_id = $1 AND user_id = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "sprint_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "planned_points",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "completed_points",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "velocity!: f64",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 6,
+        "name": "summary",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "ea3786a9de61430011d7ed30bd6cd4229f95ff1f1627fa652ce81f324eee5c94"
+}

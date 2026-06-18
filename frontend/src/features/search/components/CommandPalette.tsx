@@ -39,8 +39,8 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, keywords: ["home", "overview", "today"] },
-  { label: "Tasks", href: "/tasks", icon: CheckSquare, keywords: ["todo", "task", "work"] },
-  { label: "Kanban", href: "/kanban", icon: FolderOpen, keywords: ["board", "kanban", "drag"] },
+  { label: "Backlog", href: "/backlog", icon: CheckSquare, keywords: ["todo", "backlog", "work"] },
+  { label: "Board", href: "/board", icon: FolderOpen, keywords: ["board", "kanban", "drag"] },
   { label: "Calendar", href: "/calendar", icon: CalendarDays, keywords: ["schedule", "event"] },
   { label: "Time Blocking", href: "/timeblocking", icon: Clock, keywords: ["time", "block", "schedule"] },
   { label: "Habits", href: "/habits", icon: Activity, keywords: ["habit", "routine", "streak"] },

@@ -57,6 +57,31 @@ pub fn domain_event_to_server_message(event: &DomainEvent) -> Option<ServerMessa
             goal_id: *goal_id,
             user_id: *user_id,
         },
+        // ── Agile OS ──────────────────────────────────────────────────────────
+        DomainEvent::WorkItemCompleted {
+            work_item_id,
+            user_id,
+            sprint_id,
+        } => EventPayload::WorkItemCompleted {
+            work_item_id: *work_item_id,
+            user_id: *user_id,
+            sprint_id: *sprint_id,
+        },
+        DomainEvent::SprintStarted { sprint_id, user_id } => EventPayload::SprintStarted {
+            sprint_id: *sprint_id,
+            user_id: *user_id,
+        },
+        DomainEvent::SprintCompleted {
+            sprint_id,
+            user_id,
+            completed_points,
+            velocity,
+        } => EventPayload::SprintCompleted {
+            sprint_id: *sprint_id,
+            user_id: *user_id,
+            completed_points: *completed_points,
+            velocity: *velocity,
+        },
     };
 
     Some(ServerMessage::Event(payload))
@@ -72,6 +97,9 @@ pub fn event_user_id(event: &DomainEvent) -> uuid::Uuid {
         | DomainEvent::TimeBlockFinished { user_id, .. }
         | DomainEvent::ProjectCompleted { user_id, .. }
         | DomainEvent::CalendarEventReminder { user_id, .. }
-        | DomainEvent::GoalCompleted { user_id, .. } => *user_id,
+        | DomainEvent::GoalCompleted { user_id, .. }
+        | DomainEvent::WorkItemCompleted { user_id, .. }
+        | DomainEvent::SprintStarted { user_id, .. }
+        | DomainEvent::SprintCompleted { user_id, .. } => *user_id,
     }
 }

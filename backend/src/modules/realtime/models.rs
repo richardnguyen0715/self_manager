@@ -71,6 +71,22 @@ pub enum EventPayload {
         goal_id: Uuid,
         user_id: Uuid,
     },
+    // ── Agile OS ──────────────────────────────────────────────────────────────
+    WorkItemCompleted {
+        work_item_id: Uuid,
+        user_id: Uuid,
+        sprint_id: Option<Uuid>,
+    },
+    SprintStarted {
+        sprint_id: Uuid,
+        user_id: Uuid,
+    },
+    SprintCompleted {
+        sprint_id: Uuid,
+        user_id: Uuid,
+        completed_points: i32,
+        velocity: f64,
+    },
 }
 
 // ── Inbound (client → server) ──────────────────────────────────────────────────

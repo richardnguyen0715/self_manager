@@ -1,6 +1,8 @@
 # Manage My Life
 
-A full-stack personal productivity application built as a modular monolith. The backend is a single Rust binary (Axum + SQLx + PostgreSQL + Redis) with 12 feature modules, and the frontend is a Next.js 14 App Router SPA with feature-sliced architecture.
+A full-stack personal productivity application built as a modular monolith. The backend is a single Rust binary (Axum + SQLx + PostgreSQL + Redis) with an Agile OS domain layered on top of the legacy task/project core. The frontend is a Next.js 14 App Router SPA with feature-sliced architecture.
+
+**Agile OS domain** (migration 0003): Goals -> Initiatives -> Epics -> Work Items -> Subtasks, Sprint planning with capacity enforcement, velocity tracking, burndown charts, sprint reviews and retrospectives. Work items supersede legacy tasks as the primary work entity; legacy `/api/tasks` endpoints remain mounted for back-compat.
 
 ---
 
@@ -53,24 +55,33 @@ manage-my-life/
 
 Every module exposes `pub fn router() -> axum::Router<AppState>`. `main.rs` mounts them:
 
-| Mount path           | Module         |
-|----------------------|----------------|
-| `/api/auth`          | `auth`         |
-| `/api/tasks`         | `task`         |
-| `/api/projects`      | `project`      |
-| `/api/goals`         | `goal`         |
-| `/api/habits`        | `habit`        |
-| `/api/calendar`      | `calendar`     |
-| `/api/timeblocks`    | `timeblock`    |
-| `/api/analytics`     | `analytics`    |
-| `/api/notifications` | `notification` |
-| `/api/search`        | `search`       |
-| `/api/dashboard`     | `dashboard`    |
-| `/ws`                | `realtime`     |
+| Mount path           | Module         | Notes              |
+|----------------------|----------------|--------------------|
+| `/api/auth`          | `auth`         |                    |
+| `/api/tasks`         | `task`         | legacy             |
+| `/api/projects`      | `project`      | legacy             |
+| `/api/goals`         | `goal`         |                    |
+| `/api/habits`        | `habit`        |                    |
+| `/api/calendar`      | `calendar`     |                    |
+| `/api/timeblocks`    | `timeblock`    |                    |
+| `/api/analytics`     | `analytics`    | + velocity/burndown/time-by-epic |
+| `/api/notifications` | `notification` |                    |
+| `/api/search`        | `search`       |                    |
+| `/api/dashboard`     | `dashboard`    | + `/sprint` endpoint |
+| `/api/initiatives`   | `initiative`   | NEW                |
+| `/api/epics`         | `epic`         | NEW                |
+| `/api/sprints`       | `sprint`       | NEW                |
+| `/api/work-items`    | `work_item`    | NEW                |
+| `/api/backlog`       | `backlog`      | NEW                |
+| `/ws`                | `realtime`     |                    |
 
 ### Domain events
 
-`AppState.events` is a `tokio::sync::broadcast::Sender<DomainEvent>`. Modules publish events (e.g. `TaskCompleted`, `HabitCompleted`, `TimeBlockFinished`) and background listeners in `analytics` and `notification` consume them without direct coupling.
+`AppState.events` is a `tokio::sync::broadcast::Sender<DomainEvent>`. Modules publish events and background listeners in `analytics` and `notification` consume them without direct coupling.
+
+Legacy events: `TaskCompleted`, `HabitCompleted`, `TimeBlockFinished`, `ProjectCompleted`, `CalendarEventReminder`, `GoalCompleted`.
+
+Agile OS events: `WorkItemCompleted` (emitted on status->done), `SprintStarted` (on activate), `SprintCompleted` (on complete with velocity).
 
 ---
 
@@ -260,6 +271,9 @@ CRUD + focus session lifecycle under `/:id/focus-sessions`: start (POST), pause/
 | GET    | /completion-rate  | Task completion rate over period      |
 | POST   | /refresh          | Recompute today's stats               |
 | POST   | /refresh/:date    | Recompute stats for a specific date   |
+| GET    | /velocity         | Sprint velocity for last N sprints    |
+| GET    | /burndown         | Burndown chart for a sprint           |
+| GET    | /time-by-epic     | Focus minutes grouped by epic         |
 
 ### Notifications (`/api/notifications`)
 
@@ -273,6 +287,19 @@ List, get, create, update, delete. `POST /:id/read`, `POST /mark-all-read`, `GET
 
 `GET /` -- full today snapshot (tasks, habits, events, time blocks, quick stats).
 `GET /stats` -- quick-stats counters only.
+`GET /sprint` -- sprint-centric snapshot (active sprint progress, goal progress, overdue work items, today's time blocks, habits).
+
+### Agile OS (NEW)
+
+**Initiatives** (`/api/initiatives`): CRUD + `GET /:id/epics`. Strategic buckets under a Goal.
+
+**Epics** (`/api/epics`): CRUD + `GET /:id/work-items`. Multi-sprint bodies of work with progress rollup (total/done items, completion rate, story points).
+
+**Sprints** (`/api/sprints`): CRUD + `POST /:id/activate`, `POST /:id/complete`, `GET /active`, `GET /velocity`, `GET /:id/work-items`, `GET /:id/burndown`, `GET|PUT /:id/review`, `GET|PUT /:id/retrospective`. At most one active sprint per user (409 if violated). Capacity enforcement (409 if sprint points exceeded when adding a work item).
+
+**Work Items** (`/api/work-items`): CRUD + status/points/sprint/backlog transitions + subtask management. Backlog = sprint_id IS NULL. Story points ∈ {1,3,5,8,null}.
+
+**Backlog** (`/api/backlog`): `GET /` — filtered list of unassigned work items.
 
 ### WebSocket (`/ws`)
 
@@ -282,20 +309,26 @@ Connect with `?token=<access_jwt>`. The server pushes JSON frames for every `Dom
 
 ## Frontend Routes
 
-| Route           | Feature                                        |
-|-----------------|------------------------------------------------|
-| `/dashboard`    | Today snapshot: tasks, habits, events, stats   |
-| `/tasks`        | Task list with filters and inline create       |
-| `/kanban`       | Drag-and-drop Kanban board                     |
-| `/calendar`     | Month/week/day calendar + time grid            |
-| `/timeblocking` | Time block scheduler with focus timer          |
-| `/habits`       | Habit tracker with streaks and heatmap         |
-| `/focus`        | Focus session (Pomodoro-style)                 |
-| `/goals`        | Goal hierarchy with linked projects            |
-| `/analytics`    | Charts: productivity, completion rate, heatmap |
-| `/settings`     | User preferences                               |
-| `/login`        | Login form                                     |
-| `/register`     | Registration form                              |
+| Route              | Feature                                                |
+|--------------------|--------------------------------------------------------|
+| `/dashboard`       | Today snapshot + active sprint progress (evolved)      |
+| `/backlog`         | NEW — Sprint sections + Backlog; drag items to sprint  |
+| `/board`           | NEW — Active sprint Kanban (To do / In progress / Done)|
+| `/sprints`         | NEW — Sprint list (planned/active/completed)           |
+| `/sprints/[id]`    | NEW — Sprint detail: Overview, Review, Retro, Burndown |
+| `/work-items`      | NEW — Filterable work item table                       |
+| `/work-items/[id]` | NEW — Work item detail: subtasks, status, details panel|
+| `/goals`           | Goal -> Initiative -> Epic hierarchy (evolved)         |
+| `/analytics`       | Charts + velocity/burndown/time-by-epic (evolved)      |
+| `/tasks`           | Task list (legacy)                                     |
+| `/kanban`          | Drag-and-drop Kanban (legacy)                          |
+| `/calendar`        | Month/week/day calendar + time grid                    |
+| `/timeblocking`    | Time block scheduler with focus timer                  |
+| `/habits`          | Habit tracker with streaks and heatmap                 |
+| `/focus`           | Focus session (Pomodoro-style)                         |
+| `/settings`        | User preferences                                       |
+| `/login`           | Login form                                             |
+| `/register`        | Registration form                                      |
 
 ---
 

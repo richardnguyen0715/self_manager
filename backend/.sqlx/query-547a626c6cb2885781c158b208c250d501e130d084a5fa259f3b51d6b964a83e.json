@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n               g.id                                             AS \"goal_id!\",\n               g.title                                          AS \"title!\",\n               COUNT(wi.id)                                     AS \"total_items!: i64\",\n               COUNT(wi.id) FILTER (WHERE wi.status::text = 'done')\n                                                                AS \"done_items!: i64\"\n           FROM goals g\n           LEFT JOIN initiatives ini\n               ON ini.goal_id = g.id AND ini.user_id = g.user_id\n           LEFT JOIN epics e\n               ON e.initiative_id = ini.id AND e.user_id = g.user_id\n           LEFT JOIN work_items wi\n               ON wi.epic_id = e.id AND wi.user_id = g.user_id\n           WHERE g.user_id    = $1\n             AND g.status::text = 'active'\n           GROUP BY g.id, g.title\n           ORDER BY g.position ASC, g.created_at ASC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "goal_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "title!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "total_items!: i64",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "done_items!: i64",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "547a626c6cb2885781c158b208c250d501e130d084a5fa259f3b51d6b964a83e"
+}

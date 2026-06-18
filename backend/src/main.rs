@@ -18,6 +18,7 @@ use axum::{
 };
 use tower_http::{
     cors::{Any, CorsLayer},
+    services::ServeDir,
     trace::TraceLayer,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -45,6 +46,11 @@ async fn main() -> anyhow::Result<()> {
 
     // ── 3. Config ─────────────────────────────────────────────────────────────
     let config = Config::from_env()?;
+
+    // ── Ensure uploads directory exists ──────────────────────────────────────
+    let uploads_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/uploads");
+    std::fs::create_dir_all(uploads_dir)?;
+    tracing::info!(path = uploads_dir, "uploads directory ready");
     tracing::info!(host = %config.host, port = %config.port, "configuration loaded");
 
     // ── 4. PostgreSQL ─────────────────────────────────────────────────────────
@@ -62,22 +68,31 @@ async fn main() -> anyhow::Result<()> {
 
     // ── 7. Router ─────────────────────────────────────────────────────────────
     let api_router = Router::new()
-        .nest("/auth", modules::auth::router())
-        .nest("/tasks", modules::task::router())
-        .nest("/projects", modules::project::router())
-        .nest("/goals", modules::goal::router())
-        .nest("/habits", modules::habit::router())
-        .nest("/calendar", modules::calendar::router())
-        .nest("/timeblocks", modules::timeblock::router())
-        .nest("/analytics", modules::analytics::router())
+        // ── Legacy (kept) ─────────────────────────────────────────────────────
+        .nest("/auth",          modules::auth::router())
+        .nest("/tasks",         modules::task::router())
+        .nest("/projects",      modules::project::router())
+        .nest("/goals",         modules::goal::router())
+        .nest("/habits",        modules::habit::router())
+        .nest("/calendar",      modules::calendar::router())
+        .nest("/timeblocks",    modules::timeblock::router())
+        .nest("/analytics",     modules::analytics::router())
         .nest("/notifications", modules::notification::router())
-        .nest("/settings", modules::settings::router())
-        .nest("/search", modules::search::router())
-        .nest("/dashboard", modules::dashboard::router());
+        .nest("/settings",      modules::settings::router())
+        .nest("/search",        modules::search::router())
+        .nest("/dashboard",     modules::dashboard::router())
+        // ── Agile OS (new) ────────────────────────────────────────────────────
+        .nest("/initiatives",   modules::initiative::router())
+        .nest("/epics",         modules::epic::router())
+        .nest("/sprints",       modules::sprint::router())
+        .nest("/work-items",    modules::work_item::router())
+        .nest("/backlog",       modules::backlog::router());
 
     let app = Router::new()
         .nest("/api", api_router)
         .nest("/ws", modules::realtime::router())
+        // ── Static file serving for uploads ───────────────────────────────────
+        .nest_service("/uploads", ServeDir::new(uploads_dir))
         // ── CORS ──────────────────────────────────────────────────────────────
         .layer(
             CorsLayer::new()

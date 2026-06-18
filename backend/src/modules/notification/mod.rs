@@ -93,6 +93,11 @@ async fn handle_domain_event(state: &AppState, event: DomainEvent) {
         | DomainEvent::TimeBlockFinished { .. }
         | DomainEvent::ProjectCompleted { .. }
         | DomainEvent::CalendarEventReminder { .. }
-        | DomainEvent::GoalCompleted { .. } => {}
+        | DomainEvent::GoalCompleted { .. }
+        // Agile OS events — no notification side-effect needed here; handled by
+        // analytics / realtime modules.
+        | DomainEvent::WorkItemCompleted { .. }
+        | DomainEvent::SprintStarted { .. }
+        | DomainEvent::SprintCompleted { .. } => {}
     }
 }

@@ -1,0 +1,114 @@
+"use client";
+
+/**
+ * BacklogScreen — main entry point for /backlog route.
+ *
+ * Layout (sprint sections + backlog):
+ *   [Filter bar]
+ *   [Sprint 0 section]  ← active/planned sprints, each collapsible
+ *   [Sprint 1 section]
+ *   ...
+ *   [Backlog section]   ← unscheduled items (sprint_id IS NULL)
+ *
+ * Data sources:
+ *   GET /api/sprints           → all sprints (sorted planned→active→completed)
+ *   GET /api/backlog           → unscheduled items
+ *   GET /api/epics             → for filter dropdown
+ *
+ * Child components manage their own per-sprint data via useSprintWorkItems.
+ */
+
+import { Loader2, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useSprints, useEpics } from "@/features/agile";
+import { useProjectStore } from "@/stores";
+import { BacklogFilterBar } from "./BacklogFilterBar";
+import { SprintSection } from "./SprintSection";
+import { BacklogSection } from "./BacklogSection";
+import { CreateWorkItemDialog } from "./CreateWorkItemDialog";
+import { CreateSprintDialog } from "./CreateSprintDialog";
+import type { Sprint } from "@/types";
+
+// ─── Sort sprints: active first, then planned (newest last), then completed ──
+
+function sortSprints(sprints: Sprint[]): Sprint[] {
+  const order: Record<Sprint["status"], number> = {
+    active: 0,
+    planned: 1,
+    completed: 2,
+  };
+  return [...sprints].sort((a, b) => {
+    const o = order[a.status] - order[b.status];
+    if (o !== 0) return o;
+    // Within same status: sort by start_date asc
+    return a.start_date.localeCompare(b.start_date);
+  });
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export function BacklogScreen() {
+  const { currentProjectId } = useProjectStore();
+
+  const {
+    data: sprintsData,
+    isLoading: sprintsLoading,
+    isError: sprintsError,
+    refetch: refetchSprints,
+  } = useSprints(
+    currentProjectId != null
+      ? { project_id: currentProjectId }
+      : undefined,
+  );
+
+  const { data: epicsData } = useEpics();
+
+  const allSprints = sprintsData?.data ?? [];
+  const sortedSprints = sortSprints(allSprints);
+  const epics = epicsData?.data ?? [];
+
+  if (sprintsLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (sprintsError) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
+        <AlertCircle className="h-6 w-6" />
+        <p className="text-sm">Failed to load sprints.</p>
+        <Button variant="ghost" size="sm" onClick={() => refetchSprints()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Filter bar */}
+      <BacklogFilterBar epics={epics} />
+
+      {/* Sprint sections + Backlog section */}
+      <div className="space-y-3">
+        {sortedSprints.map((sprint) => (
+          <SprintSection
+            key={sprint.id}
+            sprint={sprint}
+            allSprints={allSprints}
+          />
+        ))}
+
+        {/* Backlog (unscheduled) — always rendered last */}
+        <BacklogSection sprints={allSprints} epics={epics} />
+      </div>
+
+      {/* Dialogs — portal-rendered, driven by useBacklogStore */}
+      <CreateWorkItemDialog sprints={allSprints} epics={epics} />
+      <CreateSprintDialog />
+    </>
+  );
+}

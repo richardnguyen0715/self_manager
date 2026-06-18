@@ -685,6 +685,197 @@ export interface SearchResponse {
   habits?: HabitHit[];
 }
 
+// ─── Agile enums ──────────────────────────────────────────────────────────────
+
+export type InitiativeStatus = "active" | "completed" | "paused" | "abandoned";
+export type EpicStatus = "todo" | "in_progress" | "done" | "cancelled";
+export type SprintStatus = "planned" | "active" | "completed";
+export type WorkItemType = "story" | "task" | "bug" | "habit" | "milestone";
+export type WorkItemStatus = "backlog" | "todo" | "in_progress" | "review" | "done";
+// priority reuses existing `Priority`
+
+// ─── Agile entities ────────────────────────────────────────────────────────────
+
+export interface Initiative {
+  id: string;
+  user_id: string;
+  goal_id: string;
+  title: string;
+  description: string | null;
+  status: InitiativeStatus;
+  color: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EpicProgress {
+  total_items: number;
+  done_items: number;
+  completion_rate: number;
+}
+
+export interface Epic {
+  id: string;
+  user_id: string;
+  initiative_id: string;
+  title: string;
+  description: string | null;
+  status: EpicStatus;
+  start_date: string | null; // YYYY-MM-DD
+  due_date: string | null; // YYYY-MM-DD
+  color: string | null;
+  position: number;
+  progress: EpicProgress;
+  total_points: number;
+  done_points: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Sprint {
+  id: string;
+  user_id: string;
+  project_id: string | null;
+  name: string;
+  goal_text: string | null;
+  start_date: string; // YYYY-MM-DD
+  end_date: string; // YYYY-MM-DD
+  capacity_points: number;
+  status: SprintStatus;
+  velocity: number | null;
+  completed_points: number;
+  planned_points: number;
+  committed_count: number;
+  done_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkItemSubtask {
+  id: string;
+  work_item_id: string;
+  title: string;
+  is_done: boolean;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkItem {
+  id: string;
+  user_id: string;
+  project_id: string | null;
+  epic_id: string | null;
+  sprint_id: string | null;
+  type: WorkItemType;
+  title: string;
+  description: string | null;
+  status: WorkItemStatus;
+  priority: Priority;
+  story_points: number | null;
+  position: number;
+  due_date: string | null;
+  recurrence_rule: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  subtasks: WorkItemSubtask[];
+}
+
+/** Kept for backwards compat — WorkItem is the primary entity. */
+export type WorkItemAlias = WorkItem;
+
+export interface WorkItemListItem {
+  id: string;
+  project_id: string | null;
+  epic_id: string | null;
+  sprint_id: string | null;
+  type: WorkItemType;
+  title: string;
+  status: WorkItemStatus;
+  priority: Priority;
+  story_points: number | null;
+  due_date: string | null;
+  position: number;
+  subtask_count: number;
+  done_subtask_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SprintReview {
+  id: string;
+  user_id: string;
+  sprint_id: string;
+  planned_points: number;
+  completed_points: number;
+  velocity: number;
+  summary: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Retrospective {
+  id: string;
+  user_id: string;
+  sprint_id: string;
+  went_well: string | null;
+  went_wrong: string | null;
+  action_items: { id: string; text: string; done?: boolean }[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BurndownPoint {
+  date: string;
+  remaining_points: number;
+  ideal_points: number;
+}
+
+export interface BurndownResponse {
+  sprint_id: string;
+  start_date: string;
+  end_date: string;
+  total_points: number;
+  points: BurndownPoint[];
+}
+
+export interface VelocityPoint {
+  sprint_id: string;
+  sprint_name: string;
+  planned_points: number;
+  completed_points: number;
+  velocity: number;
+}
+
+export interface EpicTimePoint {
+  epic_id: string;
+  epic_title: string;
+  focus_minutes: number;
+}
+
+export interface GoalProgress {
+  goal_id: string;
+  title: string;
+  completion_rate: number;
+}
+
+export interface SprintDashboardResponse {
+  active_sprint: Sprint | null;
+  sprint_progress_pct: number;
+  goal_progress: GoalProgress[];
+  today_time_blocks: DashboardTimeBlock[];
+  overdue_work_items: WorkItemListItem[];
+  habits: DashboardHabit[];
+}
+
+/** Generic list envelope matching the goal module pattern: { data, total }. */
+export interface AgileListResponse<T> {
+  data: T[];
+  total: number;
+}
+
 // ─── API Endpoint Paths (REST contract — verbatim from backend) ─────────────────
 
 export const API_ENDPOINTS = {
@@ -823,4 +1014,63 @@ export const API_ENDPOINTS = {
   NOTIFICATIONS_PUSH_SUBSCRIBE: "/api/notifications/push/subscribe",
   // POST /api/notifications/push/unsubscribe
   NOTIFICATIONS_PUSH_UNSUBSCRIBE: "/api/notifications/push/unsubscribe",
+
+  // ── Initiatives (/api/initiatives) ────────────────────────────────────────
+  INITIATIVES: "/api/initiatives",
+  INITIATIVE_BY_ID: (id: string) => `/api/initiatives/${id}`,
+  INITIATIVE_EPICS: (id: string) => `/api/initiatives/${id}/epics`,
+
+  // ── Epics (/api/epics) ────────────────────────────────────────────────────
+  EPICS: "/api/epics",
+  EPIC_BY_ID: (id: string) => `/api/epics/${id}`,
+  EPIC_WORK_ITEMS: (id: string) => `/api/epics/${id}/work-items`,
+
+  // ── Sprints (/api/sprints) ────────────────────────────────────────────────
+  SPRINTS: "/api/sprints",
+  SPRINT_ACTIVE: "/api/sprints/active",
+  SPRINT_VELOCITY: "/api/sprints/velocity",
+  SPRINT_BY_ID: (id: string) => `/api/sprints/${id}`,
+  SPRINT_ACTIVATE: (id: string) => `/api/sprints/${id}/activate`,
+  SPRINT_COMPLETE: (id: string) => `/api/sprints/${id}/complete`,
+  SPRINT_WORK_ITEMS: (id: string) => `/api/sprints/${id}/work-items`,
+  SPRINT_BURNDOWN: (id: string) => `/api/sprints/${id}/burndown`,
+  SPRINT_REVIEW: (id: string) => `/api/sprints/${id}/review`,
+  SPRINT_RETRO: (id: string) => `/api/sprints/${id}/retrospective`,
+
+  // ── Work Items (/api/work-items) ──────────────────────────────────────────
+  WORK_ITEMS: "/api/work-items",
+  WORK_ITEM_BY_ID: (id: string) => `/api/work-items/${id}`,
+  WORK_ITEM_STATUS: (id: string) => `/api/work-items/${id}/status`,
+  WORK_ITEM_POINTS: (id: string) => `/api/work-items/${id}/points`,
+  WORK_ITEM_SPRINT: (id: string) => `/api/work-items/${id}/sprint`,
+  WORK_ITEM_BACKLOG: (id: string) => `/api/work-items/${id}/backlog`,
+  WORK_ITEM_SUBTASKS: (id: string) => `/api/work-items/${id}/subtasks`,
+  WORK_ITEM_SUBTASK_BY_ID: (id: string, subtaskId: string) =>
+    `/api/work-items/${id}/subtasks/${subtaskId}`,
+  // GET|POST /api/work-items/:id/links
+  WORK_ITEM_LINKS: (id: string) => `/api/work-items/${id}/links`,
+  // DELETE /api/work-items/:id/links/:link_id
+  WORK_ITEM_LINK_BY_ID: (id: string, linkId: string) =>
+    `/api/work-items/${id}/links/${linkId}`,
+  // GET|POST /api/work-items/:id/web-links
+  WORK_ITEM_WEB_LINKS: (id: string) => `/api/work-items/${id}/web-links`,
+  // DELETE /api/work-items/:id/web-links/:link_id
+  WORK_ITEM_WEB_LINK_BY_ID: (id: string, linkId: string) =>
+    `/api/work-items/${id}/web-links/${linkId}`,
+  // GET|POST /api/work-items/:id/attachments
+  WORK_ITEM_ATTACHMENTS: (id: string) => `/api/work-items/${id}/attachments`,
+  // DELETE /api/work-items/:id/attachments/:att_id
+  WORK_ITEM_ATTACHMENT_BY_ID: (id: string, attId: string) =>
+    `/api/work-items/${id}/attachments/${attId}`,
+
+  // ── Backlog (/api/backlog) ────────────────────────────────────────────────
+  BACKLOG: "/api/backlog",
+
+  // ── Dashboard evolved ─────────────────────────────────────────────────────
+  DASHBOARD_SPRINT: "/api/dashboard/sprint",
+
+  // ── Analytics evolved ─────────────────────────────────────────────────────
+  ANALYTICS_VELOCITY: "/api/analytics/velocity",
+  ANALYTICS_BURNDOWN: "/api/analytics/burndown",
+  ANALYTICS_TIME_BY_EPIC: "/api/analytics/time-by-epic",
 } as const;

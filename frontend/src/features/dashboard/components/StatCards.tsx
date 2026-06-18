@@ -89,7 +89,7 @@ export function StatCards({ stats }: StatCardsProps) {
           label="Tasks Done"
           value={stats.tasks_done_today}
           subtitle="today"
-          href="/tasks"
+          href="/work-items"
           colorClass="text-emerald-600"
         />
         <StatCardItem
@@ -97,7 +97,7 @@ export function StatCards({ stats }: StatCardsProps) {
           label="Overdue"
           value={stats.tasks_overdue}
           subtitle={stats.tasks_overdue > 0 ? "needs attention" : "all clear"}
-          href="/tasks"
+          href="/work-items"
           colorClass={
             stats.tasks_overdue > 0 ? "text-destructive" : "text-emerald-600"
           }

@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            e.id    AS \"epic_id!: Uuid\",\n            e.title AS \"epic_title!\",\n            COALESCE(\n                SUM(\n                    EXTRACT(EPOCH FROM (tb.end_time - tb.start_time)) / 60.0\n                )::bigint,\n                0\n            ) AS \"focus_minutes!: i64\"\n        FROM       time_blocks  tb\n        JOIN       work_items   wi ON wi.id      = tb.work_item_id\n        JOIN       epics         e  ON e.id       = wi.epic_id\n        WHERE      tb.user_id   = $1\n          AND      tb.end_time    IS NOT NULL\n          AND      tb.start_time::date BETWEEN $2 AND $3\n          AND      wi.user_id   = $1\n          AND      e.user_id    = $1\n        GROUP BY   e.id, e.title\n        ORDER BY   3 DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "epic_id!: Uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "epic_title!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "focus_minutes!: i64",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "a55490ef9b83f776f8392ea28102aeb6903a8e188d22747cad5b12d39ec9740d"
+}

@@ -197,3 +197,129 @@ pub(super) struct StreakRow {
     pub log_date: NaiveDate,
     pub completed: bool,
 }
+
+// ── Sprint-centric dashboard types ────────────────────────────────────────────
+
+/// Compact sprint summary used by the sprint dashboard.
+///
+/// Carries the same fields as the sprint module's full Sprint response plus
+/// the derived `planned_points`, `committed_count`, and `done_count` so the
+/// front-end has everything it needs for the progress bar without a separate
+/// round-trip.
+#[derive(Clone, Debug, Serialize, sqlx::FromRow)]
+pub struct SprintSummary {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub name: String,
+    pub goal_text: Option<String>,
+    /// ISO-8601 date string (YYYY-MM-DD).
+    pub start_date: NaiveDate,
+    /// ISO-8601 date string (YYYY-MM-DD).
+    pub end_date: NaiveDate,
+    pub capacity_points: i32,
+    /// `sprint_status` cast to text.
+    pub status: String,
+    pub velocity: Option<f64>,
+    pub completed_points: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Lightweight work-item summary for the overdue list on the sprint dashboard.
+///
+/// Matches `WorkItemListItem` from the contract.
+#[derive(Clone, Debug, Serialize, sqlx::FromRow)]
+pub struct WorkItemListItem {
+    pub id: Uuid,
+    pub epic_id: Option<Uuid>,
+    pub sprint_id: Option<Uuid>,
+    /// `work_item_type` cast to text.
+    #[sqlx(rename = "item_type")]
+    pub r#type: String,
+    pub title: String,
+    /// `work_item_status` cast to text.
+    pub status: String,
+    /// `task_priority` cast to text.
+    pub priority: String,
+    pub story_points: Option<i32>,
+    pub due_date: Option<DateTime<Utc>>,
+    pub position: i32,
+    pub subtask_count: i64,
+    pub done_subtask_count: i64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Per-goal progress summary for the sprint dashboard.
+#[derive(Clone, Debug, Serialize)]
+pub struct GoalProgress {
+    pub goal_id: Uuid,
+    pub title: String,
+    /// Fraction in [0.0, 1.0] computed from work items under the goal's
+    /// initiative → epic hierarchy.
+    pub completion_rate: f64,
+}
+
+/// Internal DB row for goal progress rollup.
+#[derive(sqlx::FromRow)]
+pub(super) struct GoalProgressRow {
+    pub goal_id: Uuid,
+    pub title: String,
+    pub total_items: i64,
+    pub done_items: i64,
+}
+
+/// Enriched time block for the sprint dashboard (today's blocks).
+///
+/// Extends [`DashboardTimeBlock`] with an optional `work_item_id` reference
+/// added in migration 0003.
+#[derive(Clone, Debug, Serialize, sqlx::FromRow)]
+pub struct SprintDashboardTimeBlock {
+    pub id: Uuid,
+    pub title: String,
+    pub start_time: DateTime<Utc>,
+    pub end_time: DateTime<Utc>,
+    pub estimated_minutes: i64,
+    pub actual_focus_minutes: Option<i64>,
+    pub task_id: Option<Uuid>,
+    pub task_title: Option<String>,
+    pub work_item_id: Option<Uuid>,
+    pub work_item_title: Option<String>,
+    pub color: Option<String>,
+}
+
+/// Full sprint-centric dashboard response.
+///
+/// Returned by `GET /api/dashboard/sprint`.
+#[derive(Clone, Debug, Serialize)]
+pub struct SprintDashboardResponse {
+    /// The ISO-8601 date this snapshot represents (YYYY-MM-DD).
+    pub date: NaiveDate,
+    /// The currently active sprint, if any.
+    pub active_sprint: Option<SprintSummary>,
+    /// Active sprint completion percentage 0–100 (0 when no sprint / no items).
+    pub sprint_progress_pct: f64,
+    /// Progress rollup for each of the user's active goals.
+    pub goal_progress: Vec<GoalProgress>,
+    /// Time blocks that start today (legacy `task_id` + new `work_item_id`).
+    pub today_time_blocks: Vec<SprintDashboardTimeBlock>,
+    /// Work items that are past their due date and not yet done.
+    pub overdue_work_items: Vec<WorkItemListItem>,
+    /// Active habits with today's completion status (reuses existing type).
+    pub habits: Vec<DashboardHabit>,
+}
+
+/// Internal raw time block for the sprint dashboard (before derived-field calculation).
+#[derive(sqlx::FromRow)]
+pub(super) struct RawSprintTimeBlock {
+    pub id: Uuid,
+    pub title: String,
+    pub start_time: DateTime<Utc>,
+    pub end_time: DateTime<Utc>,
+    pub task_id: Option<Uuid>,
+    pub task_title: Option<String>,
+    pub work_item_id: Option<Uuid>,
+    pub work_item_title: Option<String>,
+    pub color: Option<String>,
+    pub actual_focus_seconds: Option<i64>,
+}

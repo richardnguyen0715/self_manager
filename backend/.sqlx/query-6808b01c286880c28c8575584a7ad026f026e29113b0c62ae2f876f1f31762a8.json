@@ -1,0 +1,67 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH ins AS (\n            INSERT INTO work_item_links (user_id, work_item_id, target_work_item_id, link_type)\n            VALUES ($1, $2, $3, $4)\n            RETURNING id, work_item_id, target_work_item_id, link_type, created_at\n        )\n        SELECT\n            ins.id,\n            ins.work_item_id,\n            ins.target_work_item_id,\n            ins.link_type,\n            t.title         AS \"target_title!\",\n            t.type::text    AS \"target_type!\",\n            t.status::text  AS \"target_status!\",\n            ins.created_at\n        FROM ins\n        JOIN work_items t ON t.id = ins.target_work_item_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "work_item_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "target_work_item_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "link_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "target_title!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "target_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "target_status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      null,
+      false
+    ]
+  },
+  "hash": "6808b01c286880c28c8575584a7ad026f026e29113b0c62ae2f876f1f31762a8"
+}

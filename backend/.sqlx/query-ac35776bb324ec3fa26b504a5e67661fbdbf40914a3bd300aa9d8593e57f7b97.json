@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            day::date AS \"day!: NaiveDate\",\n            COALESCE(\n                SUM(COALESCE(wi.story_points, 0))\n                    FILTER (WHERE wi.completed_at IS NULL OR wi.completed_at::date > day::date),\n                0\n            )::int AS \"remaining_points!: i32\"\n        FROM generate_series($3::date, $4::date, '1 day'::interval) AS day\n        LEFT JOIN work_items wi\n               ON wi.sprint_id = $1\n              AND wi.user_id   = $2\n        GROUP BY day\n        ORDER BY day ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "day!: NaiveDate",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 1,
+        "name": "remaining_points!: i32",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "ac35776bb324ec3fa26b504a5e67661fbdbf40914a3bd300aa9d8593e57f7b97"
+}

@@ -56,7 +56,7 @@ export function TodayTasksPanel({ tasks }: TodayTasksPanelProps) {
 
       <div className="flex justify-end pt-1">
         <Button variant="ghost" size="sm" asChild className="gap-1 text-xs text-muted-foreground">
-          <Link href="/tasks">
+          <Link href="/work-items">
             All tasks
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
