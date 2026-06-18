@@ -117,21 +117,15 @@ export function WorkItemRow({
   return (
     <div
       ref={setNodeRef}
+      {...attributes}
+      {...listeners}
       className={cn(
-        "group flex items-center gap-2 px-4 py-2 hover:bg-accent/40 transition-colors",
+        "group flex items-center gap-2 px-4 py-2 hover:bg-accent/40 transition-colors cursor-grab active:cursor-grabbing",
         isDragging && "opacity-40",
       )}
     >
-      {/* Drag handle */}
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-        aria-label="Drag to move"
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
+      {/* Drag handle (visual cue — whole row is draggable) */}
+      <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
 
       {/* Type icon */}
       <WorkItemTypeBadge type={item.type} className="shrink-0" />
@@ -139,6 +133,7 @@ export function WorkItemRow({
       {/* Title — navigates to detail page */}
       <Link
         href={`/work-items/${item.id}`}
+        draggable={false}
         className="flex-1 min-w-0 text-sm font-medium truncate hover:text-primary transition-colors"
         title={item.title}
       >
@@ -189,6 +184,7 @@ export function WorkItemRow({
             size="icon"
             className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
             onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
             aria-label="Row actions"
           >
             <MoreHorizontal className="h-4 w-4" />
