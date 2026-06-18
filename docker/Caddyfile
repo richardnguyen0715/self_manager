@@ -1,0 +1,42 @@
+# Caddy reverse proxy for manage-my-life.
+#
+# {$DOMAIN} comes from the caddy service environment (docker-compose.prod.yml).
+#   - a real FQDN (app.example.com) -> Caddy provisions a Let's Encrypt cert
+#     automatically (the DNS A/AAAA record must point at this server, ports
+#     80 + 443 open).
+#   - "localhost" (default) -> Caddy serves local HTTPS with its internal CA.
+#
+# Routing:
+#   /api/*     -> backend:8080  (REST API)
+#   /ws/*      -> backend:8080  (WebSocket; Caddy handles the upgrade)
+#   /uploads/* -> backend:8080  (avatars + work-item attachments)
+#   /*         -> frontend:3000 (Next.js app)
+
+{
+	email {$TLS_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+
+	handle /ws/* {
+		reverse_proxy backend:8080
+	}
+
+	handle /uploads/* {
+		reverse_proxy backend:8080
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

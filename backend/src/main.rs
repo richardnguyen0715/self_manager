@@ -91,6 +91,8 @@ async fn main() -> anyhow::Result<()> {
         .nest("/board-columns", modules::board_column::router());
 
     let app = Router::new()
+        // ── Health check (used by Docker healthcheck + load balancers) ─────────
+        .route("/health", axum::routing::get(|| async { "ok" }))
         .nest("/api", api_router)
         .nest("/ws", modules::realtime::router())
         // ── Static file serving for uploads ───────────────────────────────────

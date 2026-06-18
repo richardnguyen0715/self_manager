@@ -143,5 +143,39 @@ gen-secrets: ## Generate strong random values for JWT_SECRET and passwords
 	@echo "$(BOLD)Generated secrets (paste into .env):$(RESET)"
 	@printf "POSTGRES_PASSWORD=%s\n" "$$(openssl rand -base64 32)"
 	@printf "REDIS_PASSWORD=%s\n"    "$$(openssl rand -base64 24)"
-	@printf "JWT_SECRET=%s\n"        "$$(openssl rand -base64 64)"
+	@printf "JWT_SECRET=%s\n"        "$$(openssl rand -hex 64)"
 	@printf "GRAFANA_ADMIN_PASSWORD=%s\n" "$$(openssl rand -base64 16)"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Production deployment (Caddy auto-TLS) — docker/docker-compose.prod.yml
+# On the server:  make prod-env  → edit .env  → make prod-up
+# ──────────────────────────────────────────────────────────────────────────────
+PROD_COMPOSE := docker compose --env-file .env -f docker/docker-compose.prod.yml
+
+.PHONY: prod-env prod-up prod-down prod-restart prod-rebuild prod-logs prod-ps prod-psql
+
+prod-env: ## Create .env from .env.prod.example if missing (then edit secrets)
+	@test -f .env || (cp .env.prod.example .env && echo "created .env — edit DOMAIN/secrets, then 'make prod-up'")
+
+prod-up: ## Build + start the full production stack (postgres, redis, backend, frontend, caddy)
+	@test -f .env || { echo "ERROR: .env missing. Run 'make prod-env' first."; exit 1; }
+	$(PROD_COMPOSE) up -d --build
+	@echo "$(BOLD)Deployed.$(RESET) Caddy is provisioning TLS for $$(grep ^DOMAIN= .env | cut -d= -f2). Watch: make prod-logs"
+
+prod-down: ## Stop the production stack (volumes preserved)
+	$(PROD_COMPOSE) down
+
+prod-restart: ## Restart the production stack
+	$(PROD_COMPOSE) restart
+
+prod-rebuild: ## Rebuild images from current code and restart (no data loss)
+	$(PROD_COMPOSE) up -d --build
+
+prod-logs: ## Tail production logs (all services)
+	$(PROD_COMPOSE) logs -f
+
+prod-ps: ## Show production container status
+	$(PROD_COMPOSE) ps
+
+prod-psql: ## psql into the production database
+	$(PROD_COMPOSE) exec postgres psql -U $${POSTGRES_USER:-mml} -d $${POSTGRES_DB:-manage_my_life}

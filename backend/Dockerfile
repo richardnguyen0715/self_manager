@@ -64,6 +64,10 @@ COPY --from=builder /app/migrations /app/migrations
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
+# Writable uploads dir (avatars + work-item attachments) — owned by appuser so
+# a mounted named volume is writable at runtime.
+RUN mkdir -p /app/uploads
+
 RUN chown -R appuser:appgroup /app
 USER appuser
 
