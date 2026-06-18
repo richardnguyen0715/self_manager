@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DateInput } from "@/components/ui/date-input";
 import type { Priority, TaskStatus } from "@/types";
 import { useKanbanStore } from "../store";
 import { useCreateCard } from "../hooks/useTaskMutations";
@@ -45,6 +46,7 @@ export function AddCardDialog({ columnId }: AddCardDialogProps) {
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
@@ -140,10 +142,16 @@ export function AddCardDialog({ columnId }: AddCardDialogProps) {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="add-card-due">Due date</Label>
-              <Input
-                id="add-card-due"
-                type="date"
-                {...register("due_date")}
+              <Controller
+                control={control}
+                name="due_date"
+                render={({ field }) => (
+                  <DateInput
+                    id="add-card-due"
+                    value={field.value ?? ""}
+                    onChange={(v) => field.onChange(v || undefined)}
+                  />
+                )}
               />
             </div>
             <div className="space-y-1.5">

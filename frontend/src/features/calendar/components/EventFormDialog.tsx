@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
+import { DateInput } from "@/components/ui/date-input";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, parseISO } from "date-fns";
@@ -84,6 +85,7 @@ export function EventFormDialog() {
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     watch,
@@ -233,18 +235,30 @@ export function EventFormDialog() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="event-start-date">Start date</Label>
-                  <Input
-                    id="event-start-date"
-                    type="date"
-                    {...register("start_time")}
+                  <Controller
+                    control={control}
+                    name="start_time"
+                    render={({ field }) => (
+                      <DateInput
+                        id="event-start-date"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                      />
+                    )}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="event-end-date">End date</Label>
-                  <Input
-                    id="event-end-date"
-                    type="date"
-                    {...register("end_time")}
+                  <Controller
+                    control={control}
+                    name="end_time"
+                    render={({ field }) => (
+                      <DateInput
+                        id="event-end-date"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                      />
+                    )}
                   />
                 </div>
               </div>

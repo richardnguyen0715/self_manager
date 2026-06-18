@@ -258,7 +258,7 @@ export function CommandPalette() {
       {/* Panel */}
       <div
         className={cn(
-          "fixed left-1/2 top-[20%] z-50 w-full max-w-xl -translate-x-1/2",
+          "fixed left-1/2 top-[15%] z-50 w-full max-w-2xl -translate-x-1/2",
           "rounded-xl border bg-background shadow-2xl",
           "animate-in fade-in-0 zoom-in-95 duration-150",
         )}
@@ -271,18 +271,18 @@ export function CommandPalette() {
           className="flex flex-col overflow-hidden rounded-xl"
         >
           {/* Search input row */}
-          <div className="flex items-center gap-2 border-b px-3 py-2.5">
+          <div className="flex items-center gap-3 border-b px-4 py-3.5">
             {isFetching ? (
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+              <Loader2 className="h-5 w-5 shrink-0 animate-spin text-muted-foreground" />
             ) : (
-              <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <Search className="h-5 w-5 shrink-0 text-muted-foreground" />
             )}
             <Command.Input
               value={inputValue}
               onValueChange={setInputValue}
               placeholder="Search or type a command…"
               className={cn(
-                "flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground",
+                "flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground",
               )}
             />
             {inputValue.length > 0 && (
@@ -291,7 +291,7 @@ export function CommandPalette() {
                 className="rounded p-0.5 text-muted-foreground hover:text-foreground"
                 aria-label="Clear search"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-4 w-4" />
               </button>
             )}
             <kbd
@@ -321,12 +321,12 @@ export function CommandPalette() {
                   value="create-task"
                   onSelect={() => setQuickCreateMode("task")}
                   className={cn(
-                    "flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm",
+                    "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-[15px]",
                     "aria-selected:bg-accent",
                   )}
                 >
-                  <span className="flex h-6 w-6 items-center justify-center rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                    <Plus className="h-3.5 w-3.5" />
+                  <span className="flex h-8 w-8 items-center justify-center rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                    <Plus className="h-4 w-4" />
                   </span>
                   <span>Create task</span>
                   <kbd className="ml-auto rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
@@ -338,12 +338,12 @@ export function CommandPalette() {
                   value="create-habit"
                   onSelect={() => setQuickCreateMode("habit")}
                   className={cn(
-                    "flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm",
+                    "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-[15px]",
                     "aria-selected:bg-accent",
                   )}
                 >
-                  <span className="flex h-6 w-6 items-center justify-center rounded bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400">
-                    <Plus className="h-3.5 w-3.5" />
+                  <span className="flex h-8 w-8 items-center justify-center rounded bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400">
+                    <Plus className="h-4 w-4" />
                   </span>
                   <span>Create habit</span>
                   <kbd className="ml-auto rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
@@ -358,18 +358,18 @@ export function CommandPalette() {
                       navigate(`/search?q=${encodeURIComponent(trimmed)}`);
                     }}
                     className={cn(
-                      "flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm",
+                      "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-[15px]",
                       "aria-selected:bg-accent",
                     )}
                   >
-                    <span className="flex h-6 w-6 items-center justify-center rounded bg-muted">
-                      <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="flex h-8 w-8 items-center justify-center rounded bg-muted">
+                      <Search className="h-4 w-4 text-muted-foreground" />
                     </span>
                     <span>
                       Search for{" "}
                       <strong className="font-medium">&ldquo;{trimmed}&rdquo;</strong>
                     </span>
-                    <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
+                    <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground" />
                   </Command.Item>
                 )}
               </Command.Group>
@@ -390,15 +390,15 @@ export function CommandPalette() {
                         value={`nav-${item.href}-${item.label}`}
                         onSelect={() => navigate(item.href)}
                         className={cn(
-                          "flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-sm",
+                          "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-[15px]",
                           "aria-selected:bg-accent",
                         )}
                       >
-                        <span className="flex h-6 w-6 items-center justify-center rounded bg-muted">
-                          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="flex h-8 w-8 items-center justify-center rounded bg-muted">
+                          <Icon className="h-4 w-4 text-muted-foreground" />
                         </span>
                         <span>Go to {item.label}</span>
-                        <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
+                        <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground" />
                       </Command.Item>
                     );
                   })}

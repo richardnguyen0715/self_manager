@@ -762,12 +762,32 @@ export interface WorkItemSubtask {
   updated_at: string;
 }
 
+/**
+ * BoardColumn — a user-defined column on the Kanban board.
+ * Mirrors the `board_columns` table row returned by GET /api/board-columns.
+ * mapped_status links the 5 seeded defaults back to work_item_status; custom
+ * columns have mapped_status = null.
+ */
+export interface BoardColumn {
+  id: string;
+  user_id?: string;
+  project_id: string | null;
+  name: string;
+  color: string | null;
+  position: number;
+  wip_limit: number | null;
+  mapped_status: WorkItemStatus | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WorkItem {
   id: string;
   user_id: string;
   project_id: string | null;
   epic_id: string | null;
   sprint_id: string | null;
+  column_id: string | null;
   type: WorkItemType;
   title: string;
   description: string | null;
@@ -791,6 +811,7 @@ export interface WorkItemListItem {
   project_id: string | null;
   epic_id: string | null;
   sprint_id: string | null;
+  column_id: string | null;
   type: WorkItemType;
   title: string;
   status: WorkItemStatus;
@@ -1037,10 +1058,16 @@ export const API_ENDPOINTS = {
   SPRINT_REVIEW: (id: string) => `/api/sprints/${id}/review`,
   SPRINT_RETRO: (id: string) => `/api/sprints/${id}/retrospective`,
 
+  // ── Board Columns (/api/board-columns) ───────────────────────────────────
+  BOARD_COLUMNS: "/api/board-columns",
+  BOARD_COLUMN_BY_ID: (id: string) => `/api/board-columns/${id}`,
+  BOARD_COLUMNS_REORDER: "/api/board-columns/reorder",
+
   // ── Work Items (/api/work-items) ──────────────────────────────────────────
   WORK_ITEMS: "/api/work-items",
   WORK_ITEM_BY_ID: (id: string) => `/api/work-items/${id}`,
   WORK_ITEM_STATUS: (id: string) => `/api/work-items/${id}/status`,
+  WORK_ITEM_COLUMN: (id: string) => `/api/work-items/${id}/column`,
   WORK_ITEM_POINTS: (id: string) => `/api/work-items/${id}/points`,
   WORK_ITEM_SPRINT: (id: string) => `/api/work-items/${id}/sprint`,
   WORK_ITEM_BACKLOG: (id: string) => `/api/work-items/${id}/backlog`,

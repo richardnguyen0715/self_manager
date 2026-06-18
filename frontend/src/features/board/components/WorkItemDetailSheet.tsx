@@ -306,7 +306,7 @@ export function WorkItemDetailSheet({ sprintId }: WorkItemDetailSheetProps) {
         onSuccess: () => {
           setNewSubtaskTitle("");
           setIsAddingSubtask(false);
-          qc.invalidateQueries({ queryKey: boardKeys.sprintItems(sprintId) });
+          qc.invalidateQueries({ queryKey: boardKeys.all });
         },
       },
     );
@@ -676,7 +676,7 @@ export function WorkItemDetailSheet({ sprintId }: WorkItemDetailSheetProps) {
                           {
                             onSuccess: () => {
                               qc.invalidateQueries({
-                                queryKey: boardKeys.sprintItems(sprintId),
+                                queryKey: boardKeys.all,
                               });
                             },
                           },
@@ -715,17 +715,57 @@ export function WorkItemDetailSheet({ sprintId }: WorkItemDetailSheetProps) {
                 </div>
               </DetailRow>
 
-              {/* Priority */}
+              {/* Priority — editable */}
               <DetailRow label="Priority">
-                <span
-                  className={cn(
-                    "flex items-center gap-1.5 text-sm font-medium",
-                    PRIORITY_COLORS[workItem.priority],
-                  )}
-                >
-                  <Flag className="h-3.5 w-3.5" />
-                  {PRIORITY_LABELS[workItem.priority]}
-                </span>
+                <DropdownMenuPrimitive.Root>
+                  <DropdownMenuPrimitive.Trigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex items-center gap-1.5 text-sm font-medium hover:opacity-80 transition-opacity",
+                        PRIORITY_COLORS[workItem.priority],
+                      )}
+                    >
+                      <Flag className="h-3.5 w-3.5" />
+                      {PRIORITY_LABELS[workItem.priority]}
+                      <ChevronDown className="h-3 w-3 opacity-50" />
+                    </button>
+                  </DropdownMenuPrimitive.Trigger>
+                  <DropdownMenuPrimitive.Portal>
+                    <DropdownMenuPrimitive.Content
+                      align="start"
+                      sideOffset={4}
+                      className="z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 shadow-md"
+                    >
+                      {(["critical", "high", "medium", "low"] as Priority[]).map(
+                        (p) => (
+                          <DropdownMenuPrimitive.Item
+                            key={p}
+                            onSelect={() =>
+                              updateItem.mutate(
+                                { priority: p },
+                                {
+                                  onSuccess: () =>
+                                    qc.invalidateQueries({ queryKey: boardKeys.all }),
+                                },
+                              )
+                            }
+                            className={cn(
+                              "flex cursor-default select-none items-center gap-1.5 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent",
+                              PRIORITY_COLORS[p],
+                            )}
+                          >
+                            <Flag className="h-3.5 w-3.5" />
+                            {PRIORITY_LABELS[p]}
+                            {workItem.priority === p && (
+                              <Check className="h-3 w-3 ml-auto" />
+                            )}
+                          </DropdownMenuPrimitive.Item>
+                        ),
+                      )}
+                    </DropdownMenuPrimitive.Content>
+                  </DropdownMenuPrimitive.Portal>
+                </DropdownMenuPrimitive.Root>
               </DetailRow>
 
               {/* Parent (epic) */}
@@ -740,16 +780,34 @@ export function WorkItemDetailSheet({ sprintId }: WorkItemDetailSheetProps) {
                 )}
               </DetailRow>
 
-              {/* Due date */}
+              {/* Due date — editable */}
               <DetailRow label="Due date">
-                {workItem.due_date ? (
-                  <span className="flex items-center gap-1.5 text-sm">
-                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                    {format(new Date(workItem.due_date), "MMM d, yyyy")}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground text-sm">None</span>
-                )}
+                <label className="flex items-center gap-1.5 text-sm cursor-pointer hover:text-primary transition-colors">
+                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                  {workItem.due_date ? (
+                    format(new Date(workItem.due_date), "MMM d, yyyy")
+                  ) : (
+                    <span className="text-muted-foreground">None</span>
+                  )}
+                  <input
+                    type="date"
+                    value={workItem.due_date?.slice(0, 10) ?? ""}
+                    onChange={(e) =>
+                      updateItem.mutate(
+                        {
+                          due_date: e.target.value
+                            ? `${e.target.value}T00:00:00Z`
+                            : null,
+                        },
+                        {
+                          onSuccess: () =>
+                            qc.invalidateQueries({ queryKey: boardKeys.all }),
+                        },
+                      )
+                    }
+                    className="sr-only"
+                  />
+                </label>
               </DetailRow>
 
               {/* Labels */}
@@ -807,7 +865,7 @@ export function WorkItemDetailSheet({ sprintId }: WorkItemDetailSheetProps) {
                               {
                                 onSuccess: () => {
                                   qc.invalidateQueries({
-                                    queryKey: boardKeys.sprintItems(sprintId),
+                                    queryKey: boardKeys.all,
                                   });
                                 },
                               },
@@ -864,6 +922,38 @@ function SheetWrapper({
   children: React.ReactNode;
   onClose: () => void;
 }) {
+  // Resizable width, persisted across opens.
+  const [width, setWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return 768;
+    const saved = Number(localStorage.getItem("mml_sheet_width"));
+    return saved >= 480 ? saved : 768;
+  });
+  const dragging = useRef(false);
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!dragging.current) return;
+      const w = Math.min(
+        Math.max(window.innerWidth - e.clientX, 480),
+        Math.min(1200, window.innerWidth - 80),
+      );
+      setWidth(w);
+    }
+    function onUp() {
+      if (dragging.current) {
+        dragging.current = false;
+        document.body.style.userSelect = "";
+        localStorage.setItem("mml_sheet_width", String(width));
+      }
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [width]);
+
   return (
     <div className="fixed inset-0 z-40 flex">
       {/* Backdrop */}
@@ -874,7 +964,19 @@ function SheetWrapper({
       />
 
       {/* Panel */}
-      <div className="relative ml-auto flex flex-col w-full max-w-3xl bg-background border-l shadow-2xl h-full overflow-hidden">
+      <div
+        className="relative ml-auto flex flex-col w-full bg-background border-l shadow-2xl h-full overflow-hidden"
+        style={{ maxWidth: `${width}px` }}
+      >
+        {/* Resize handle (left edge) */}
+        <div
+          onMouseDown={() => {
+            dragging.current = true;
+            document.body.style.userSelect = "none";
+          }}
+          className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize z-20 hover:bg-primary/40 transition-colors"
+          aria-label="Resize panel"
+        />
         {/* Close button */}
         <div className="absolute top-3 right-3 z-10">
           <Button

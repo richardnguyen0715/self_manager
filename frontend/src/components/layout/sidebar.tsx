@@ -19,6 +19,7 @@ import {
   Rocket,
   SquareKanban,
   Network,
+  FolderOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -79,9 +80,22 @@ export function Sidebar() {
       </div>
 
       {/* Project switcher */}
-      <div className={cn("px-2 py-2 border-b", !sidebarOpen && "px-1")}>
+      <div className={cn("px-2 py-2", !sidebarOpen && "px-1")}>
         <ProjectSwitcher collapsed={!sidebarOpen} />
       </div>
+
+      <Separator />
+
+      {/* Projects management link */}
+      <div className="px-2 py-2">
+        <NavLink
+          item={{ label: "Projects", href: "/projects", icon: FolderOpen }}
+          isActive={pathname.startsWith("/projects")}
+          collapsed={!sidebarOpen}
+        />
+      </div>
+
+      <Separator />
 
       {/* Nav */}
       <ScrollArea className="flex-1 px-2 py-3">

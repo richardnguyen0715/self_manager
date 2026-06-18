@@ -3,14 +3,17 @@
 //! Mounts all auth endpoints relative to the prefix that `main.rs` nests this
 //! router under (`/api/auth`):
 //!
-//! | Method | Path              | Handler                  | Auth required |
-//! |--------|-------------------|--------------------------|---------------|
-//! | POST   | /register         | [`handlers::register`]   | No            |
-//! | POST   | /login            | [`handlers::login`]      | No            |
-//! | POST   | /refresh          | [`handlers::refresh`]    | No            |
-//! | POST   | /logout           | [`handlers::logout`]     | Yes (access)  |
-//! | POST   | /logout-all       | [`handlers::logout_all`] | Yes (access)  |
-//! | GET    | /me               | [`handlers::me`]         | Yes (access)  |
+//! | Method | Path              | Handler                        | Auth required |
+//! |--------|-------------------|--------------------------------|---------------|
+//! | POST   | /register         | [`handlers::register`]         | No            |
+//! | POST   | /login            | [`handlers::login`]            | No            |
+//! | POST   | /refresh          | [`handlers::refresh`]          | No            |
+//! | POST   | /logout           | [`handlers::logout`]           | Yes (access)  |
+//! | POST   | /logout-all       | [`handlers::logout_all`]       | Yes (access)  |
+//! | GET    | /me               | [`handlers::me`]               | Yes (access)  |
+//! | PATCH  | /me               | [`handlers::update_me`]        | Yes (access)  |
+//! | POST   | /me/avatar        | [`handlers::upload_avatar`]    | Yes (access)  |
+//! | DELETE | /me/avatar        | [`handlers::delete_avatar`]    | Yes (access)  |
 
 use axum::{
     routing::{get, post},
@@ -31,5 +34,9 @@ pub fn router() -> Router<AppState> {
         .route("/refresh", post(handlers::refresh))
         .route("/logout", post(handlers::logout))
         .route("/logout-all", post(handlers::logout_all))
-        .route("/me", get(handlers::me))
+        .route("/me", get(handlers::me).patch(handlers::update_me))
+        .route(
+            "/me/avatar",
+            post(handlers::upload_avatar).delete(handlers::delete_avatar),
+        )
 }

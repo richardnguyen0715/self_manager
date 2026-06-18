@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
+import { DateInput } from "@/components/ui/date-input";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -409,10 +410,16 @@ export function TaskDialog() {
                   <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
                   Start date
                 </Label>
-                <Input
-                  id="task-start-date"
-                  type="date"
-                  {...register("start_date")}
+                <Controller
+                  control={control}
+                  name="start_date"
+                  render={({ field }) => (
+                    <DateInput
+                      id="task-start-date"
+                      value={field.value ?? ""}
+                      onChange={(v) => field.onChange(v || null)}
+                    />
+                  )}
                 />
               </div>
 
@@ -421,10 +428,16 @@ export function TaskDialog() {
                   <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
                   Due date
                 </Label>
-                <Input
-                  id="task-due-date"
-                  type="date"
-                  {...register("due_date")}
+                <Controller
+                  control={control}
+                  name="due_date"
+                  render={({ field }) => (
+                    <DateInput
+                      id="task-due-date"
+                      value={field.value ?? ""}
+                      onChange={(v) => field.onChange(v || null)}
+                    />
+                  )}
                 />
               </div>
             </div>

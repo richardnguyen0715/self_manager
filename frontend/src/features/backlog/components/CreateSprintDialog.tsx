@@ -5,7 +5,7 @@
  * Same Dialog + react-hook-form + zod pattern as TaskDialog.
  */
 
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DateInput } from "@/components/ui/date-input";
 import { cn } from "@/lib/utils";
 import { X, Loader2, CalendarDays, Hash } from "lucide-react";
 import { useCreateSprint } from "@/features/agile";
@@ -52,6 +53,7 @@ export function CreateSprintDialog() {
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
@@ -137,11 +139,17 @@ export function CreateSprintDialog() {
                 <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
                 Start date <span className="text-destructive">*</span>
               </Label>
-              <Input
-                id="sprint-start"
-                type="date"
-                {...register("start_date")}
-                className={cn(errors.start_date && "border-destructive")}
+              <Controller
+                control={control}
+                name="start_date"
+                render={({ field }) => (
+                  <DateInput
+                    id="sprint-start"
+                    value={field.value}
+                    onChange={field.onChange}
+                    className={cn(errors.start_date && "border-destructive")}
+                  />
+                )}
               />
               {errors.start_date && (
                 <p className="text-xs text-destructive">
@@ -154,11 +162,17 @@ export function CreateSprintDialog() {
                 <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
                 End date <span className="text-destructive">*</span>
               </Label>
-              <Input
-                id="sprint-end"
-                type="date"
-                {...register("end_date")}
-                className={cn(errors.end_date && "border-destructive")}
+              <Controller
+                control={control}
+                name="end_date"
+                render={({ field }) => (
+                  <DateInput
+                    id="sprint-end"
+                    value={field.value}
+                    onChange={field.onChange}
+                    className={cn(errors.end_date && "border-destructive")}
+                  />
+                )}
               />
               {errors.end_date && (
                 <p className="text-xs text-destructive">

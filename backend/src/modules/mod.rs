@@ -8,6 +8,7 @@
 pub mod analytics;
 pub mod auth;
 pub mod backlog;
+pub mod board_column;
 pub mod calendar;
 pub mod dashboard;
 pub mod epic;

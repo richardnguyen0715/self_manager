@@ -68,6 +68,8 @@ pub struct WorkItem {
     pub due_date: Option<DateTime<Utc>>,
     pub recurrence_rule: Option<String>,
     pub completed_at: Option<DateTime<Utc>>,
+    /// Board column assignment; `None` until the board is first opened (lazy seed).
+    pub column_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -108,6 +110,8 @@ pub struct WorkItemResponse {
     pub due_date: Option<DateTime<Utc>>,
     pub recurrence_rule: Option<String>,
     pub completed_at: Option<DateTime<Utc>>,
+    /// Board column assignment.
+    pub column_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub subtasks: Vec<WorkItemSubtask>,
@@ -130,6 +134,8 @@ pub struct WorkItemListItem {
     pub story_points: Option<i32>,
     pub due_date: Option<DateTime<Utc>>,
     pub position: i32,
+    /// Board column assignment.
+    pub column_id: Option<Uuid>,
     pub subtask_count: i64,
     pub done_subtask_count: i64,
     pub created_at: DateTime<Utc>,
@@ -339,6 +345,18 @@ pub struct MoveToSprintRequest {
 #[derive(Debug, Deserialize)]
 pub struct MoveToBacklogRequest {
     pub position: Option<i32>,
+}
+
+/// Body for `PATCH /api/work-items/:id/column`.
+///
+/// Moves the work item to the given board column. If `column_id` is `None`
+/// the item's column assignment is cleared. When the target column has a
+/// non-null `mapped_status`, the item's `status` field is also updated to
+/// keep enum-based views consistent.
+#[derive(Debug, Deserialize)]
+pub struct SetColumnRequest {
+    /// Target column UUID, or `null` to clear the assignment.
+    pub column_id: Option<Uuid>,
 }
 
 /// Body for `POST /api/work-items/:id/subtasks`.

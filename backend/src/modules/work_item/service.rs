@@ -22,8 +22,9 @@ use crate::shared::{
 use super::models::{
     Attachment, AttachmentRow, CreateLinkRequest, CreateSubtaskRequest, CreateWebLinkRequest,
     CreateWorkItemRequest, ListWorkItemsQuery, MoveToBacklogRequest, MoveToSprintRequest,
-    SetPointsRequest, SetStatusRequest, UpdateSubtaskRequest, UpdateWorkItemRequest, WebLink,
-    WorkItem, WorkItemLink, WorkItemListItem, WorkItemListResponse, WorkItemResponse, WorkItemSubtask,
+    SetColumnRequest, SetPointsRequest, SetStatusRequest, UpdateSubtaskRequest,
+    UpdateWorkItemRequest, WebLink, WorkItem, WorkItemLink, WorkItemListItem, WorkItemListResponse,
+    WorkItemResponse, WorkItemSubtask,
 };
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ async fn fetch_work_item_with_subtasks(
             priority::text AS "priority!",
             story_points, position,
             due_date, recurrence_rule, completed_at,
+            column_id,
             created_at, updated_at
         FROM work_items
         WHERE id = $1 AND user_id = $2
@@ -111,6 +113,7 @@ fn work_item_into_response(item: WorkItem, subtasks: Vec<WorkItemSubtask>) -> Wo
         due_date: item.due_date,
         recurrence_rule: item.recurrence_rule,
         completed_at: item.completed_at,
+        column_id: item.column_id,
         created_at: item.created_at,
         updated_at: item.updated_at,
         subtasks,
@@ -166,7 +169,8 @@ pub async fn list_work_items(
             wi.story_points,
             wi.due_date,
             wi.position,
-            COUNT(s.id)                         AS "subtask_count!: i64",
+            wi.column_id,
+            COUNT(s.id)                          AS "subtask_count!: i64",
             COUNT(s.id) FILTER (WHERE s.is_done) AS "done_subtask_count!: i64",
             wi.created_at,
             wi.updated_at
@@ -279,6 +283,7 @@ pub async fn create_work_item(
             priority::text AS "priority!",
             story_points, position,
             due_date, recurrence_rule, completed_at,
+            column_id,
             created_at, updated_at
         "#,
         user_id,
@@ -344,6 +349,7 @@ pub async fn update_work_item(
             priority::text AS "priority!",
             story_points, position,
             due_date, recurrence_rule, completed_at,
+            column_id,
             created_at, updated_at
         FROM work_items
         WHERE id = $1 AND user_id = $2
@@ -459,6 +465,7 @@ pub async fn update_work_item(
             priority::text AS "priority!",
             story_points, position,
             due_date, recurrence_rule, completed_at,
+            column_id,
             created_at, updated_at
         "#,
         item_id,
@@ -595,6 +602,7 @@ pub async fn set_status(
             priority::text AS "priority!",
             story_points, position,
             due_date, recurrence_rule, completed_at,
+            column_id,
             created_at, updated_at
         "#,
         item_id,
@@ -661,6 +669,7 @@ pub async fn set_points(
             priority::text AS "priority!",
             story_points, position,
             due_date, recurrence_rule, completed_at,
+            column_id,
             created_at, updated_at
         "#,
         item_id,
@@ -776,6 +785,7 @@ pub async fn move_to_sprint(
             priority::text AS "priority!",
             story_points, position,
             due_date, recurrence_rule, completed_at,
+            column_id,
             created_at, updated_at
         "#,
         item_id,
@@ -831,6 +841,7 @@ pub async fn move_to_backlog(
             priority::text AS "priority!",
             story_points, position,
             due_date, recurrence_rule, completed_at,
+            column_id,
             created_at, updated_at
         "#,
         item_id,
@@ -1066,6 +1077,137 @@ pub async fn delete_subtask(
     Ok(())
 }
 
+// ── Column assignment ──────────────────────────────────────────────────────────
+
+/// Set the board column for a work item.
+///
+/// If `req.column_id` is `Some(id)` the item is moved to that column and, when
+/// the column has a non-null `mapped_status`, the item's `status` is also
+/// updated to keep enum-based views (Backlog, Sprints, Reviews, Analytics)
+/// consistent.
+///
+/// If `req.column_id` is `None` the column assignment is cleared.
+///
+/// Returns the flat [`WorkItemResponse`] (with subtasks).
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — work item or target column not found / not owned.
+/// - [`AppError::Db`] — database failure.
+pub async fn set_column(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    req: SetColumnRequest,
+) -> AppResult<WorkItemResponse> {
+    // Verify ownership of the work item.
+    let item_exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !item_exists {
+        return Err(AppError::NotFound);
+    }
+
+    // When a target column is given, look up its mapped_status and verify ownership.
+    let mapped_status: Option<String> = if let Some(col_id) = req.column_id {
+        let row = sqlx::query!(
+            r#"
+            SELECT mapped_status::text AS "mapped_status?"
+            FROM board_columns
+            WHERE id = $1 AND user_id = $2
+            "#,
+            col_id,
+            user_id,
+        )
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
+        row.mapped_status
+    } else {
+        None
+    };
+
+    // Build the UPDATE. When mapped_status is present we also advance the
+    // work item's status enum so enum-based views stay in sync.
+    let updated = if let Some(ref new_status) = mapped_status {
+        sqlx::query_as!(
+            WorkItem,
+            r#"
+            UPDATE work_items
+            SET column_id  = $3,
+                status     = ($4::text)::work_item_status,
+                updated_at = now()
+            WHERE id = $1 AND user_id = $2
+            RETURNING
+                id, user_id, project_id, epic_id, sprint_id,
+                type::text     AS "item_type!",
+                title, description,
+                status::text   AS "status!",
+                priority::text AS "priority!",
+                story_points, position,
+                due_date, recurrence_rule, completed_at,
+                column_id,
+                created_at, updated_at
+            "#,
+            item_id,
+            user_id,
+            req.column_id as Option<Uuid>,
+            new_status,
+        )
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or(AppError::NotFound)?
+    } else {
+        sqlx::query_as!(
+            WorkItem,
+            r#"
+            UPDATE work_items
+            SET column_id  = $3,
+                updated_at = now()
+            WHERE id = $1 AND user_id = $2
+            RETURNING
+                id, user_id, project_id, epic_id, sprint_id,
+                type::text     AS "item_type!",
+                title, description,
+                status::text   AS "status!",
+                priority::text AS "priority!",
+                story_points, position,
+                due_date, recurrence_rule, completed_at,
+                column_id,
+                created_at, updated_at
+            "#,
+            item_id,
+            user_id,
+            req.column_id as Option<Uuid>,
+        )
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or(AppError::NotFound)?
+    };
+
+    let subtasks = sqlx::query_as!(
+        WorkItemSubtask,
+        r#"
+        SELECT id, work_item_id, title, is_done, position, created_at, updated_at
+        FROM work_item_subtasks
+        WHERE work_item_id = $1
+        ORDER BY position ASC, created_at ASC
+        "#,
+        item_id,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(work_item_into_response(updated, subtasks))
+}
+
 // ── Nested list helpers (called by epic/sprint modules) ───────────────────────
 
 /// List work items belonging to a specific sprint, verifying sprint ownership.
@@ -1112,6 +1254,7 @@ pub async fn list_items_for_sprint(
             wi.story_points,
             wi.due_date,
             wi.position,
+            wi.column_id,
             COUNT(s.id)                          AS "subtask_count!: i64",
             COUNT(s.id) FILTER (WHERE s.is_done) AS "done_subtask_count!: i64",
             wi.created_at,
@@ -1189,6 +1332,7 @@ pub async fn list_items_for_epic(
             wi.story_points,
             wi.due_date,
             wi.position,
+            wi.column_id,
             COUNT(s.id)                          AS "subtask_count!: i64",
             COUNT(s.id) FILTER (WHERE s.is_done) AS "done_subtask_count!: i64",
             wi.created_at,

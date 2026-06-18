@@ -1,15 +1,32 @@
 "use client";
 
 import { create } from "zustand";
-import type { WorkItemListItem, WorkItemStatus } from "@/types";
+import type {
+  WorkItemListItem,
+  WorkItemStatus,
+  WorkItemType,
+  Priority,
+  BoardColumn as BoardColumnDef,
+} from "@/types";
 
-// ─── Board column (virtual, derived from work_item_status) ────────────────────
+// ─── Board filters ──────────────────────────────────────────────────────────
 
-export interface BoardColumn {
-  status: WorkItemStatus;
-  label: string;
-  accentClass: string;
+export interface BoardFilters {
+  type: WorkItemType | "all";
+  priority: Priority | "all";
+  sprintId: string | "all" | "none";
+}
+
+// ─── Board column (runtime, carries inlined items array) ─────────────────────
+// Extends the API BoardColumn type with a runtime `items` list and an
+// `accentClass` derived from `color` for Tailwind border coloring.
+
+export interface BoardColumn extends BoardColumnDef {
+  /** Items currently in this column (optimistic, kept in sync with server). */
   items: WorkItemListItem[];
+  /** Tailwind border-color class derived from the column color; used for the
+   *  top border accent on each column card. */
+  accentClass: string;
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -22,10 +39,15 @@ interface BoardUIState {
   openItemId: string | null;
 
   /** id of column where the quick-create form is open; null = closed */
-  creatingInColumnStatus: WorkItemStatus | null;
+  creatingInColumnId: string | null;
 
   /** Whether a DnD drag is in flight (blocks duplicate drops) */
   isDragging: boolean;
+
+  /** Display filters applied to the board */
+  filters: BoardFilters;
+  setFilters: (patch: Partial<BoardFilters>) => void;
+  resetFilters: () => void;
 
   // ─── Actions ─────────────────────────────────────────────────────────────────
 
@@ -37,8 +59,8 @@ interface BoardUIState {
    */
   moveItem: (
     itemId: string,
-    srcStatus: WorkItemStatus,
-    dstStatus: WorkItemStatus,
+    srcColumnId: string,
+    dstColumnId: string,
     dstIndex: number,
   ) => void;
 
@@ -54,7 +76,7 @@ interface BoardUIState {
   openItemDetail: (itemId: string) => void;
   closeItemDetail: () => void;
 
-  openCreateInColumn: (status: WorkItemStatus) => void;
+  openCreateInColumn: (columnId: string) => void;
   closeCreateInColumn: () => void;
 
   setIsDragging: (v: boolean) => void;
@@ -63,19 +85,25 @@ interface BoardUIState {
 export const useBoardStore = create<BoardUIState>((set, get) => ({
   columns: [],
   openItemId: null,
-  creatingInColumnStatus: null,
+  creatingInColumnId: null,
   isDragging: false,
+  filters: { type: "all", priority: "all", sprintId: "all" },
+
+  setFilters: (patch) =>
+    set((state) => ({ filters: { ...state.filters, ...patch } })),
+  resetFilters: () =>
+    set({ filters: { type: "all", priority: "all", sprintId: "all" } }),
 
   setColumns: (columns) => set({ columns }),
 
-  moveItem: (itemId, srcStatus, dstStatus, dstIndex) => {
+  moveItem: (itemId, srcColumnId, dstColumnId, dstIndex) => {
     const cols = get().columns.map((c) => ({
       ...c,
       items: [...(c.items ?? [])],
     }));
 
-    const srcCol = cols.find((c) => c.status === srcStatus);
-    const dstCol = cols.find((c) => c.status === dstStatus);
+    const srcCol = cols.find((c) => c.id === srcColumnId);
+    const dstCol = cols.find((c) => c.id === dstColumnId);
     if (!srcCol || !dstCol) return;
 
     const srcItems = srcCol.items;
@@ -83,9 +111,17 @@ export const useBoardStore = create<BoardUIState>((set, get) => ({
     if (idx === -1) return;
 
     const [item] = srcItems.splice(idx, 1);
-    // When moving to a different column, update the status on the optimistic copy
+    // When moving to a different column, update column_id on the optimistic copy
+    // and also update status if the destination has a mapped_status.
     const movedItem: WorkItemListItem =
-      srcStatus !== dstStatus ? { ...item, status: dstStatus } : item;
+      srcColumnId !== dstColumnId
+        ? {
+            ...item,
+            column_id: dstColumnId,
+            // If the destination column maps to a status enum, reflect that too.
+            status: dstCol.mapped_status ?? item.status,
+          }
+        : item;
 
     srcCol.items = srcItems;
     const dstItems = dstCol.items;
@@ -114,19 +150,32 @@ export const useBoardStore = create<BoardUIState>((set, get) => ({
   },
 
   appendItem: (item) => {
-    set((state) => ({
-      columns: state.columns.map((col) => {
-        if (col.status !== item.status) return col;
-        return { ...col, items: [...(col.items ?? []), item] };
-      }),
-    }));
+    set((state) => {
+      // Place item in the column matching column_id, or fall back to the
+      // column whose mapped_status matches item.status, or first column.
+      const target = state.columns.find(
+        (col) =>
+          (item.column_id && col.id === item.column_id) ||
+          (!item.column_id && col.mapped_status === item.status),
+      ) ?? state.columns[0];
+
+      if (!target) return state;
+
+      return {
+        columns: state.columns.map((col) =>
+          col.id !== target.id
+            ? col
+            : { ...col, items: [...(col.items ?? []), item] },
+        ),
+      };
+    });
   },
 
   openItemDetail: (itemId) => set({ openItemId: itemId }),
   closeItemDetail: () => set({ openItemId: null }),
 
-  openCreateInColumn: (status) => set({ creatingInColumnStatus: status }),
-  closeCreateInColumn: () => set({ creatingInColumnStatus: null }),
+  openCreateInColumn: (columnId) => set({ creatingInColumnId: columnId }),
+  closeCreateInColumn: () => set({ creatingInColumnId: null }),
 
   setIsDragging: (v) => set({ isDragging: v }),
 }));

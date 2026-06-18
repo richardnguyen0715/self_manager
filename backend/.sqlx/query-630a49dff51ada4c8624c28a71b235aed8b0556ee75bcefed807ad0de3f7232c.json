@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT mapped_status::text AS \"mapped_status?\"\n            FROM board_columns\n            WHERE id = $1 AND user_id = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "mapped_status?",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "630a49dff51ada4c8624c28a71b235aed8b0556ee75bcefed807ad0de3f7232c"
+}

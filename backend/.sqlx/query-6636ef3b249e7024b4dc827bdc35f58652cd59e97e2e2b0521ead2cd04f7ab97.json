@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        UPDATE work_items\n        SET\n            project_id      = $3,\n            epic_id         = $4,\n            sprint_id       = $5,\n            type            = ($6::text)::work_item_type,\n            title           = $7,\n            description     = $8,\n            status          = ($9::text)::work_item_status,\n            priority        = ($10::text)::task_priority,\n            story_points    = $11,\n            position        = $12,\n            due_date        = $13,\n            recurrence_rule = $14,\n            completed_at    = $15,\n            updated_at      = now()\n        WHERE id = $1 AND user_id = $2\n        RETURNING\n            id, user_id, project_id, epic_id, sprint_id,\n            type::text     AS \"item_type!\",\n            title, description,\n            status::text   AS \"status!\",\n            priority::text AS \"priority!\",\n            story_points, position,\n            due_date, recurrence_rule, completed_at,\n            created_at, updated_at\n        ",
+  "query": "\n        UPDATE work_items\n        SET story_points = $3, updated_at = now()\n        WHERE id = $1 AND user_id = $2\n        RETURNING\n            id, user_id, project_id, epic_id, sprint_id,\n            type::text     AS \"item_type!\",\n            title, description,\n            status::text   AS \"status!\",\n            priority::text AS \"priority!\",\n            story_points, position,\n            due_date, recurrence_rule, completed_at,\n            column_id,\n            created_at, updated_at\n        ",
   "describe": {
     "columns": [
       {
@@ -80,11 +80,16 @@
       },
       {
         "ordinal": 15,
+        "name": "column_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 16,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 16,
+        "ordinal": 17,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -93,19 +98,7 @@
       "Left": [
         "Uuid",
         "Uuid",
-        "Uuid",
-        "Uuid",
-        "Uuid",
-        "Text",
-        "Text",
-        "Text",
-        "Text",
-        "Text",
-        "Int4",
-        "Int4",
-        "Timestamptz",
-        "Text",
-        "Timestamptz"
+        "Int4"
       ]
     },
     "nullable": [
@@ -124,9 +117,10 @@
       true,
       true,
       true,
+      true,
       false,
       false
     ]
   },
-  "hash": "53658017dcef4a48698543cd522180325de0f81e9a05a84b266a37bff4b8d1df"
+  "hash": "6636ef3b249e7024b4dc827bdc35f58652cd59e97e2e2b0521ead2cd04f7ab97"
 }

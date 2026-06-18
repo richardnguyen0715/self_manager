@@ -23,8 +23,9 @@ use super::{
     models::{
         Attachment, CreateLinkRequest, CreateSubtaskRequest, CreateWebLinkRequest,
         CreateWorkItemRequest, ListWorkItemsQuery, MoveToBacklogRequest, MoveToSprintRequest,
-        SetPointsRequest, SetStatusRequest, UpdateSubtaskRequest, UpdateWorkItemRequest, WebLink,
-        WorkItemLink, WorkItemListResponse, WorkItemResponse, WorkItemSubtask,
+        SetColumnRequest, SetPointsRequest, SetStatusRequest, UpdateSubtaskRequest,
+        UpdateWorkItemRequest, WebLink, WorkItemLink, WorkItemListResponse, WorkItemResponse,
+        WorkItemSubtask,
     },
     service,
 };
@@ -159,6 +160,24 @@ pub async fn move_to_sprint(
     Json(body): Json<MoveToSprintRequest>,
 ) -> AppResult<Json<WorkItemResponse>> {
     let item = service::move_to_sprint(&state, auth.user_id, item_id, body).await?;
+    Ok(Json(item))
+}
+
+// ── PATCH /api/work-items/:id/column ──────────────────────────────────────────
+
+/// Assign a work item to a board column (or clear the assignment with `null`).
+///
+/// When the target column has a non-null `mapped_status` the item's `status`
+/// field is also updated so enum-based views stay consistent.
+///
+/// Returns the full work item with subtasks.
+pub async fn set_column(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(item_id): Path<Uuid>,
+    Json(body): Json<SetColumnRequest>,
+) -> AppResult<Json<WorkItemResponse>> {
+    let item = service::set_column(&state, auth.user_id, item_id, body).await?;
     Ok(Json(item))
 }
 

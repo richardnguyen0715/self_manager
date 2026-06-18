@@ -5,7 +5,7 @@
 //! - call the service function,
 //! - return a typed JSON response or propagate [`AppError`].
 
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{extract::{Multipart, State}, http::StatusCode, Json};
 use validator::Validate;
 
 use crate::shared::{
@@ -16,10 +16,14 @@ use crate::shared::{
 
 use super::{
     models::{
-        AuthResponse, LoginRequest, RefreshRequest, RegisterRequest, TokenPairResponse, UserProfile,
+        AuthResponse, LoginRequest, RefreshRequest, RegisterRequest, TokenPairResponse,
+        UpdateProfileRequest, UserProfile,
     },
     service,
 };
+
+/// Absolute path to the uploads directory (same constant used by work_item).
+const UPLOADS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/uploads");
 
 // ── POST /api/auth/register ────────────────────────────────────────────────────
 
@@ -154,5 +158,150 @@ pub async fn logout_all(auth: AuthUser, State(state): State<AppState>) -> AppRes
 /// - 500 — internal error.
 pub async fn me(auth: AuthUser, State(state): State<AppState>) -> AppResult<Json<UserProfile>> {
     let profile = service::get_me(&state.db, auth.user_id).await?;
+    Ok(Json(profile))
+}
+
+// ── PATCH /api/auth/me ────────────────────────────────────────────────────────
+
+/// Partially update the authenticated user's profile.
+///
+/// Accepts an optional `display_name` and/or `timezone`; unset fields keep
+/// their current values (COALESCE semantics).  Returns the updated
+/// [`UserProfile`].
+///
+/// # Errors
+///
+/// - 401 — missing or invalid access token.
+/// - 404 — user record not found.
+/// - 422 — validation failed.
+/// - 500 — internal error.
+pub async fn update_me(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Json(body): Json<UpdateProfileRequest>,
+) -> AppResult<Json<UserProfile>> {
+    body.validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    let profile =
+        service::update_profile(&state.db, auth.user_id, body.display_name, body.timezone).await?;
+    Ok(Json(profile))
+}
+
+// ── POST /api/auth/me/avatar ──────────────────────────────────────────────────
+
+/// Upload a new avatar image for the authenticated user.
+///
+/// Expects `multipart/form-data` with a single field named `file` whose
+/// content-type starts with `image/`.  Saves the file to the `uploads/`
+/// directory, sets `users.avatar_url`, and returns the updated [`UserProfile`].
+///
+/// # Errors
+///
+/// - 401 — missing or invalid access token.
+/// - 404 — user record not found.
+/// - 422 — `file` field missing or not an image MIME type.
+/// - 500 — I/O or database error.
+pub async fn upload_avatar(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> AppResult<Json<UserProfile>> {
+    let mut file_bytes: Option<bytes::Bytes> = None;
+    let mut original_filename: Option<String> = None;
+    let mut mime_type: Option<String> = None;
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        AppError::Validation(format!("multipart error: {e}"))
+    })? {
+        if field.name().unwrap_or("") == "file" {
+            original_filename = field
+                .file_name()
+                .map(ToOwned::to_owned)
+                .or_else(|| Some("avatar".to_owned()));
+            mime_type = field.content_type().map(ToOwned::to_owned);
+            let data = field.bytes().await.map_err(|e| {
+                AppError::Validation(format!("failed to read file field: {e}"))
+            })?;
+            file_bytes = Some(data);
+            break;
+        }
+    }
+
+    let bytes = file_bytes
+        .ok_or_else(|| AppError::Validation("multipart field 'file' is required".to_owned()))?;
+
+    // Validate MIME type.
+    let mime = mime_type.unwrap_or_default();
+    if !mime.starts_with("image/") {
+        return Err(AppError::Validation(
+            "uploaded file must be an image (image/* MIME type required)".to_owned(),
+        ));
+    }
+
+    // Build a uuid-prefixed, sanitised filename.
+    let raw_name = original_filename.unwrap_or_else(|| "avatar".to_owned());
+    let sanitized: String = raw_name
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '.' || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let sanitized = sanitized.trim_matches('_');
+    let sanitized = if sanitized.is_empty() { "avatar" } else { sanitized };
+
+    let file_id = uuid::Uuid::new_v4();
+    let stored_name = format!("{file_id}-{sanitized}");
+    let uploads_dir = std::path::Path::new(UPLOADS_DIR);
+    let full_path = uploads_dir.join(&stored_name);
+
+    std::fs::create_dir_all(uploads_dir).map_err(|e| {
+        AppError::InternalMsg(anyhow::anyhow!("failed to create uploads directory: {e}"))
+    })?;
+
+    tokio::fs::write(&full_path, &bytes).await.map_err(|e| {
+        AppError::InternalMsg(anyhow::anyhow!(
+            "failed to write avatar file {}: {e}",
+            full_path.display()
+        ))
+    })?;
+
+    let avatar_url = format!("/uploads/{stored_name}");
+    let profile = service::set_avatar(&state.db, auth.user_id, avatar_url).await?;
+    Ok(Json(profile))
+}
+
+// ── DELETE /api/auth/me/avatar ────────────────────────────────────────────────
+
+/// Clear the authenticated user's avatar.
+///
+/// Sets `users.avatar_url` to NULL and attempts to remove the file from disk
+/// (best-effort; disk errors are silently ignored).  Returns the updated
+/// [`UserProfile`] with `avatar_url: null`.
+///
+/// # Errors
+///
+/// - 401 — missing or invalid access token.
+/// - 404 — user record not found.
+/// - 500 — database error.
+pub async fn delete_avatar(
+    auth: AuthUser,
+    State(state): State<AppState>,
+) -> AppResult<Json<UserProfile>> {
+    let (old_url, profile) = service::clear_avatar(&state.db, auth.user_id).await?;
+
+    // Best-effort: remove the old file from disk.
+    if let Some(url) = old_url {
+        // url is "/uploads/<filename>"; strip the leading "/uploads/" prefix.
+        if let Some(filename) = url.strip_prefix("/uploads/") {
+            let full_path = std::path::Path::new(UPLOADS_DIR).join(filename);
+            let _ = tokio::fs::remove_file(&full_path).await;
+        }
+    }
+
     Ok(Json(profile))
 }

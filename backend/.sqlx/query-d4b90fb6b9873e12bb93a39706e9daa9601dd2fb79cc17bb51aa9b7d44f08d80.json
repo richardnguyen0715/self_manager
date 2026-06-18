@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id\n        FROM board_columns\n        WHERE user_id  = $1\n          AND id      != $2\n          AND ($3::uuid IS NULL AND project_id IS NULL\n               OR project_id = $3)\n        ORDER BY position ASC, created_at ASC\n        LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d4b90fb6b9873e12bb93a39706e9daa9601dd2fb79cc17bb51aa9b7d44f08d80"
+}

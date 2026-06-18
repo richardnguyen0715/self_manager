@@ -11,7 +11,7 @@ import {
 import { format, isPast, isToday, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import type { WorkItemListItem, WorkItemStatus, Priority } from "@/types";
+import type { WorkItemListItem, Priority } from "@/types";
 import { WorkItemTypeBadge } from "@/features/agile/components/WorkItemTypeBadge";
 import { useBoardStore } from "../store";
 
@@ -24,7 +24,10 @@ const PRIORITY_ICON_COLORS: Record<Priority, string> = {
   low: "text-blue-400",
 };
 
-const PRIORITY_BADGE_VARIANT: Record<Priority, "critical" | "high" | "medium" | "low"> = {
+const PRIORITY_BADGE_VARIANT: Record<
+  Priority,
+  "critical" | "high" | "medium" | "low"
+> = {
   critical: "critical",
   high: "high",
   medium: "medium",
@@ -35,14 +38,15 @@ const PRIORITY_BADGE_VARIANT: Record<Priority, "critical" | "high" | "medium" | 
 
 interface BoardCardProps {
   item: WorkItemListItem;
-  columnStatus: WorkItemStatus;
+  /** The id of the column this card currently lives in (used for DnD data). */
+  columnId: string;
   /** When true the card renders as a static drag-overlay clone */
   isOverlay?: boolean;
 }
 
 export function BoardCard({
   item,
-  columnStatus,
+  columnId,
   isOverlay = false,
 }: BoardCardProps) {
   const openItemDetail = useBoardStore((s) => s.openItemDetail);
@@ -56,7 +60,7 @@ export function BoardCard({
     isDragging,
   } = useSortable({
     id: item.id,
-    data: { type: "board-card", itemId: item.id, columnStatus },
+    data: { type: "board-card", itemId: item.id, columnId },
   });
 
   const style = {
@@ -139,7 +143,10 @@ export function BoardCard({
           <div className="flex items-center gap-2">
             {/* Priority flag */}
             <Flag
-              className={cn("h-3 w-3 shrink-0", PRIORITY_ICON_COLORS[item.priority])}
+              className={cn(
+                "h-3 w-3 shrink-0",
+                PRIORITY_ICON_COLORS[item.priority],
+              )}
               aria-label={`Priority: ${item.priority}`}
             />
 

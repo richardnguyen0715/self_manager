@@ -1,0 +1,80 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE board_columns\n        SET name       = $3,\n            color      = $4,\n            wip_limit  = $5,\n            updated_at = now()\n        WHERE id = $1 AND user_id = $2\n        RETURNING\n            id, user_id, project_id, name, color, position, wip_limit,\n            mapped_status::text AS \"mapped_status?\",\n            created_at, updated_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "project_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "position",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "wip_limit",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "mapped_status?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "506d9c75d7fe04f657da1013af1266b93d1d025be711cd98d0bdf40ff44ed075"
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DateInput } from "@/components/ui/date-input";
 import { useCreateProject, type CreateProjectPayload } from "../hooks/useGoals";
 
 // ─── Schema ────────────────────────────────────────────────────────────────────
@@ -65,6 +66,7 @@ export function ProjectForm({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     setValue,
@@ -176,10 +178,16 @@ export function ProjectForm({
                   Deadline{" "}
                   <span className="text-muted-foreground font-normal">(optional)</span>
                 </Label>
-                <Input
-                  id="project-deadline"
-                  type="date"
-                  {...register("deadline")}
+                <Controller
+                  control={control}
+                  name="deadline"
+                  render={({ field }) => (
+                    <DateInput
+                      id="project-deadline"
+                      value={field.value ?? ""}
+                      onChange={(v) => field.onChange(v || null)}
+                    />
+                  )}
                 />
                 {errors.deadline && (
                   <p className="text-xs text-destructive">

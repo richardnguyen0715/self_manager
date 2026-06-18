@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { DateInput } from "@/components/ui/date-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import type { Priority, TaskStatus } from "@/types";
@@ -76,6 +77,7 @@ export function CardDetailDialog() {
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isDirty, isSubmitting },
@@ -230,11 +232,31 @@ export function CardDetailDialog() {
                   <CalendarDays className="inline h-3 w-3 mr-1" />
                   Start date
                 </Label>
-                <Input id="detail-start" type="date" {...register("start_date")} />
+                <Controller
+                  control={control}
+                  name="start_date"
+                  render={({ field }) => (
+                    <DateInput
+                      id="detail-start"
+                      value={field.value ?? ""}
+                      onChange={(v) => field.onChange(v || undefined)}
+                    />
+                  )}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="detail-due">Due date</Label>
-                <Input id="detail-due" type="date" {...register("due_date")} />
+                <Controller
+                  control={control}
+                  name="due_date"
+                  render={({ field }) => (
+                    <DateInput
+                      id="detail-due"
+                      value={field.value ?? ""}
+                      onChange={(v) => field.onChange(v || undefined)}
+                    />
+                  )}
+                />
               </div>
             </div>
 

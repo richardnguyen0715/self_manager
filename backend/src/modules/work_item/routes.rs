@@ -10,6 +10,7 @@
 //! DELETE /api/work-items/:id                          delete_work_item
 //! PATCH  /api/work-items/:id/status                   set_status
 //! PATCH  /api/work-items/:id/points                   set_points
+//! PATCH  /api/work-items/:id/column                   set_column
 //! PATCH  /api/work-items/:id/sprint                   move_to_sprint
 //! PATCH  /api/work-items/:id/backlog                  move_to_backlog
 //! GET    /api/work-items/:id/subtasks                 list_subtasks
@@ -58,6 +59,8 @@ pub fn router() -> Router<AppState> {
         .route("/:id/status", patch(handlers::set_status))
         // Sub-resource: story points
         .route("/:id/points", patch(handlers::set_points))
+        // Sub-resource: board column assignment
+        .route("/:id/column", patch(handlers::set_column))
         // Sub-resource: sprint / backlog moves
         .route("/:id/sprint", patch(handlers::move_to_sprint))
         .route("/:id/backlog", patch(handlers::move_to_backlog))

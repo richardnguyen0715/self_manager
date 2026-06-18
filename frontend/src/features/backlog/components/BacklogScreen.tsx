@@ -19,8 +19,19 @@
  */
 
 import { Loader2, AlertCircle } from "lucide-react";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  pointerWithin,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useSprints, useEpics } from "@/features/agile";
+import { api } from "@/lib/api";
+import { API_ENDPOINTS } from "@/types";
 import { useProjectStore } from "@/stores";
 import { BacklogFilterBar } from "./BacklogFilterBar";
 import { SprintSection } from "./SprintSection";
@@ -62,6 +73,48 @@ export function BacklogScreen() {
   );
 
   const { data: epicsData } = useEpics();
+  const qc = useQueryClient();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
+
+  // Move an item to a sprint (sprintId) or back to the backlog (sprintId null).
+  const move = useMutation({
+    mutationFn: ({
+      itemId,
+      sprintId,
+    }: {
+      itemId: string;
+      sprintId: string | null;
+    }) =>
+      sprintId
+        ? api.patch(API_ENDPOINTS.WORK_ITEM_SPRINT(itemId), {
+            sprint_id: sprintId,
+          })
+        : api.patch(API_ENDPOINTS.WORK_ITEM_BACKLOG(itemId), {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["backlog"] });
+      qc.invalidateQueries({ queryKey: ["sprints"] });
+      qc.invalidateQueries({ queryKey: ["work-items"] });
+    },
+  });
+
+  function onDragEnd(e: DragEndEvent) {
+    const data = e.active.data.current as
+      | { type: "backlog-item"; itemId: string; fromSprintId: string | null }
+      | undefined;
+    const over = e.over?.data.current as
+      | { type: "sprint-drop"; sprintId: string }
+      | { type: "backlog-drop" }
+      | undefined;
+    if (!data || data.type !== "backlog-item" || !over) return;
+
+    const targetSprintId =
+      over.type === "sprint-drop" ? over.sprintId : null;
+    if ((data.fromSprintId ?? null) === targetSprintId) return; // no-op
+    move.mutate({ itemId: data.itemId, sprintId: targetSprintId });
+  }
 
   const allSprints = sprintsData?.data ?? [];
   const sortedSprints = sortSprints(allSprints);
@@ -92,19 +145,25 @@ export function BacklogScreen() {
       {/* Filter bar */}
       <BacklogFilterBar epics={epics} />
 
-      {/* Sprint sections + Backlog section */}
-      <div className="space-y-3">
-        {sortedSprints.map((sprint) => (
-          <SprintSection
-            key={sprint.id}
-            sprint={sprint}
-            allSprints={allSprints}
-          />
-        ))}
+      {/* Sprint sections + Backlog section — drag work items between them */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        onDragEnd={onDragEnd}
+      >
+        <div className="space-y-3">
+          {sortedSprints.map((sprint) => (
+            <SprintSection
+              key={sprint.id}
+              sprint={sprint}
+              allSprints={allSprints}
+            />
+          ))}
 
-        {/* Backlog (unscheduled) — always rendered last */}
-        <BacklogSection sprints={allSprints} epics={epics} />
-      </div>
+          {/* Backlog (unscheduled) — always rendered last */}
+          <BacklogSection sprints={allSprints} epics={epics} />
+        </div>
+      </DndContext>
 
       {/* Dialogs — portal-rendered, driven by useBacklogStore */}
       <CreateWorkItemDialog sprints={allSprints} epics={epics} />

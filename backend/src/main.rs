@@ -86,7 +86,9 @@ async fn main() -> anyhow::Result<()> {
         .nest("/epics",         modules::epic::router())
         .nest("/sprints",       modules::sprint::router())
         .nest("/work-items",    modules::work_item::router())
-        .nest("/backlog",       modules::backlog::router());
+        .nest("/backlog",       modules::backlog::router())
+        // ── Board columns (dynamic board) ─────────────────────────────────────
+        .nest("/board-columns", modules::board_column::router());
 
     let app = Router::new()
         .nest("/api", api_router)

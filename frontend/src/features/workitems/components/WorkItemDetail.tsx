@@ -23,6 +23,7 @@ import {
   Check,
   X,
   Trash2,
+  Download,
   SquareKanban,
   MessageSquare,
   Clock,
@@ -217,26 +218,44 @@ interface AttachmentRowProps {
 function AttachmentRow({ attachment, workItemId }: AttachmentRowProps) {
   const remove = useDeleteAttachment(workItemId);
   const isImage = attachment.mime_type?.startsWith("image/") ?? false;
+  const fileUrl = NEXT_PUBLIC_API_URL + attachment.url;
 
   return (
     <div className="group flex items-start gap-2 py-2 border-b border-border/50 last:border-0">
-      {isImage ? (
-        <img
-          src={NEXT_PUBLIC_API_URL + attachment.url}
-          alt={attachment.filename}
-          className="h-14 w-14 rounded object-cover shrink-0 border border-border"
-        />
-      ) : (
-        <div className="h-10 w-10 rounded border border-border flex items-center justify-center shrink-0 bg-muted">
-          <FileIcon className="h-5 w-5 text-muted-foreground" />
-        </div>
-      )}
+      <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
+        {isImage ? (
+          <img
+            src={fileUrl}
+            alt={attachment.filename}
+            className="h-14 w-14 rounded object-cover border border-border hover:opacity-80 transition-opacity"
+          />
+        ) : (
+          <div className="h-10 w-10 rounded border border-border flex items-center justify-center bg-muted hover:bg-accent transition-colors">
+            <FileIcon className="h-5 w-5 text-muted-foreground" />
+          </div>
+        )}
+      </a>
       <div className="flex-1 min-w-0">
-        <p className="text-sm truncate font-medium">{attachment.filename}</p>
+        <a
+          href={fileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm truncate font-medium text-primary hover:underline block"
+        >
+          {attachment.filename}
+        </a>
         {attachment.size_bytes != null && (
           <p className="text-xs text-muted-foreground">{formatBytes(attachment.size_bytes)}</p>
         )}
       </div>
+      <a
+        href={fileUrl}
+        download={attachment.filename}
+        className="h-6 w-6 inline-flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1 text-muted-foreground hover:bg-accent"
+        aria-label="Download attachment"
+      >
+        <Download className="h-3.5 w-3.5" />
+      </a>
       <Button
         variant="ghost"
         size="icon"

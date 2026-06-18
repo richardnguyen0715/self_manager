@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*)\n        FROM board_columns\n        WHERE user_id = $1\n          AND ($2::uuid IS NULL AND project_id IS NULL\n               OR project_id = $2)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a62b44239a24fa69759ab58bfa66e2e71bdd2627b2e3a7fb28dd754da592c428"
+}

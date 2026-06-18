@@ -12,8 +12,10 @@ import {
   ArrowRight,
   ArrowLeft,
   Calendar,
+  GripVertical,
 } from "lucide-react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
+import { useDraggable } from "@dnd-kit/core";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +90,11 @@ export function WorkItemRow({
   const moveToBacklog = useMoveWorkItemToBacklog(item.id);
   const deleteItem = useDeleteWorkItem();
 
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: item.id,
+    data: { type: "backlog-item", itemId: item.id, fromSprintId: sprintId ?? null },
+  });
+
   const isInSprint = Boolean(sprintId);
 
   // Sprints this item can be moved TO (exclude current)
@@ -108,7 +115,24 @@ export function WorkItemRow({
       : 0;
 
   return (
-    <div className="group flex items-center gap-2 px-4 py-2 hover:bg-accent/40 transition-colors">
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "group flex items-center gap-2 px-4 py-2 hover:bg-accent/40 transition-colors",
+        isDragging && "opacity-40",
+      )}
+    >
+      {/* Drag handle */}
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+        aria-label="Drag to move"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+
       {/* Type icon */}
       <WorkItemTypeBadge type={item.type} className="shrink-0" />
 

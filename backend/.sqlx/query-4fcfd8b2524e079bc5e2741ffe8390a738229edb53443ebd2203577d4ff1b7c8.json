@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            wi.id,\n            wi.project_id,\n            wi.epic_id,\n            wi.sprint_id,\n            wi.type::text      AS \"item_type!\",\n            wi.title,\n            wi.status::text    AS \"status!\",\n            wi.priority::text  AS \"priority!\",\n            wi.story_points,\n            wi.due_date,\n            wi.position,\n            COUNT(s.id)                         AS \"subtask_count!: i64\",\n            COUNT(s.id) FILTER (WHERE s.is_done) AS \"done_subtask_count!: i64\",\n            wi.created_at,\n            wi.updated_at\n        FROM work_items wi\n        LEFT JOIN work_item_subtasks s ON s.work_item_id = wi.id\n        WHERE wi.user_id = $1\n          AND ($2::uuid IS NULL OR wi.project_id = $2)\n          AND ($3::uuid IS NULL OR wi.sprint_id  = $3)\n          AND ($4::uuid IS NULL OR wi.epic_id    = $4)\n          AND ($5::text IS NULL OR wi.status::text   = $5)\n          AND ($6::text IS NULL OR wi.type::text     = $6)\n          AND ($7::text IS NULL OR wi.priority::text = $7)\n        GROUP BY wi.id\n        ORDER BY wi.position ASC, wi.created_at ASC\n        LIMIT $8 OFFSET $9\n        ",
+  "query": "\n        SELECT\n            wi.id,\n            wi.project_id,\n            wi.epic_id,\n            wi.sprint_id,\n            wi.type::text      AS \"item_type!\",\n            wi.title,\n            wi.status::text    AS \"status!\",\n            wi.priority::text  AS \"priority!\",\n            wi.story_points,\n            wi.due_date,\n            wi.position,\n            wi.column_id,\n            COUNT(s.id)                          AS \"subtask_count!: i64\",\n            COUNT(s.id) FILTER (WHERE s.is_done) AS \"done_subtask_count!: i64\",\n            wi.created_at,\n            wi.updated_at\n        FROM work_items wi\n        LEFT JOIN work_item_subtasks s ON s.work_item_id = wi.id\n        WHERE wi.user_id = $1\n          AND ($2::uuid IS NULL OR wi.project_id = $2)\n          AND ($3::uuid IS NULL OR wi.sprint_id  = $3)\n          AND ($4::uuid IS NULL OR wi.epic_id    = $4)\n          AND ($5::text IS NULL OR wi.status::text   = $5)\n          AND ($6::text IS NULL OR wi.type::text     = $6)\n          AND ($7::text IS NULL OR wi.priority::text = $7)\n        GROUP BY wi.id\n        ORDER BY wi.position ASC, wi.created_at ASC\n        LIMIT $8 OFFSET $9\n        ",
   "describe": {
     "columns": [
       {
@@ -60,21 +60,26 @@
       },
       {
         "ordinal": 11,
+        "name": "column_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 12,
         "name": "subtask_count!: i64",
         "type_info": "Int8"
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "done_subtask_count!: i64",
         "type_info": "Int8"
       },
       {
-        "ordinal": 13,
+        "ordinal": 14,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 14,
+        "ordinal": 15,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -104,11 +109,12 @@
       true,
       true,
       false,
+      true,
       null,
       null,
       false,
       false
     ]
   },
-  "hash": "43b952c20c77fed84fd16ee0b23ce1b71a7c5f9079625b4a7bdc54895a6f35f5"
+  "hash": "4fcfd8b2524e079bc5e2741ffe8390a738229edb53443ebd2203577d4ff1b7c8"
 }

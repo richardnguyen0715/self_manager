@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { WorkItemListItem, Sprint, Epic } from "@/types";
+import { useDroppable } from "@dnd-kit/core";
 import { useBacklog } from "@/features/agile";
 import { useBacklogStore } from "../store/useBacklogStore";
 import { useProjectStore } from "@/stores";
@@ -78,8 +79,19 @@ export function BacklogSection({ sprints, epics: _epics }: BacklogSectionProps) 
 
   const activeSprints = sprints.filter((s) => s.status !== "completed");
 
+  const { setNodeRef: dropRef, isOver } = useDroppable({
+    id: "backlog-drop",
+    data: { type: "backlog-drop" },
+  });
+
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div
+      ref={dropRef}
+      className={cn(
+        "rounded-lg border bg-card overflow-hidden transition-shadow",
+        isOver && "ring-2 ring-primary ring-offset-1",
+      )}
+    >
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-card">
         {/* Collapse toggle */}

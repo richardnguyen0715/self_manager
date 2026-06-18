@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE board_columns\n            SET position   = $3,\n                updated_at = now()\n            WHERE id = $1 AND user_id = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "67578ebbf6cd7804e1895cf46475b5a1cdceb5290e0f0702df60c8a150d412d8"
+}

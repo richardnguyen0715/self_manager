@@ -1,0 +1,77 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            id, user_id, project_id, name, color, position, wip_limit,\n            mapped_status::text AS \"mapped_status?\",\n            created_at, updated_at\n        FROM board_columns\n        WHERE id = $1 AND user_id = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "project_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "position",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "wip_limit",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "mapped_status?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "b1e417ea5eca4487fc07194f6cb4099e9113354a43695407e43f568b57ef81d5"
+}

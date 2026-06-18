@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*)\n        FROM board_columns\n        WHERE user_id = $1\n          AND id = ANY($2)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "f91509f06bffb50c5b24b52548dbdfd031cc61832d6a4aa2ad7d73afa7021436"
+}

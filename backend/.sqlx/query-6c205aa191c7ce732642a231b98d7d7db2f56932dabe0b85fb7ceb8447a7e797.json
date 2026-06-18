@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COALESCE(MAX(position), -1) + 1\n        FROM board_columns\n        WHERE user_id = $1\n          AND ($2::uuid IS NULL AND project_id IS NULL\n               OR project_id = $2)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "?column?",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "6c205aa191c7ce732642a231b98d7d7db2f56932dabe0b85fb7ceb8447a7e797"
+}

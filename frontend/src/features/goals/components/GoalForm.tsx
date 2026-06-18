@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DateInput } from "@/components/ui/date-input";
 import type { Goal, GoalStatus } from "@/types";
 import {
   useCreateGoal,
@@ -59,6 +60,7 @@ export function GoalForm({ open, onOpenChange, goal }: GoalFormProps) {
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
@@ -198,10 +200,16 @@ export function GoalForm({ open, onOpenChange, goal }: GoalFormProps) {
                   Target Date{" "}
                   <span className="text-muted-foreground font-normal">(optional)</span>
                 </Label>
-                <Input
-                  id="goal-target-date"
-                  type="date"
-                  {...register("target_date")}
+                <Controller
+                  control={control}
+                  name="target_date"
+                  render={({ field }) => (
+                    <DateInput
+                      id="goal-target-date"
+                      value={field.value ?? ""}
+                      onChange={(v) => field.onChange(v || null)}
+                    />
+                  )}
                 />
                 {errors.target_date && (
                   <p className="text-xs text-destructive">

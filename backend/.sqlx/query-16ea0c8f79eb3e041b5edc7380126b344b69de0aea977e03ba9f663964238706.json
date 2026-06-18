@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE work_items\n        SET column_id  = $3,\n            updated_at = now()\n        WHERE column_id = $1\n          AND user_id   = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "16ea0c8f79eb3e041b5edc7380126b344b69de0aea977e03ba9f663964238706"
+}

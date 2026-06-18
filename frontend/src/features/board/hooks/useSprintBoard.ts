@@ -9,44 +9,244 @@ import type {
   WorkItemListItem,
   WorkItem,
   AgileListResponse,
+  BoardColumn as BoardColumnDef,
   WorkItemStatus,
 } from "@/types";
 import type { CreateWorkItemPayload } from "@/features/agile/types";
 import { useBoardStore, type BoardColumn } from "../store";
 
-// ─── Column configuration ─────────────────────────────────────────────────────
+// ─── Color -> Tailwind accent class ──────────────────────────────────────────
 
-export const BOARD_COLUMNS: Pick<BoardColumn, "status" | "label" | "accentClass">[] = [
-  {
-    status: "todo",
-    label: "To Do",
-    accentClass: "border-violet-500",
-  },
-  {
-    status: "in_progress",
-    label: "In Progress",
-    accentClass: "border-sky-500",
-  },
-  {
-    status: "review",
-    label: "In Review",
-    accentClass: "border-amber-500",
-  },
-  {
-    status: "done",
-    label: "Done",
-    accentClass: "border-emerald-500",
-  },
-];
+/** Map a hex color to the closest named Tailwind border-color class.
+ *  The 5 seeded defaults each have a known color; custom columns fall back
+ *  to a neutral border. */
+function colorToAccentClass(color: string | null): string {
+  if (!color) return "border-border";
+  const map: Record<string, string> = {
+    "#94a3b8": "border-slate-400",
+    "#8b5cf6": "border-violet-500",
+    "#0ea5e9": "border-sky-500",
+    "#f59e0b": "border-amber-500",
+    "#10b981": "border-emerald-500",
+  };
+  return map[color.toLowerCase()] ?? "border-primary/60";
+}
 
 // ─── Query keys ───────────────────────────────────────────────────────────────
 
 export const boardKeys = {
   all: ["board"] as const,
+  columns: (projectId: string | null) =>
+    [...boardKeys.all, "columns", projectId ?? "all"] as const,
   activeSprint: () => [...boardKeys.all, "active-sprint"] as const,
   sprintItems: (sprintId: string) =>
     [...boardKeys.all, "sprint-items", sprintId] as const,
+  items: (projectId: string | null) =>
+    [...boardKeys.all, "items", projectId ?? "all"] as const,
 };
+
+// ─── useBoardColumns — GET + lazy-seed + hydrate store ───────────────────────
+
+export function useBoardColumns(projectId: string | null) {
+  return useQuery<BoardColumnDef[]>({
+    queryKey: boardKeys.columns(projectId),
+    queryFn: async () => {
+      const params = projectId ? { project_id: projectId } : {};
+      return api.get<BoardColumnDef[]>(API_ENDPOINTS.BOARD_COLUMNS, params);
+    },
+    staleTime: 30_000,
+  });
+}
+
+// ─── useCreateColumn ─────────────────────────────────────────────────────────
+
+interface CreateColumnPayload {
+  name: string;
+  color?: string | null;
+  project_id?: string | null;
+  wip_limit?: number | null;
+}
+
+export function useCreateColumn() {
+  const qc = useQueryClient();
+  return useMutation<BoardColumnDef, Error, CreateColumnPayload>({
+    mutationFn: (payload) =>
+      api.post<BoardColumnDef>(API_ENDPOINTS.BOARD_COLUMNS, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: boardKeys.all });
+    },
+  });
+}
+
+// ─── useUpdateColumn ─────────────────────────────────────────────────────────
+
+interface UpdateColumnPayload {
+  id: string;
+  name?: string;
+  color?: string | null;
+  wip_limit?: number | null;
+}
+
+export function useUpdateColumn() {
+  const qc = useQueryClient();
+  return useMutation<BoardColumnDef, Error, UpdateColumnPayload>({
+    mutationFn: ({ id, ...body }) =>
+      api.patch<BoardColumnDef>(API_ENDPOINTS.BOARD_COLUMN_BY_ID(id), body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: boardKeys.all });
+    },
+  });
+}
+
+// ─── useDeleteColumn ─────────────────────────────────────────────────────────
+
+export function useDeleteColumn() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: (id) =>
+      api.delete<void>(API_ENDPOINTS.BOARD_COLUMN_BY_ID(id)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: boardKeys.all });
+      qc.invalidateQueries({ queryKey: ["work-items"] });
+    },
+  });
+}
+
+// ─── useReorderColumns ───────────────────────────────────────────────────────
+
+export function useReorderColumns() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { ids: string[] }>({
+    mutationFn: (body) =>
+      api.put<void>(API_ENDPOINTS.BOARD_COLUMNS_REORDER, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: boardKeys.all });
+    },
+  });
+}
+
+// ─── useMoveItemToColumn — PATCH /work-items/:id/column ──────────────────────
+
+export interface MoveToColumnVars {
+  itemId: string;
+  columnId: string | null;
+  /** snapshot of all columns for rollback */
+  srcColumnId: string;
+  dstColumnId: string;
+  dstIndex: number;
+}
+
+export function useMoveItemToColumn() {
+  const qc = useQueryClient();
+
+  return useMutation<WorkItemListItem, Error, MoveToColumnVars>({
+    mutationFn: ({ itemId, columnId }) =>
+      api
+        .patch<WorkItem>(API_ENDPOINTS.WORK_ITEM_COLUMN(itemId), {
+          column_id: columnId,
+        })
+        .then((wi) => ({
+          id: wi.id,
+          project_id: wi.project_id,
+          epic_id: wi.epic_id,
+          sprint_id: wi.sprint_id,
+          column_id: wi.column_id,
+          type: wi.type,
+          title: wi.title,
+          status: wi.status,
+          priority: wi.priority,
+          story_points: wi.story_points,
+          due_date: wi.due_date,
+          position: wi.position,
+          subtask_count: (wi.subtasks ?? []).length,
+          done_subtask_count: (wi.subtasks ?? []).filter((s) => s.is_done)
+            .length,
+          created_at: wi.created_at,
+          updated_at: wi.updated_at,
+        })),
+
+    onMutate: ({ itemId, srcColumnId, dstColumnId, dstIndex }) => {
+      const snapshot = useBoardStore.getState().columns;
+      useBoardStore
+        .getState()
+        .moveItem(itemId, srcColumnId, dstColumnId, dstIndex);
+      return { snapshot };
+    },
+
+    onError: (_err, _vars, ctx) => {
+      const snap = ctx as
+        | { snapshot?: ReturnType<typeof useBoardStore.getState>["columns"] }
+        | undefined;
+      if (snap?.snapshot) {
+        useBoardStore.getState().setColumns(snap.snapshot);
+      }
+    },
+
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: boardKeys.all });
+      qc.invalidateQueries({ queryKey: ["work-items"] });
+    },
+  });
+}
+
+// ─── useBoardItems — fetch items + group by column_id ────────────────────────
+// Fetches the board columns (lazy-seeded server-side) and work items, then
+// groups items into the correct column by column_id, falling back to the
+// first column for items where column_id is null.
+
+export function useBoardItems(projectId: string | null) {
+  const setColumns = useBoardStore((s) => s.setColumns);
+
+  const columnsQuery = useBoardColumns(projectId);
+
+  const itemsQuery = useQuery<WorkItemListItem[]>({
+    queryKey: boardKeys.items(projectId),
+    queryFn: async () => {
+      const params = projectId
+        ? { project_id: projectId, limit: 200 }
+        : { limit: 200 };
+      const resp = await api.get<AgileListResponse<WorkItemListItem>>(
+        API_ENDPOINTS.WORK_ITEMS,
+        params,
+      );
+      return resp.data ?? [];
+    },
+    staleTime: 0,
+    enabled: Boolean(columnsQuery.data),
+  });
+
+  useEffect(() => {
+    const apiColumns = columnsQuery.data;
+    const items = itemsQuery.data;
+    if (!apiColumns) return;
+
+    const firstColId = apiColumns[0]?.id ?? null;
+
+    const boardColumns: BoardColumn[] = apiColumns.map((col) => ({
+      ...col,
+      accentClass: colorToAccentClass(col.color),
+      items: (items ?? [])
+        .filter((item) => {
+          if (item.column_id === col.id) return true;
+          // null column_id items fall into the first column
+          if (!item.column_id && col.id === firstColId) return true;
+          return false;
+        })
+        .sort((a, b) => a.position - b.position),
+    }));
+
+    setColumns(boardColumns);
+  }, [columnsQuery.data, itemsQuery.data, setColumns]);
+
+  return {
+    isLoading: columnsQuery.isLoading || itemsQuery.isLoading,
+    isError: columnsQuery.isError || itemsQuery.isError,
+    refetch: () => {
+      columnsQuery.refetch();
+      itemsQuery.refetch();
+    },
+  };
+}
 
 // ─── Fetch active sprint ──────────────────────────────────────────────────────
 
@@ -66,42 +266,52 @@ export function useActiveSprint() {
   });
 }
 
-// ─── Fetch sprint work items + hydrate store ──────────────────────────────────
+// ─── useSprintBoard — sprint-scoped items grouped into board columns ──────────
 
 export function useSprintBoard(sprintId: string) {
   const setColumns = useBoardStore((s) => s.setColumns);
+  const columnsQuery = useBoardColumns(null); // sprint board is not project-scoped
 
-  const query = useQuery<BoardColumn[]>({
+  const query = useQuery<WorkItemListItem[]>({
     queryKey: boardKeys.sprintItems(sprintId),
     queryFn: async () => {
-      // GET /api/sprints/:id/work-items → { data: WorkItemListItem[], total }
       const resp = await api.get<AgileListResponse<WorkItemListItem>>(
         API_ENDPOINTS.SPRINT_WORK_ITEMS(sprintId),
       );
-      const items = resp.data ?? [];
-
-      return BOARD_COLUMNS.map((col) => ({
-        ...col,
-        items: items
-          .filter((i) => i.status === col.status)
-          .sort((a, b) => a.position - b.position),
-      }));
+      return resp.data ?? [];
     },
-    enabled: Boolean(sprintId),
+    enabled: Boolean(sprintId) && Boolean(columnsQuery.data),
     staleTime: 0,
   });
 
-  // Sync server state into local optimistic store
   useEffect(() => {
-    if (query.data) {
-      setColumns(query.data);
-    }
-  }, [query.data, setColumns]);
+    const apiColumns = columnsQuery.data;
+    const items = query.data;
+    if (!apiColumns) return;
+
+    const firstColId = apiColumns[0]?.id ?? null;
+
+    const boardColumns: BoardColumn[] = apiColumns.map((col) => ({
+      ...col,
+      accentClass: colorToAccentClass(col.color),
+      items: (items ?? [])
+        .filter((item) => {
+          if (item.column_id === col.id) return true;
+          if (!item.column_id && col.id === firstColId) return true;
+          return false;
+        })
+        .sort((a, b) => a.position - b.position),
+    }));
+
+    setColumns(boardColumns);
+  }, [columnsQuery.data, query.data, setColumns]);
 
   return query;
 }
 
-// ─── Move (status change) mutation ───────────────────────────────────────────
+// ─── useMoveItem (legacy alias) ───────────────────────────────────────────────
+// Kept so WorkItemDetailSheet + any remaining callers continue to compile.
+// The board DnD now calls useMoveItemToColumn instead.
 
 interface MoveItemVars {
   itemId: string;
@@ -117,7 +327,6 @@ export function useMoveItem() {
 
   return useMutation<WorkItemListItem, Error, MoveItemVars>({
     mutationFn: ({ itemId, newStatus }) =>
-      // PATCH /api/work-items/:id/status { status } → flat WorkItem
       api
         .patch<WorkItem>(API_ENDPOINTS.WORK_ITEM_STATUS(itemId), {
           status: newStatus,
@@ -127,6 +336,7 @@ export function useMoveItem() {
           project_id: wi.project_id,
           epic_id: wi.epic_id,
           sprint_id: wi.sprint_id,
+          column_id: wi.column_id,
           type: wi.type,
           title: wi.title,
           status: wi.status,
@@ -135,31 +345,15 @@ export function useMoveItem() {
           due_date: wi.due_date,
           position: wi.position,
           subtask_count: (wi.subtasks ?? []).length,
-          done_subtask_count: (wi.subtasks ?? []).filter((s) => s.is_done).length,
+          done_subtask_count: (wi.subtasks ?? []).filter((s) => s.is_done)
+            .length,
           created_at: wi.created_at,
           updated_at: wi.updated_at,
         })),
 
-    onMutate: ({ itemId, srcStatus, dstStatus, dstIndex }) => {
-      // Optimistic move is already applied on drag-over; snapshot for rollback
-      const snapshot = useBoardStore.getState().columns;
-      useBoardStore.getState().moveItem(itemId, srcStatus, dstStatus, dstIndex);
-      return { snapshot };
-    },
-
-    onError: (_err, _vars, ctx) => {
-      const snap = ctx as
-        | { snapshot?: ReturnType<typeof useBoardStore.getState>["columns"] }
-        | undefined;
-      if (snap?.snapshot) {
-        useBoardStore.getState().setColumns(snap.snapshot);
-      }
-    },
-
-    onSettled: (_data, _err, vars) => {
-      qc.invalidateQueries({
-        queryKey: boardKeys.sprintItems(vars.sprintId),
-      });
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: boardKeys.all });
+      qc.invalidateQueries({ queryKey: ["work-items"] });
     },
   });
 }
@@ -173,16 +367,16 @@ export function useCreateBoardItem(sprintId: string) {
     mutationFn: (payload) =>
       api.post<WorkItem>(API_ENDPOINTS.WORK_ITEMS, {
         ...payload,
-        sprint_id: sprintId,
+        sprint_id: sprintId || null,
       }),
 
     onSuccess: (wi) => {
-      // Map full WorkItem → WorkItemListItem and append optimistically
       const listItem: WorkItemListItem = {
         id: wi.id,
         project_id: wi.project_id,
         epic_id: wi.epic_id,
         sprint_id: wi.sprint_id,
+        column_id: wi.column_id,
         type: wi.type,
         title: wi.title,
         status: wi.status,
@@ -197,7 +391,13 @@ export function useCreateBoardItem(sprintId: string) {
       };
       useBoardStore.getState().appendItem(listItem);
 
-      qc.invalidateQueries({ queryKey: boardKeys.sprintItems(sprintId) });
+      qc.invalidateQueries({ queryKey: boardKeys.all });
+      qc.invalidateQueries({ queryKey: ["work-items"] });
     },
   });
 }
+
+// ─── BOARD_COLUMNS const (kept for any external callers that import it) ───────
+// The runtime column config now comes from the API; this stub prevents import
+// errors in case any file still references BOARD_COLUMNS.
+export const BOARD_COLUMNS: never[] = [];

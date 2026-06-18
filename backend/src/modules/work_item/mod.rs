@@ -17,6 +17,7 @@
 //! | `DELETE` | `/:id`                                | delete work item  |
 //! | `PATCH`  | `/:id/status`                         | set status        |
 //! | `PATCH`  | `/:id/points`                         | set story points  |
+//! | `PATCH`  | `/:id/column`                         | set board column  |
 //! | `PATCH`  | `/:id/sprint`                         | move to sprint    |
 //! | `PATCH`  | `/:id/backlog`                        | move to backlog   |
 //! | `GET`    | `/:id/subtasks`                       | list subtasks     |

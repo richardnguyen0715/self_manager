@@ -346,6 +346,107 @@ pub async fn get_me(db: &PgPool, user_id: Uuid) -> AppResult<UserProfile> {
     Ok(UserProfile::from(user))
 }
 
+/// Partially update the authenticated user's profile.
+///
+/// Only fields supplied in `req` (i.e. `Some(…)`) are written; unset fields
+/// retain their current database values via `COALESCE`.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — user not found.
+/// - [`AppError::Db`] — unexpected database error.
+pub async fn update_profile(
+    db: &PgPool,
+    user_id: Uuid,
+    display_name: Option<String>,
+    timezone: Option<String>,
+) -> AppResult<UserProfile> {
+    let user = sqlx::query_as!(
+        User,
+        r#"
+        UPDATE users
+        SET
+            display_name = COALESCE($2, display_name),
+            timezone     = COALESCE($3, timezone),
+            updated_at   = NOW()
+        WHERE id = $1
+        RETURNING id, email, password_hash, display_name,
+                  avatar_url, timezone, created_at, updated_at
+        "#,
+        user_id,
+        display_name as Option<String>,
+        timezone     as Option<String>,
+    )
+    .fetch_optional(db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    Ok(UserProfile::from(user))
+}
+
+/// Set `avatar_url` for the given user and return the updated profile.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — user not found.
+/// - [`AppError::Db`] — unexpected database error.
+pub async fn set_avatar(db: &PgPool, user_id: Uuid, url: String) -> AppResult<UserProfile> {
+    let user = sqlx::query_as!(
+        User,
+        r#"
+        UPDATE users
+        SET avatar_url = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, email, password_hash, display_name,
+                  avatar_url, timezone, created_at, updated_at
+        "#,
+        user_id,
+        url as String,
+    )
+    .fetch_optional(db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    Ok(UserProfile::from(user))
+}
+
+/// Clear `avatar_url` (set to NULL) for the given user.
+///
+/// Returns the old `avatar_url` (before the update, if any) and the updated
+/// profile.  The caller uses the old URL for best-effort disk removal.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — user not found.
+/// - [`AppError::Db`] — unexpected database error.
+pub async fn clear_avatar(db: &PgPool, user_id: Uuid) -> AppResult<(Option<String>, UserProfile)> {
+    // First read the current avatar_url so we can remove the file afterward.
+    let old_url: Option<String> = sqlx::query_scalar!(
+        "SELECT avatar_url FROM users WHERE id = $1",
+        user_id,
+    )
+    .fetch_optional(db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    let user = sqlx::query_as!(
+        User,
+        r#"
+        UPDATE users
+        SET avatar_url = NULL, updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, email, password_hash, display_name,
+                  avatar_url, timezone, created_at, updated_at
+        "#,
+        user_id,
+    )
+    .fetch_optional(db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    Ok((old_url, UserProfile::from(user)))
+}
+
 // ── Private helpers ────────────────────────────────────────────────────────────
 
 /// Encode a JWT access + refresh pair and persist the hashed refresh token.

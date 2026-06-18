@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        UPDATE work_items\n        SET sprint_id = $3, position = $4, updated_at = now()\n        WHERE id = $1 AND user_id = $2\n        RETURNING\n            id, user_id, project_id, epic_id, sprint_id,\n            type::text     AS \"item_type!\",\n            title, description,\n            status::text   AS \"status!\",\n            priority::text AS \"priority!\",\n            story_points, position,\n            due_date, recurrence_rule, completed_at,\n            created_at, updated_at\n        ",
+  "query": "\n        INSERT INTO work_items (\n            user_id, project_id, epic_id, sprint_id, type, title, description,\n            status, priority, story_points, position, due_date, recurrence_rule\n        )\n        VALUES (\n            $1, $2, $3, $4,\n            ($5::text)::work_item_type,\n            $6, $7,\n            ($8::text)::work_item_status,\n            ($9::text)::task_priority,\n            $10, $11, $12, $13\n        )\n        RETURNING\n            id, user_id, project_id, epic_id, sprint_id,\n            type::text     AS \"item_type!\",\n            title, description,\n            status::text   AS \"status!\",\n            priority::text AS \"priority!\",\n            story_points, position,\n            due_date, recurrence_rule, completed_at,\n            column_id,\n            created_at, updated_at\n        ",
   "describe": {
     "columns": [
       {
@@ -80,11 +80,16 @@
       },
       {
         "ordinal": 15,
+        "name": "column_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 16,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 16,
+        "ordinal": 17,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -94,7 +99,16 @@
         "Uuid",
         "Uuid",
         "Uuid",
-        "Int4"
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int4",
+        "Int4",
+        "Timestamptz",
+        "Text"
       ]
     },
     "nullable": [
@@ -113,9 +127,10 @@
       true,
       true,
       true,
+      true,
       false,
       false
     ]
   },
-  "hash": "7fba4d6278a4ee691e1e5420fe202937c764e8fb0129f8105af03dc2e93893d2"
+  "hash": "8bf08f80ebafa06deb82e392ae4645e3fb49929248f878d5c9ab7951011509c0"
 }

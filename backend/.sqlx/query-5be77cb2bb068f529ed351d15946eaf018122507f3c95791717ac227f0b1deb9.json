@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE work_items wi\n        SET column_id  = bc.id,\n            updated_at = now()\n        FROM board_columns bc\n        WHERE wi.user_id     = $1\n          AND wi.column_id   IS NULL\n          AND bc.user_id     = $1\n          AND bc.mapped_status IS NOT NULL\n          AND bc.mapped_status = wi.status\n          AND (\n              $2::uuid IS NULL AND bc.project_id IS NULL AND wi.project_id IS NULL\n              OR bc.project_id = $2 AND wi.project_id = $2\n          )\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5be77cb2bb068f529ed351d15946eaf018122507f3c95791717ac227f0b1deb9"
+}

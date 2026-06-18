@@ -34,6 +34,7 @@ import {
   useActivateSprint,
   useCompleteSprint,
 } from "@/features/agile";
+import { useDroppable } from "@dnd-kit/core";
 import { useBacklogStore } from "../store/useBacklogStore";
 import { WorkItemRow } from "./WorkItemRow";
 import { QuickAddRow } from "./QuickAddRow";
@@ -119,6 +120,11 @@ export function SprintSection({ sprint, allSprints }: SprintSectionProps) {
     useBacklogStore();
   const isCollapsed = Boolean(collapsedSprints[sprint.id]);
 
+  const { setNodeRef: dropRef, isOver } = useDroppable({
+    id: `sprint-${sprint.id}`,
+    data: { type: "sprint-drop", sprintId: sprint.id },
+  });
+
   const { data, isLoading } = useSprintWorkItems(sprint.id);
   const activateSprint = useActivateSprint();
   const completeSprint = useCompleteSprint();
@@ -157,7 +163,13 @@ export function SprintSection({ sprint, allSprints }: SprintSectionProps) {
   }
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div
+      ref={dropRef}
+      className={cn(
+        "rounded-lg border bg-card overflow-hidden transition-shadow",
+        isOver && "ring-2 ring-primary ring-offset-1",
+      )}
+    >
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-card">
         {/* Collapse toggle */}

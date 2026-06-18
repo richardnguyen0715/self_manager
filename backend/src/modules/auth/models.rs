@@ -56,6 +56,28 @@ pub struct RegisterRequest {
     pub display_name: String,
 }
 
+/// Body for `PATCH /api/auth/me`.
+///
+/// All fields are optional — only supplied fields are updated.
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateProfileRequest {
+    /// Human-readable display name (1–100 characters).
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "display_name must be between 1 and 100 characters"
+    ))]
+    pub display_name: Option<String>,
+
+    /// IANA timezone identifier (1–100 characters).
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "timezone must be between 1 and 100 characters"
+    ))]
+    pub timezone: Option<String>,
+}
+
 /// Body for `POST /api/auth/login`.
 #[derive(Debug, Deserialize, Validate)]
 pub struct LoginRequest {

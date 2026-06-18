@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DateInput } from "@/components/ui/date-input";
 import { cn } from "@/lib/utils";
 import { CalendarDays, X, Loader2, ChevronDown, Check } from "lucide-react";
 import * as SelectPrimitive from "@radix-ui/react-select";
@@ -328,7 +329,17 @@ export function CreateWorkItemDialog() {
               <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
               Due date
             </Label>
-            <Input id="wi-due-date" type="date" {...register("due_date")} />
+            <Controller
+              control={control}
+              name="due_date"
+              render={({ field }) => (
+                <DateInput
+                  id="wi-due-date"
+                  value={field.value ?? ""}
+                  onChange={(v) => field.onChange(v || null)}
+                />
+              )}
+            />
           </div>
 
           {/* API error */}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DateInput } from "@/components/ui/date-input";
 import type { Epic, EpicStatus } from "@/types";
 import { useCreateEpic, useUpdateEpic } from "../hooks/useHierarchy";
 
@@ -60,6 +61,7 @@ export function EpicForm({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     watch,
@@ -185,18 +187,30 @@ export function EpicForm({
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="epic-start-date">Start date</Label>
-                <Input
-                  id="epic-start-date"
-                  type="date"
-                  {...register("start_date")}
+                <Controller
+                  control={control}
+                  name="start_date"
+                  render={({ field }) => (
+                    <DateInput
+                      id="epic-start-date"
+                      value={field.value ?? ""}
+                      onChange={(v) => field.onChange(v || null)}
+                    />
+                  )}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="epic-due-date">Due date</Label>
-                <Input
-                  id="epic-due-date"
-                  type="date"
-                  {...register("due_date")}
+                <Controller
+                  control={control}
+                  name="due_date"
+                  render={({ field }) => (
+                    <DateInput
+                      id="epic-due-date"
+                      value={field.value ?? ""}
+                      onChange={(v) => field.onChange(v || null)}
+                    />
+                  )}
                 />
               </div>
             </div>
