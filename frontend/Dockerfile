@@ -1,28 +1,17 @@
 # ──────────────────────────────────────────────────────────────
-# Stage 1: deps – install node_modules with cache mount
+# Stage 1: deps – install node_modules with Bun (fast, resilient)
 # ──────────────────────────────────────────────────────────────
-FROM node:20-alpine AS deps
-RUN apk add --no-cache libc6-compat
+FROM oven/bun:1 AS deps
 WORKDIR /app
 
-COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* ./
-# Resilient install: retry on flaky registry networks (slow server egress).
-RUN npm config set fetch-retries 5 \
- && npm config set fetch-retry-mintimeout 20000 \
- && npm config set fetch-retry-maxtimeout 180000 \
- && npm config set fetch-timeout 600000 \
- && if [ -f pnpm-lock.yaml ]; then \
-      corepack enable pnpm && pnpm install --frozen-lockfile; \
-    elif [ -f yarn.lock ]; then \
-      yarn --frozen-lockfile --network-timeout 600000; \
-    else \
-      npm ci; \
-    fi
+COPY package.json bun.lockb* package-lock.json* ./
+# Bun resolves from package.json; far faster + more network-tolerant than npm.
+RUN bun install
 
 # ──────────────────────────────────────────────────────────────
-# Stage 2: builder – compile Next.js app
+# Stage 2: builder – compile Next.js app with Bun
 # ──────────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM oven/bun:1 AS builder
 WORKDIR /app
 
 # Build-time public env vars (baked into the bundle)
@@ -30,24 +19,16 @@ ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_WS_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
+ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Disable Next.js telemetry during build
-ENV NEXT_TELEMETRY_DISABLED=1
-
-RUN \
-  if [ -f pnpm-lock.yaml ]; then \
-    corepack enable pnpm && pnpm run build; \
-  elif [ -f yarn.lock ]; then \
-    yarn build; \
-  else \
-    npm run build; \
-  fi
+RUN bun run build
 
 # ──────────────────────────────────────────────────────────────
-# Stage 3: runner – minimal production image
+# Stage 3: runner – minimal production image (Node runtime)
+# Next.js standalone output ships a plain `server.js` run by Node.
 # ──────────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 WORKDIR /app
@@ -58,7 +39,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copy only what next start needs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
