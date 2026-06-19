@@ -15,7 +15,9 @@ export type { DocTemplate } from "./templates";
 
 export { TemplatesPicker } from "./TemplatesPicker";
 export { Toolbar } from "./Toolbar";
-export { SlashMenu, SLASH_ITEMS } from "./SlashMenu";
+export { SlashMenu, SLASH_ITEMS, buildSlashItems } from "./SlashMenu";
+export { UrlDialog } from "./UrlDialog";
+export type { UrlDialogProps } from "./UrlDialog";
 export { EmojiPicker } from "./EmojiPicker";
 
 // Extensions

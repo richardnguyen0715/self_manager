@@ -8,8 +8,16 @@ import {
 } from "react";
 import { useEditor, EditorContent, ReactNodeViewRenderer } from "@tiptap/react";
 import { Extension } from "@tiptap/core";
+import type { Editor as TipTapEditor, Range } from "@tiptap/core";
 import Suggestion from "@tiptap/suggestion";
 import type { SuggestionProps, SuggestionKeyDownProps } from "@tiptap/suggestion";
+
+// ── Drag-handle + auto-joiner ───────────────────────────────────────────────
+import GlobalDragHandle from "tiptap-extension-global-drag-handle";
+import AutoJoiner from "tiptap-extension-auto-joiner";
+
+// ── Block gutter ("+") ───────────────────────────────────────────────────────
+import { BlockGutter } from "./BlockGutter";
 
 // ── StarterKit ──────────────────────────────────────────────────────────────
 import StarterKit from "@tiptap/starter-kit";
@@ -48,12 +56,15 @@ import { MermaidView } from "./node-views/MermaidView";
 import { TableOfContentsView } from "./node-views/TableOfContentsView";
 
 // ── Slash menu ──────────────────────────────────────────────────────────────
-import type { SlashMenuHandle } from "./SlashMenu";
-import { SlashMenu, SLASH_ITEMS } from "./SlashMenu";
+import type { SlashMenuHandle, SlashCommandItem } from "./SlashMenu";
+import { SlashMenu, buildSlashItems } from "./SlashMenu";
 
 // ── Toolbar + template picker ───────────────────────────────────────────────
 import { Toolbar } from "./Toolbar";
 import { TemplatesPicker } from "./TemplatesPicker";
+
+// ── URL dialog (replaces window.prompt) ────────────────────────────────────
+import { UrlDialog } from "./UrlDialog";
 
 // ── Hooks + types ───────────────────────────────────────────────────────────
 import { useUploadPageImage } from "@/features/docs";
@@ -64,27 +75,45 @@ import { cn } from "@/lib/utils";
 const lowlight = createLowlight(all);
 
 // ── Slash-menu suggestion config ────────────────────────────────────────────
-type SlashItem = (typeof SLASH_ITEMS)[number];
+type SlashItem = SlashCommandItem;
 
-function buildSlashSuggestion() {
+// Pending image insert: captures editor + range so the dialog can apply the
+// command after the user confirms.
+interface PendingImageInsert {
+  onUrl: (url: string, editor: TipTapEditor, range: Range) => void;
+  editor: TipTapEditor;
+  range: Range;
+}
+
+function buildSlashSuggestion(
+  onRequestImageUrl: (
+    onUrl: (url: string, editor: TipTapEditor, range: Range) => void,
+    editor: TipTapEditor,
+    range: Range,
+  ) => void,
+) {
+  // Build items once per suggestion config (stable reference is fine because
+  // onRequestImageUrl is passed by reference from the component and captured
+  // in the closure; see note in DocEditor about using a ref).
+  const items = buildSlashItems(onRequestImageUrl);
+
   return {
     char: "/",
     startOfLine: false,
-    // command in SuggestionOptions<I, TSelected> receives { editor, range, props: TSelected }
     command({
       editor,
       range,
       props,
     }: {
-      editor: import("@tiptap/core").Editor;
-      range: import("@tiptap/core").Range;
+      editor: TipTapEditor;
+      range: Range;
       props: SlashItem;
     }) {
       props.command({ editor, range });
     },
     items({ query }: { query: string }): SlashItem[] {
       const q = query.toLowerCase();
-      return SLASH_ITEMS.filter(
+      return items.filter(
         (item) =>
           item.title.toLowerCase().includes(q) ||
           item.description.toLowerCase().includes(q),
@@ -103,7 +132,6 @@ function buildSlashSuggestion() {
             <SlashMenu
               ref={(r) => { menuHandle = r; }}
               items={suggProps.items}
-              // props.command(item) dispatches via the top-level command handler
               command={(item) => suggProps.command(item)}
             />,
           );
@@ -153,22 +181,6 @@ function buildSlashSuggestion() {
     },
   };
 }
-
-// ── Slash command TipTap Extension ───────────────────────────────────────────
-const SlashCommandExtension = Extension.create({
-  name: "slashCommand",
-  addOptions() {
-    return { suggestion: buildSlashSuggestion() };
-  },
-  addProseMirrorPlugins() {
-    return [
-      Suggestion({
-        editor: this.editor,
-        ...this.options.suggestion,
-      }),
-    ];
-  },
-});
 
 // ── Mention suggestion (lightweight stub) ────────────────────────────────────
 const mentionSuggestion = {
@@ -232,6 +244,10 @@ export function DocEditor({
 }: DocEditorProps) {
   const uploadMutation = useUploadPageImage(pageId);
 
+  // Ref for the editor wrapper div — passed to BlockGutter so it can locate
+  // the drag-handle element that GlobalDragHandle appends to it.
+  const editorWrapperRef = useRef<HTMLDivElement>(null);
+
   // Keep onChange ref stable so the TipTap onUpdate closure always has
   // the latest version without triggering editor recreation.
   const onChangeRef = useRef(onChange);
@@ -242,6 +258,30 @@ export function DocEditor({
   const [templatePickerOpen, setTemplatePickerOpen] = useState(
     showTemplatePicker && !hasContent(value),
   );
+
+  // ── Image URL dialog state ────────────────────────────────────────────────
+  // Stores the pending slash-menu insert context so the dialog can apply the
+  // image command once the user confirms a URL.
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const pendingImageRef = useRef<PendingImageInsert | null>(null);
+
+  // Stable ref for the callback so it can be captured by the suggestion config
+  // without requiring editor re-creation.
+  const requestImageUrlRef = useRef<
+    (
+      onUrl: (url: string, editor: TipTapEditor, range: Range) => void,
+      editor: TipTapEditor,
+      range: Range,
+    ) => void
+  >(
+    (onUrl, ed, range) => {
+      pendingImageRef.current = { onUrl, editor: ed, range };
+      setImageDialogOpen(true);
+    },
+  );
+
+  // Keep the callback ref current (no-op: the implementation only touches
+  // React state setters which are stable; nothing needs updating).
 
   const editor = useEditor({
     extensions: [
@@ -265,7 +305,9 @@ export function DocEditor({
         },
       }),
       Placeholder.configure({
-        placeholder: 'Type "/" for slash commands, or start writing…',
+        placeholder: "Type '/' for commands",
+        // Show placeholder on every empty paragraph, not just the first child.
+        includeChildren: true,
       }),
       CharacterCount,
       Mention.configure({
@@ -290,8 +332,33 @@ export function DocEditor({
           return ReactNodeViewRenderer(TableOfContentsView);
         },
       }),
+      // ── Drag-to-reorder + auto-joiner ──────────────────────────────────
+      GlobalDragHandle.configure({
+        dragHandleWidth: 24,
+        scrollTreshold: 100,
+      }),
+      AutoJoiner.configure({
+        elementsToJoin: ["bulletList", "orderedList", "taskList"],
+      }),
       // Slash command (non-conflicting with Mention)
-      SlashCommandExtension,
+      Extension.create({
+        name: "slashCommand",
+        addOptions() {
+          return {
+            suggestion: buildSlashSuggestion(
+              (...args) => requestImageUrlRef.current(...args),
+            ),
+          };
+        },
+        addProseMirrorPlugins() {
+          return [
+            Suggestion({
+              editor: this.editor,
+              ...this.options.suggestion,
+            }),
+          ];
+        },
+      }),
     ],
     editable: !readOnly,
     content: normalizeDoc(value),
@@ -321,6 +388,15 @@ export function DocEditor({
       return result.url;
     },
     [uploadMutation],
+  );
+
+  // Insert image by URL (called from Toolbar image URL dialog)
+  const handleInsertImageUrl = useCallback(
+    (url: string) => {
+      if (!editor || !url) return;
+      editor.chain().focus().setImage({ src: url }).run();
+    },
+    [editor],
   );
 
   // Clipboard paste → upload image
@@ -353,50 +429,84 @@ export function DocEditor({
     onChangeRef.current(content);
   };
 
+  // Handle image dialog confirm from slash menu
+  const handleSlashImageConfirm = (url: string) => {
+    setImageDialogOpen(false);
+    const pending = pendingImageRef.current;
+    if (pending && url) {
+      pending.onUrl(url, pending.editor, pending.range);
+    }
+    pendingImageRef.current = null;
+  };
+
+  const handleSlashImageCancel = () => {
+    setImageDialogOpen(false);
+    pendingImageRef.current = null;
+  };
+
   const charCount = editor?.storage.characterCount?.characters?.() ?? 0;
   const wordCount = editor?.storage.characterCount?.words?.() ?? 0;
 
   return (
     <div className={cn("flex flex-col flex-1 min-h-0", className)}>
       {editor && !readOnly && (
-        <Toolbar editor={editor} onImageUpload={handleImageUpload} />
+        <Toolbar
+          editor={editor}
+          onImageUpload={handleImageUpload}
+          onInsertImageUrl={handleInsertImageUrl}
+        />
       )}
 
-      <div className="flex-1 overflow-y-auto">
-        <EditorContent
-          editor={editor}
-          className={cn(
-            "mx-auto max-w-3xl px-8 py-10",
-            // Prose styling
-            "prose prose-neutral dark:prose-invert max-w-none",
-            // Editor area min-height
-            "[&_.ProseMirror]:min-h-[60vh] [&_.ProseMirror]:outline-none",
-            // Heading scroll margin for anchors
-            "[&_h1]:scroll-mt-16 [&_h2]:scroll-mt-16 [&_h3]:scroll-mt-16",
-            // Task list reset
-            "[&_.task-list]:list-none [&_.task-list]:pl-0",
-            "[&_.task-list-item]:flex [&_.task-list-item]:items-baseline [&_.task-list-item]:gap-2",
-            "[&_.task-list-item_input[type=checkbox]]:cursor-pointer",
-            // Mention chip
-            "[&_.mention]:rounded [&_.mention]:bg-primary/10 [&_.mention]:px-1",
-            "[&_.mention]:text-primary [&_.mention]:font-medium [&_.mention]:text-sm",
-            // Columns layout
-            "[&_.columns-block]:grid [&_.columns-block]:grid-cols-2 [&_.columns-block]:gap-4 [&_.columns-block]:my-3",
-            "[&_.column-block]:min-w-0",
-            // Code block
-            "[&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:text-sm",
-            // Placeholder
-            "[&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]",
-            "[&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left",
-            "[&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground/60",
-            "[&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none",
-            "[&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0",
-            // Table
-            "[&_table]:w-full [&_table]:border-collapse",
-            "[&_td,&_th]:border [&_td,&_th]:border-border [&_td,&_th]:px-3 [&_td,&_th]:py-1.5 [&_td,&_th]:text-sm",
-            "[&_th]:bg-muted [&_th]:font-semibold",
+      {/* Notion-style centered page scroll area */}
+      <div className="notion-page-scroll flex-1 overflow-y-auto">
+        {/*
+          notion-editor-wrapper: relative container that GlobalDragHandle
+          appends its .drag-handle element to. The group/editor class lets
+          the BlockGutter "+" button use group-hover visibility.
+        */}
+        <div
+          ref={editorWrapperRef}
+          className="notion-editor-wrapper group/editor relative mx-auto"
+        >
+          <EditorContent
+            editor={editor}
+            className={cn(
+              "notion-editor-content",
+              // Prose styling
+              "prose prose-neutral dark:prose-invert max-w-none",
+              // Editor area min-height
+              "[&_.ProseMirror]:min-h-[60vh] [&_.ProseMirror]:outline-none",
+              // Heading scroll margin for anchors
+              "[&_h1]:scroll-mt-16 [&_h2]:scroll-mt-16 [&_h3]:scroll-mt-16",
+              // Task list reset
+              "[&_.task-list]:list-none [&_.task-list]:pl-0",
+              "[&_.task-list-item]:flex [&_.task-list-item]:items-baseline [&_.task-list-item]:gap-2",
+              "[&_.task-list-item_input[type=checkbox]]:cursor-pointer",
+              // Mention chip
+              "[&_.mention]:rounded [&_.mention]:bg-primary/10 [&_.mention]:px-1",
+              "[&_.mention]:text-primary [&_.mention]:font-medium [&_.mention]:text-sm",
+              // Columns layout
+              "[&_.columns-block]:grid [&_.columns-block]:grid-cols-2 [&_.columns-block]:gap-4 [&_.columns-block]:my-3",
+              "[&_.column-block]:min-w-0",
+              // Code block
+              "[&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:text-sm",
+              // Placeholder
+              "[&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]",
+              "[&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left",
+              "[&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground/60",
+              "[&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none",
+              "[&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0",
+              // Table
+              "[&_table]:w-full [&_table]:border-collapse",
+              "[&_td,&_th]:border [&_td,&_th]:border-border [&_td,&_th]:px-3 [&_td,&_th]:py-1.5 [&_td,&_th]:text-sm",
+              "[&_th]:bg-muted [&_th]:font-semibold",
+            )}
+          />
+          {/* "+" add-block button that tracks the drag handle position */}
+          {editor && !readOnly && (
+            <BlockGutter editor={editor} editorWrapperRef={editorWrapperRef} />
           )}
-        />
+        </div>
       </div>
 
       {/* Status bar — only when editable */}
@@ -412,6 +522,16 @@ export function DocEditor({
         open={templatePickerOpen}
         onClose={() => setTemplatePickerOpen(false)}
         onSelect={handleTemplateSelect}
+      />
+
+      {/* Image URL dialog — shared between slash-menu Image item and toolbar */}
+      <UrlDialog
+        open={imageDialogOpen}
+        title="Insert Image"
+        label="Image URL"
+        placeholder="https://example.com/image.png"
+        onConfirm={handleSlashImageConfirm}
+        onCancel={handleSlashImageCancel}
       />
     </div>
   );

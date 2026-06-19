@@ -4,6 +4,7 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useRef,
   useState,
 } from "react";
 import type { Editor, Range } from "@tiptap/core";
@@ -37,6 +38,10 @@ export interface SlashCommandItem {
   command: (params: { editor: Editor; range: Range }) => void;
 }
 
+// ── Static slash items (no side effects) ──────────────────────────────────────
+// The Image item's command is intentionally a no-op here; callers should
+// override it via buildSlashItems() to open an in-app dialog instead of
+// relying on window.prompt.
 export const SLASH_ITEMS: SlashCommandItem[] = [
   {
     title: "Text",
@@ -147,14 +152,12 @@ export const SLASH_ITEMS: SlashCommandItem[] = [
     },
   },
   {
+    // Image — command is a no-op placeholder; see buildSlashItems() below.
     title: "Image",
     description: "Insert image via URL",
     icon: Image,
-    command: ({ editor, range }) => {
-      const url = window.prompt("Image URL:");
-      if (url) {
-        editor.chain().focus().deleteRange(range).setImage({ src: url }).run();
-      }
+    command: () => {
+      // Intentionally empty — callers override this via buildSlashItems().
     },
   },
   {
@@ -254,6 +257,40 @@ export const SLASH_ITEMS: SlashCommandItem[] = [
   },
 ];
 
+// ── buildSlashItems ──────────────────────────────────────────────────────────
+// Returns a copy of SLASH_ITEMS with the Image command wired to open the
+// supplied in-app dialog instead of window.prompt.
+//
+// onRequestImageUrl receives a callback that must be called with the URL once
+// the user confirms the dialog (or not called at all if they cancel).
+export function buildSlashItems(
+  onRequestImageUrl: (
+    onUrl: (url: string, editor: Editor, range: Range) => void,
+    editor: Editor,
+    range: Range,
+  ) => void,
+): SlashCommandItem[] {
+  return SLASH_ITEMS.map((item) => {
+    if (item.title !== "Image") return item;
+    return {
+      ...item,
+      command: ({ editor, range }: { editor: Editor; range: Range }) => {
+        onRequestImageUrl(
+          (url, ed, r) => {
+            if (url) {
+              ed.chain().focus().deleteRange(r).setImage({ src: url }).run();
+            }
+          },
+          editor,
+          range,
+        );
+      },
+    };
+  });
+}
+
+// ── SlashMenu component ───────────────────────────────────────────────────────
+
 export interface SlashMenuHandle {
   onKeyDown: (props: { event: KeyboardEvent }) => boolean;
 }
@@ -266,8 +303,14 @@ interface SlashMenuProps {
 export const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(
   ({ items, command }, ref) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
+    const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
     useEffect(() => setSelectedIndex(0), [items]);
+
+    // Keep the highlighted item scrolled into view during keyboard navigation.
+    useEffect(() => {
+      itemRefs.current[selectedIndex]?.scrollIntoView({ block: "nearest" });
+    }, [selectedIndex]);
 
     useImperativeHandle(ref, () => ({
       onKeyDown({ event }: { event: KeyboardEvent }) {
@@ -299,6 +342,9 @@ export const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(
             return (
               <button
                 key={item.title}
+                ref={(el) => {
+                  itemRefs.current[index] = el;
+                }}
                 onClick={() => command(item)}
                 className={cn(
                   "flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors",

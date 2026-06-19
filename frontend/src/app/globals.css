@@ -132,3 +132,426 @@
     animation: fade-in 0.2s ease-out;
   }
 }
+
+/* ─── ProseMirror / TipTap editor content styles ──────────────────────────── */
+/* These rules apply inside the contenteditable .ProseMirror div.              */
+/* They intentionally do NOT rely on Tailwind @apply so they work in all       */
+/* rendering contexts (editor + read-only DocView).                            */
+
+/* ── Headings ─────────────────────────────────────────────────────────────── */
+.ProseMirror h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 1.25rem;
+  margin-bottom: 0.4rem;
+}
+
+.ProseMirror h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 1rem;
+  margin-bottom: 0.35rem;
+}
+
+/* ── Paragraph spacing ────────────────────────────────────────────────────── */
+.ProseMirror p {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+  line-height: 1.7;
+}
+
+/* ── Bullet & ordered lists ──────────────────────────────────────────────── */
+.ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-top: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin-top: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.ProseMirror li {
+  margin-top: 0.2rem;
+  margin-bottom: 0.2rem;
+}
+
+/* ── Task list ───────────────────────────────────────────────────────────── */
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.25rem;
+}
+
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+  cursor: pointer;
+}
+
+.ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
+  cursor: pointer;
+  width: 1rem;
+  height: 1rem;
+  accent-color: hsl(var(--primary));
+}
+
+/* ── Blockquote ──────────────────────────────────────────────────────────── */
+.ProseMirror blockquote {
+  border-left: 3px solid hsl(var(--border));
+  padding-left: 1rem;
+  margin-left: 0;
+  margin-right: 0;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+
+/* ── Inline code ─────────────────────────────────────────────────────────── */
+.ProseMirror code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875em;
+  background-color: hsl(var(--muted));
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+}
+
+/* ── Code block ──────────────────────────────────────────────────────────── */
+.ProseMirror pre {
+  background-color: hsl(var(--muted));
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.ProseMirror pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.85em;
+  color: inherit;
+}
+
+/* ── Horizontal rule ─────────────────────────────────────────────────────── */
+.ProseMirror hr {
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+  margin: 1.5rem 0;
+}
+
+/* ── Images ──────────────────────────────────────────────────────────────── */
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem;
+  display: block;
+  margin: 0.75rem 0;
+}
+
+.ProseMirror img.ProseMirror-selectednode {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+
+/* ── Links ───────────────────────────────────────────────────────────────── */
+.ProseMirror a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* ISSUE 2 — Table styles                                                       */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+/* Wrapper added by TipTap's tableWrapper option for overflow scrolling */
+.ProseMirror .tableWrapper {
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+
+.ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  margin: 0;
+}
+
+.ProseMirror th,
+.ProseMirror td {
+  border: 1px solid hsl(var(--border));
+  padding: 6px 8px;
+  vertical-align: top;
+  text-align: left;
+  min-width: 2rem;
+  position: relative;
+  word-break: break-word;
+}
+
+.ProseMirror th {
+  background-color: hsl(var(--muted));
+  font-weight: 600;
+}
+
+/* Selected cell highlight */
+.ProseMirror .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: hsl(var(--primary) / 0.12);
+  z-index: 2;
+}
+
+/* Column resize handle */
+.ProseMirror .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  background-color: hsl(var(--primary) / 0.4);
+  z-index: 20;
+}
+
+/* Resize cursor while dragging */
+.ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* ISSUE 3 — Info panels and two-column layout                                  */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+/* Info panel node — styling is handled by InfoPanelView React component,       */
+/* but ensure the raw HTML output (e.g. read-only SSR) also looks reasonable.   */
+.ProseMirror div[data-type="info-panel"] {
+  display: flex;
+  gap: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--border));
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+  background-color: hsl(var(--muted) / 0.4);
+}
+
+.ProseMirror div[data-type="info-panel"][data-variant="info"] {
+  border-color: hsl(212 90% 70% / 0.5);
+  background-color: hsl(212 90% 96% / 0.6);
+}
+
+.ProseMirror div[data-type="info-panel"][data-variant="note"] {
+  border-color: hsl(45 90% 70% / 0.5);
+  background-color: hsl(45 90% 96% / 0.6);
+}
+
+.ProseMirror div[data-type="info-panel"][data-variant="warning"] {
+  border-color: hsl(25 90% 70% / 0.5);
+  background-color: hsl(25 90% 96% / 0.6);
+}
+
+.ProseMirror div[data-type="info-panel"][data-variant="success"] {
+  border-color: hsl(145 60% 60% / 0.5);
+  background-color: hsl(145 60% 96% / 0.6);
+}
+
+/* Two-column layout */
+.ProseMirror div[data-type="columns"] {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 0.75rem 0;
+}
+
+.ProseMirror div[data-type="column"] {
+  min-width: 0;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  border: 1px dashed hsl(var(--border));
+}
+
+/* Dark-mode tweaks for info panels */
+.dark .ProseMirror div[data-type="info-panel"][data-variant="info"] {
+  border-color: hsl(212 70% 40% / 0.7);
+  background-color: hsl(212 70% 10% / 0.4);
+}
+
+.dark .ProseMirror div[data-type="info-panel"][data-variant="note"] {
+  border-color: hsl(45 70% 40% / 0.7);
+  background-color: hsl(45 70% 10% / 0.4);
+}
+
+.dark .ProseMirror div[data-type="info-panel"][data-variant="warning"] {
+  border-color: hsl(25 70% 40% / 0.7);
+  background-color: hsl(25 70% 10% / 0.4);
+}
+
+.dark .ProseMirror div[data-type="info-panel"][data-variant="success"] {
+  border-color: hsl(145 50% 30% / 0.7);
+  background-color: hsl(145 50% 8% / 0.4);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* Notion-style page layout                                                      */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+/*
+ * The scroll container fills the available height.
+ */
+.notion-page-scroll {
+  /* Nothing special — flex-1 + overflow-y-auto is set via Tailwind */
+}
+
+/*
+ * Centered content column — max 760 px, generous horizontal padding.
+ * Left side gets extra padding (80 px) to give the gutter controls room.
+ * Right side mirrors it so text is visually centered.
+ */
+.notion-editor-wrapper {
+  max-width: 760px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  /* top/bottom breathing room */
+  padding-top: 3rem;
+  padding-bottom: 6rem;
+  /* left gutter for drag-handle + "+" button; right mirrors it */
+  padding-left: 80px;
+  padding-right: 80px;
+  position: relative;
+}
+
+/* Slightly tighter on small viewports */
+@media (max-width: 768px) {
+  .notion-editor-wrapper {
+    padding-left: 56px;
+    padding-right: 24px;
+  }
+}
+
+/* The EditorContent wrapper itself needs no extra padding */
+.notion-editor-content {
+  /* Inherits full width of notion-editor-wrapper */
+}
+
+/* Comfortable block spacing in Notion style */
+.notion-editor-wrapper .ProseMirror > * + * {
+  margin-top: 0.35rem;
+}
+
+/* Generous line height for paragraphs */
+.notion-editor-wrapper .ProseMirror p {
+  line-height: 1.75;
+  margin-top: 0.2rem;
+  margin-bottom: 0.2rem;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* GlobalDragHandle — .drag-handle styling                                       */
+/* The extension appends a div.drag-handle to the editor's parentElement.       */
+/* We style it as a subtle grip icon that appears on block hover.               */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+.drag-handle {
+  position: fixed;
+  /* Stack above the editor but below modals */
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Size */
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  /* Visual */
+  color: hsl(var(--muted-foreground) / 0.4);
+  background-color: transparent;
+  cursor: grab;
+  transition: color 0.15s, background-color 0.15s;
+  /* Braille block "⠿" used as grip; we use a background image so no
+     extra markup is needed. Alternatively pure CSS dots: */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='16' viewBox='0 0 10 16'%3E%3Ccircle cx='3' cy='2' r='1.5' fill='%23888'/%3E%3Ccircle cx='7' cy='2' r='1.5' fill='%23888'/%3E%3Ccircle cx='3' cy='7' r='1.5' fill='%23888'/%3E%3Ccircle cx='7' cy='7' r='1.5' fill='%23888'/%3E%3Ccircle cx='3' cy='12' r='1.5' fill='%23888'/%3E%3Ccircle cx='7' cy='12' r='1.5' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 10px 16px;
+  /* Ensure the icon itself is transparent so background shows */
+  font-size: 0;
+  color: transparent;
+  /* Opacity: hidden by default, revealed on editor hover via JS */
+  opacity: 0.4;
+  /* Nudge: align with block vertical center */
+  margin-top: -2px;
+}
+
+.drag-handle:hover {
+  opacity: 1;
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+  cursor: grab;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Hide handle during drag so it doesn't obstruct */
+.ProseMirror.dragging .drag-handle {
+  display: none;
+}
+
+/* ── "+" add-block button ─────────────────────────────────────────────────── */
+/* Rendered via React portal into document.body; visibility is controlled
+   purely by React state (only shown when drag-handle is visible). */
+
+.notion-add-btn:hover,
+.notion-add-btn:focus-visible {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
+  outline: none;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* Per-block placeholder (TipTap Placeholder extension)                         */
+/* Show "Type '/' for commands" on every empty block, not just the first.       */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+.ProseMirror p.is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: hsl(var(--muted-foreground) / 0.45);
+  pointer-events: none;
+  height: 0;
+  font-style: normal;
+}
+
+/* Hide the per-block placeholder when the editor is not focused, to avoid
+   distracting placeholder text on every empty line at once */
+.ProseMirror:not(:focus-within) p.is-empty::before {
+  opacity: 0;
+}
