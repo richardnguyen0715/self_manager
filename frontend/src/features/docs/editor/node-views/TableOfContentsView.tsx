@@ -55,7 +55,10 @@ export function TableOfContentsView({ editor }: NodeViewProps) {
   if (headings.length === 0) {
     return (
       <NodeViewWrapper>
-        <div className="my-3 rounded-lg border border-dashed p-4 text-sm text-muted-foreground flex items-center gap-2">
+        <div
+          contentEditable={false}
+          className="my-2 flex items-center gap-2 text-sm italic text-muted-foreground/60"
+        >
           <List className="h-4 w-4" />
           Table of contents — add headings to populate
         </div>
@@ -65,32 +68,27 @@ export function TableOfContentsView({ editor }: NodeViewProps) {
 
   return (
     <NodeViewWrapper>
-      <div className="my-3 rounded-lg border bg-muted/30 p-4">
-        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          <List className="h-3.5 w-3.5" />
+      <div contentEditable={false} className="my-3 border-b pb-3">
+        <div className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-foreground">
+          <List className="h-4 w-4 text-muted-foreground" />
           Table of Contents
         </div>
-        <nav>
-          <ul className="space-y-1">
-            {headings.map((h, i) => (
-              <li
-                key={i}
-                style={{ paddingLeft: `${(h.level - 1) * 12}px` }}
-              >
-                <a
-                  href={`#${h.id}`}
-                  className="text-sm text-primary hover:underline decoration-primary/50 underline-offset-2"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    const el = document.getElementById(h.id);
-                    el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
-                >
-                  {h.text}
-                </a>
-              </li>
-            ))}
-          </ul>
+        <nav className="flex flex-col gap-0.5 pl-6">
+          {headings.map((h, i) => (
+            <a
+              key={i}
+              href={`#${h.id}`}
+              style={{ paddingLeft: `${(h.level - 1) * 16}px` }}
+              className="block rounded px-1 py-0.5 text-sm text-muted-foreground no-underline transition-colors hover:bg-accent hover:text-foreground hover:underline underline-offset-2 decoration-muted-foreground/40"
+              onClick={(e) => {
+                e.preventDefault();
+                const el = document.getElementById(h.id);
+                el?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            >
+              {h.text}
+            </a>
+          ))}
         </nav>
       </div>
     </NodeViewWrapper>

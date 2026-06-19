@@ -51,6 +51,7 @@ export function BlockGutter({ editor, editorWrapperRef }: BlockGutterProps) {
         s.display === "none" ||
         s.visibility === "hidden" ||
         s.opacity === "0" ||
+        el.classList.contains("hide") ||
         el.classList.contains("hidden");
 
       if (hidden && !addBtnHoveredRef.current) {
@@ -113,19 +114,19 @@ export function BlockGutter({ editor, editorWrapperRef }: BlockGutterProps) {
       top: handleTop + 8,
     });
 
+    const docSize = view.state.doc.content.size;
     let insertAt: number;
 
     if (pmPos != null) {
       const $pos = view.state.doc.resolve(pmPos.pos);
-      // Walk up to depth 1 — the top-level block
-      let depth = $pos.depth;
-      while (depth > 1) depth--;
-      const blockNode = $pos.node(depth);
-      insertAt = $pos.before(depth) + (blockNode?.nodeSize ?? 1);
+      // Insert right after the top-level (depth-1) block the handle points at.
+      // Guard the doc-level case (empty doc / boundary) which has no ancestor.
+      insertAt = $pos.depth > 0 ? $pos.after(1) : docSize;
     } else {
-      // Fallback: end of document
-      insertAt = editor.state.doc.content.size;
+      insertAt = docSize;
     }
+    // Clamp defensively.
+    if (insertAt < 0 || insertAt > docSize) insertAt = docSize;
 
     editor
       .chain()

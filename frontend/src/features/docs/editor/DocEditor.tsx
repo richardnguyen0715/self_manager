@@ -11,6 +11,7 @@ import { Extension } from "@tiptap/core";
 import type { Editor as TipTapEditor, Range } from "@tiptap/core";
 import Suggestion from "@tiptap/suggestion";
 import type { SuggestionProps, SuggestionKeyDownProps } from "@tiptap/suggestion";
+import { PluginKey } from "@tiptap/pm/state";
 
 // ── Drag-handle + auto-joiner ───────────────────────────────────────────────
 import GlobalDragHandle from "tiptap-extension-global-drag-handle";
@@ -60,6 +61,8 @@ import { Embed } from "./extensions/Embed";
 import { DatabaseEmbed } from "./extensions/DatabaseEmbed";
 import { PageMention } from "./extensions/PageMention";
 import type { PageMentionAttrs } from "./extensions/PageMention";
+import { NodeDelete } from "./extensions/NodeDelete";
+import { BlockSelection } from "./extensions/BlockSelection";
 
 // ── Node views ──────────────────────────────────────────────────────────────
 import { InfoPanelView } from "./node-views/InfoPanelView";
@@ -531,6 +534,10 @@ export function DocEditor({
       AutoJoiner.configure({
         elementsToJoin: ["bulletList", "orderedList", "taskList"],
       }),
+      // ── Node deletion (Backspace/Delete for NodeSelection) ────────────
+      NodeDelete,
+      // ── Multi-block selection (gutter drag + decorations) ─────────────
+      BlockSelection,
       // ── @page mention suggestion ──────────────────────────────────────
       Extension.create({
         name: "pageMentionSuggestion",
@@ -552,6 +559,7 @@ export function DocEditor({
           return [
             Suggestion({
               editor: this.editor,
+              pluginKey: new PluginKey("pageMentionSuggestion"),
               ...this.options.suggestion,
             }),
           ];
@@ -575,6 +583,7 @@ export function DocEditor({
           return [
             Suggestion({
               editor: this.editor,
+              pluginKey: new PluginKey("slashCommandSuggestion"),
               ...this.options.suggestion,
             }),
           ];
@@ -654,6 +663,34 @@ export function DocEditor({
     };
     el.addEventListener("contextmenu", handleContextMenu);
     return () => el.removeEventListener("contextmenu", handleContextMenu);
+  }, [editor, readOnly]);
+
+  // ── Drag-handle focus fix ────────────────────────────────────────────────
+  // The GlobalDragHandle element lives OUTSIDE the contenteditable, so clicking
+  // it can steal browser focus from the editor.  We listen for mousedown on the
+  // parent (where the handle is appended) and, if the target is the handle,
+  // we schedule a re-focus after the event is processed so that keydown events
+  // (Backspace / Delete) still reach ProseMirror.
+  useEffect(() => {
+    if (!editor || readOnly) return;
+    const parent = editor.view.dom.parentElement;
+    if (!parent) return;
+
+    const onParentMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      // Match both the handle itself and any SVG child inside it
+      const handle = target.closest("[data-drag-handle], .drag-handle");
+      if (!handle) return;
+      // After the browser processes the click (which may move focus to the
+      // drag handle element), refocus the editor view.
+      requestAnimationFrame(() => {
+        editor.view.focus();
+      });
+    };
+
+    parent.addEventListener("mousedown", onParentMouseDown);
+    return () => parent.removeEventListener("mousedown", onParentMouseDown);
   }, [editor, readOnly]);
 
   const handleTemplateSelect = (content: TipTapDoc) => {

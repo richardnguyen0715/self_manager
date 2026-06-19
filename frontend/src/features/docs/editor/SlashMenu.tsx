@@ -131,8 +131,8 @@ export const SLASH_ITEMS: SlashCommandItem[] = [
     },
   },
   {
-    title: "Divider",
-    description: "Horizontal rule",
+    title: "Divider line",
+    description: "Horizontal line / rule to separate sections",
     icon: Minus,
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).setHorizontalRule().run();

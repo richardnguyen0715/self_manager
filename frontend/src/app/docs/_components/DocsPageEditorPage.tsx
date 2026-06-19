@@ -314,7 +314,7 @@ export function DocsPageEditorPage({
             {isWhiteboard ? (
               <Whiteboard pageId={pageId} readOnly={false} />
             ) : (
-              <div className="mx-auto max-w-3xl">
+              <div className="mx-auto w-full max-w-none">
                 {/* V2 page meta header: cover + icon + title + meta actions */}
                 <PageMetaHeader
                   page={page}

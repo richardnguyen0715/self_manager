@@ -204,13 +204,22 @@
 
 .ProseMirror ul[data-type="taskList"] li > label {
   flex-shrink: 0;
-  margin-top: 0.2rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  height: 1.5em; /* match the text line-height so the checkbox centers on line 1 */
   cursor: pointer;
 }
 
 .ProseMirror ul[data-type="taskList"] li > div {
   flex: 1;
   min-width: 0;
+}
+
+/* Kill default paragraph margins inside task items so text aligns with the box */
+.ProseMirror ul[data-type="taskList"] li > div > p {
+  margin: 0;
+  line-height: 1.5;
 }
 
 .ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
@@ -434,7 +443,7 @@
  * Right side mirrors it so text is visually centered.
  */
 .notion-editor-wrapper {
-  max-width: 760px;
+  max-width: none;
   width: 100%;
   margin-left: auto;
   margin-right: auto;
@@ -442,16 +451,16 @@
   padding-top: 3rem;
   padding-bottom: 6rem;
   /* left gutter for drag-handle + "+" button; right mirrors it */
-  padding-left: 80px;
-  padding-right: 80px;
+  padding-left: 3.25rem;
+  padding-right: 3.25rem;
   position: relative;
 }
 
 /* Slightly tighter on small viewports */
 @media (max-width: 768px) {
   .notion-editor-wrapper {
-    padding-left: 56px;
-    padding-right: 24px;
+    padding-left: 2.75rem;
+    padding-right: 1rem;
   }
 }
 
@@ -505,8 +514,6 @@
   color: transparent;
   /* Opacity: hidden by default, revealed on editor hover via JS */
   opacity: 0.4;
-  /* Nudge: align with block vertical center */
-  margin-top: -2px;
 }
 
 .drag-handle:hover {
@@ -523,6 +530,56 @@
 /* Hide handle during drag so it doesn't obstruct */
 .ProseMirror.dragging .drag-handle {
   display: none;
+}
+
+/* The global-drag-handle extension adds `.hide` when the cursor leaves the
+   editor / no block is hovered (Notion behaviour: handle only on block hover). */
+.drag-handle.hide {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* Block selection — multi-block highlight (BlockSelection extension)           */
+/* Applied via ProseMirror Decoration.node with class="block-selected".        */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+/*
+ * Highlight applied to each selected top-level block.
+ * The subtle blue background mimics Notion's block-selection style.
+ */
+.ProseMirror .block-selected {
+  border-radius: 4px;
+  background-color: hsl(217 91% 60% / 0.12);
+  outline: 1.5px solid hsl(217 91% 60% / 0.25);
+  outline-offset: 1px;
+  /* Suppress the default browser text-selection highlight inside selected
+     blocks so the decoration colour is clearly visible. */
+  user-select: none;
+}
+
+/* Dark-mode variant */
+.dark .ProseMirror .block-selected {
+  background-color: hsl(217 91% 65% / 0.18);
+  outline-color: hsl(217 91% 65% / 0.35);
+}
+
+/*
+ * When a NodeSelection block is selected via the drag-handle click, ProseMirror
+ * adds .ProseMirror-selectednode to the node's DOM element.  Give it the same
+ * visual treatment so it's consistent with the block-selection highlight.
+ * (Images already have their own outline above; this covers other block nodes.)
+ */
+.ProseMirror .ProseMirror-selectednode:not(img) {
+  border-radius: 4px;
+  background-color: hsl(217 91% 60% / 0.10);
+  outline: 1.5px solid hsl(217 91% 60% / 0.30);
+  outline-offset: 1px;
+}
+
+.dark .ProseMirror .ProseMirror-selectednode:not(img) {
+  background-color: hsl(217 91% 65% / 0.15);
+  outline-color: hsl(217 91% 65% / 0.40);
 }
 
 /* ── "+" add-block button ─────────────────────────────────────────────────── */
