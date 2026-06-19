@@ -70,7 +70,7 @@ export function AddColumnDialog({
     >
       {/* Dialog */}
       <div
-        className="bg-background border rounded-xl shadow-xl w-80 p-5 space-y-4"
+        className="bg-background border rounded-xl shadow-xl w-[95vw] max-w-xs sm:w-80 p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >

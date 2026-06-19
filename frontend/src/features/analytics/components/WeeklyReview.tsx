@@ -101,16 +101,16 @@ export function WeeklyReview({ data, isLoading }: WeeklyReviewProps) {
               {days.map((d) => (
                 <div
                   key={d.stat_date}
-                  className="flex items-center justify-between px-3 py-2.5 text-sm bg-card hover:bg-muted/40 transition-colors"
+                  className="flex flex-wrap items-center justify-between gap-y-1 px-3 py-2.5 text-sm bg-card hover:bg-muted/40 transition-colors"
                 >
-                  <span className="text-muted-foreground text-xs">
+                  <span className="text-muted-foreground text-xs shrink-0">
                     {format(parseISO(d.stat_date), "EEE, MMM d")}
                   </span>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                     <span className="text-xs text-muted-foreground">
                       {d.tasks_completed} tasks
                     </span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="hidden sm:inline text-xs text-muted-foreground">
                       {formatDuration(d.focus_minutes)}
                     </span>
                     <HabitBadge rate={d.habit_completion_rate} />

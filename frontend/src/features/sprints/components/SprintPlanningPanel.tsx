@@ -102,9 +102,9 @@ export function SprintPlanningPanel({ sprintId }: SprintPlanningPanelProps) {
   }
 
   return (
-    <div className="flex gap-4 h-[560px]">
+    <div className="flex flex-col md:flex-row gap-4 md:h-[560px]">
       {/* ── Left: Backlog ─────────────────────────────────────────────── */}
-      <div className="flex flex-col flex-1 min-w-0 rounded-lg border bg-card overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 rounded-lg border bg-card overflow-hidden h-[360px] md:h-auto">
         <div className="px-4 py-3 border-b space-y-2 shrink-0">
           <h3 className="text-sm font-semibold flex items-center gap-1.5">
             <ListTodo className="h-4 w-4 text-muted-foreground" />
@@ -183,7 +183,7 @@ export function SprintPlanningPanel({ sprintId }: SprintPlanningPanelProps) {
       </div>
 
       {/* ── Right: Sprint items ───────────────────────────────────────── */}
-      <div className="flex flex-col w-[340px] shrink-0 rounded-lg border bg-card overflow-hidden">
+      <div className="flex flex-col w-full md:w-[340px] shrink-0 rounded-lg border bg-card overflow-hidden h-[320px] md:h-auto">
         <div className="px-4 py-3 border-b space-y-2 shrink-0">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold leading-tight truncate">

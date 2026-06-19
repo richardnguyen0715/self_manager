@@ -170,7 +170,7 @@ export function HabitFormDialog({ open, mode, habit }: HabitFormDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && closeModal()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md sm:w-full">
         <DialogHeader>
           <DialogTitle>
             {mode === "create" ? "New Habit" : "Edit Habit"}
@@ -272,7 +272,7 @@ export function HabitFormDialog({ open, mode, habit }: HabitFormDialogProps) {
           {frequency === "custom" && (
             <div className="space-y-1.5">
               <Label>Days</Label>
-              <div className="flex gap-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 {DAYS.map((day, idx) => {
                   const active = (frequencyDays ?? []).includes(idx);
                   return (
@@ -281,7 +281,7 @@ export function HabitFormDialog({ open, mode, habit }: HabitFormDialogProps) {
                       type="button"
                       onClick={() => toggleDay(idx)}
                       className={cn(
-                        "h-8 w-8 rounded-full text-xs font-semibold transition-colors",
+                        "h-8 w-8 shrink-0 rounded-full text-xs font-semibold transition-colors",
                         active
                           ? "bg-primary text-primary-foreground"
                           : "bg-secondary text-secondary-foreground hover:bg-accent",

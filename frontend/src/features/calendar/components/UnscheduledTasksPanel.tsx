@@ -64,7 +64,7 @@ export function UnscheduledTasksPanel() {
   const { data: tasks, isLoading } = useUnscheduledTasks();
 
   return (
-    <div className="w-52 shrink-0 border-l flex flex-col bg-background">
+    <div className="w-full lg:w-52 shrink-0 border-t lg:border-t-0 lg:border-l flex flex-col bg-background">
       {/* Panel header */}
       <button
         onClick={() => setCollapsed((c) => !c)}
@@ -84,7 +84,7 @@ export function UnscheduledTasksPanel() {
       </button>
 
       {!collapsed && (
-        <div className="flex-1 overflow-y-auto px-1 py-1">
+        <div className="flex-1 overflow-y-auto px-1 py-1 max-h-48 lg:max-h-none">
           {isLoading && (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -104,7 +104,7 @@ export function UnscheduledTasksPanel() {
       )}
 
       {!collapsed && (
-        <p className="text-[10px] text-muted-foreground px-3 py-2 border-t">
+        <p className="text-[10px] text-muted-foreground px-3 py-2 border-t hidden lg:block">
           Drag a task onto the calendar to create a time block.
         </p>
       )}

@@ -191,7 +191,7 @@ export function AppearanceSection() {
         description="Customize the look and feel of the app."
       />
 
-      <div className="space-y-6 max-w-lg">
+      <div className="space-y-6 max-w-lg w-full">
         {/* Color scheme */}
         <Card>
           <CardContent className="pt-6 space-y-5">

@@ -93,7 +93,7 @@ export function BacklogSection({ sprints, epics: _epics }: BacklogSectionProps) 
       )}
     >
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-card">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-4 py-2.5 border-b bg-card">
         {/* Collapse toggle */}
         <button
           type="button"
@@ -114,9 +114,9 @@ export function BacklogSection({ sprints, epics: _epics }: BacklogSectionProps) 
           {total}
         </Badge>
 
-        <div className="flex-1" />
+        <div className="flex-1 min-w-0" />
 
-        {/* Estimate summary */}
+        {/* Estimate summary — hidden on mobile */}
         {estimatePoints > 0 && (
           <span className="hidden sm:inline text-xs text-muted-foreground whitespace-nowrap">
             Estimate: {estimatePoints} of{" "}
@@ -128,18 +128,19 @@ export function BacklogSection({ sprints, epics: _epics }: BacklogSectionProps) 
         <Button
           size="sm"
           variant="outline"
-          className="h-7 text-xs gap-1.5"
+          className="h-7 text-xs gap-1.5 shrink-0"
           onClick={openCreateSprint}
         >
           <Plus className="h-3 w-3" />
-          Create sprint
+          <span className="hidden sm:inline">Create sprint</span>
+          <span className="sm:hidden">Sprint</span>
         </Button>
 
         {/* Quick add item */}
         <Button
           size="sm"
           variant="ghost"
-          className="h-7 text-xs"
+          className="h-7 text-xs shrink-0"
           onClick={() => openCreateItem()}
           aria-label="Create work item"
         >
@@ -206,8 +207,8 @@ export function BacklogSection({ sprints, epics: _epics }: BacklogSectionProps) 
                 <span className="hidden sm:inline w-10 text-center">Sub</span>
                 <span className="hidden sm:inline w-4 text-center">P</span>
                 <span className="w-24 text-center">Status</span>
-                <span className="hidden sm:inline w-10 text-center">Pts</span>
-                <span className="hidden sm:inline w-16 text-right">Due</span>
+                <span className="hidden md:inline w-10 text-center">Pts</span>
+                <span className="hidden md:inline w-16 text-right">Due</span>
                 <span className="w-7 shrink-0" />
               </div>
               {filtered.map((item) => (

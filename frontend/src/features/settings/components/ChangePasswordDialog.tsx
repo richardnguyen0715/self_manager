@@ -70,7 +70,7 @@ export function ChangePasswordDialog() {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[95vw] max-w-full sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Change password</DialogTitle>
           <DialogDescription>
@@ -158,16 +158,18 @@ export function ChangePasswordDialog() {
             <p className="text-sm text-destructive">{error}</p>
           )}
 
-          <DialogFooter className="mt-4">
+          <DialogFooter className="mt-4 flex-col-reverse sm:flex-row gap-2 sm:gap-0">
             <Button
               type="button"
               variant="outline"
+              className="w-full sm:w-auto"
               onClick={() => handleOpenChange(false)}
             >
               Cancel
             </Button>
             <Button
               type="submit"
+              className="w-full sm:w-auto"
               disabled={
                 changePassword.isPending ||
                 !currentPassword ||

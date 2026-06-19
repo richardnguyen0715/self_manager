@@ -197,7 +197,7 @@ function DayColumn({ day, events, timeBlocks, showDayHeader }: DayColumnProps) {
   );
 
   return (
-    <div className="flex flex-col min-w-0 flex-1">
+    <div className="flex flex-col flex-1" style={{ minWidth: 80 }}>
       {/* Day header */}
       {showDayHeader && (
         <div
@@ -325,6 +325,10 @@ interface TimeGridProps {
 export function TimeGrid({ days, events, timeBlocks, showDayHeaders = true }: TimeGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Min width per day column so week view scrolls on narrow screens
+  const minColWidth = 80; // px
+  const gridMinWidth = days.length > 1 ? days.length * minColWidth : 0;
+
   // Scroll to 7 AM on mount
   React.useEffect(() => {
     if (scrollRef.current) {
@@ -336,7 +340,7 @@ export function TimeGrid({ days, events, timeBlocks, showDayHeaders = true }: Ti
     <div className="flex flex-col flex-1 min-h-0">
       {/* All-day row */}
       {showDayHeaders && (
-        <div className="flex border-b shrink-0">
+        <div className="flex border-b shrink-0" style={{ minWidth: gridMinWidth + 56 }}>
           {/* Spacer for gutter */}
           <div className="w-14 shrink-0" />
           <div className="flex flex-1">
@@ -345,7 +349,11 @@ export function TimeGrid({ days, events, timeBlocks, showDayHeaders = true }: Ti
                 (e) => e.all_day && isSameDay(parseISO(e.start_time), day),
               );
               return (
-                <div key={day.toISOString()} className="flex-1 min-h-[2rem] border-r last:border-r-0 px-1 py-0.5">
+                <div
+                  key={day.toISOString()}
+                  className="flex-1 min-h-[2rem] border-r last:border-r-0 px-1 py-0.5"
+                  style={{ minWidth: minColWidth }}
+                >
                   {allDay.map((e) => (
                     <div
                       key={e.id}
@@ -366,21 +374,24 @@ export function TimeGrid({ days, events, timeBlocks, showDayHeaders = true }: Ti
       )}
 
       {/* Scrollable time grid */}
-      <div ref={scrollRef} className="flex flex-1 overflow-y-auto overflow-x-hidden min-h-0">
-        {/* Gutter */}
-        <TimeGutter />
+      <div ref={scrollRef} className="flex flex-1 overflow-y-auto overflow-x-auto min-h-0">
+        {/* Inner wrapper enforces min-width for horizontal scroll on narrow screens */}
+        <div className="flex flex-1" style={{ minWidth: gridMinWidth + 56 }}>
+          {/* Gutter */}
+          <TimeGutter />
 
-        {/* Day columns */}
-        <div className="flex flex-1 min-w-0">
-          {days.map((day) => (
-            <DayColumn
-              key={day.toISOString()}
-              day={day}
-              events={eventsForDay(events, day)}
-              timeBlocks={timeBlocksForDay(timeBlocks, day)}
-              showDayHeader={showDayHeaders}
-            />
-          ))}
+          {/* Day columns */}
+          <div className="flex flex-1 min-w-0">
+            {days.map((day) => (
+              <DayColumn
+                key={day.toISOString()}
+                day={day}
+                events={eventsForDay(events, day)}
+                timeBlocks={timeBlocksForDay(timeBlocks, day)}
+                showDayHeader={showDayHeaders}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </div>

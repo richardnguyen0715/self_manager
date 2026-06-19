@@ -115,7 +115,7 @@ export function InitiativeForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[95vw] max-w-full sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? "Edit Initiative" : "New Initiative"}

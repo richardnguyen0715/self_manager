@@ -123,7 +123,7 @@ export function EpicForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[95vw] max-w-full sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Epic" : "New Epic"}</DialogTitle>
           <DialogDescription>
@@ -184,7 +184,7 @@ export function EpicForm({
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="epic-start-date">Start date</Label>
                 <Controller

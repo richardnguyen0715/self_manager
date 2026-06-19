@@ -141,9 +141,9 @@ function SkeletonRow() {
       <div className="flex-1 space-y-1.5">
         <div className="h-3.5 bg-muted rounded w-1/2" />
       </div>
-      <div className="h-5 w-16 bg-muted rounded" />
-      <div className="h-5 w-14 bg-muted rounded" />
-      <div className="h-5 w-8 bg-muted rounded" />
+      <div className="h-5 w-16 bg-muted rounded hidden sm:block" />
+      <div className="h-5 w-14 bg-muted rounded hidden md:block" />
+      <div className="h-5 w-8 bg-muted rounded hidden md:block" />
     </div>
   );
 }
@@ -213,7 +213,7 @@ function WorkItemRow({ item }: { item: WorkItemListItem }) {
       {dueMeta ? (
         <span
           className={cn(
-            "inline-flex items-center gap-1 text-xs shrink-0 hidden sm:inline-flex",
+            "hidden sm:inline-flex items-center gap-1 text-xs shrink-0",
             dueMeta.overdue
               ? "text-red-600 dark:text-red-400 font-medium"
               : dueMeta.today
@@ -312,7 +312,7 @@ export function WorkItemList() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-y-2 mb-4">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-semibold">Work Items</h1>
           {total > 0 && (
@@ -324,23 +324,24 @@ export function WorkItemList() {
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           )}
         </div>
-        <Button onClick={openCreateDialog} size="sm" className="gap-1.5">
+        <Button onClick={openCreateDialog} size="sm" className="gap-1.5 shrink-0">
           <Plus className="h-4 w-4" />
-          New work item
+          <span className="hidden sm:inline">New work item</span>
+          <span className="sm:hidden">New</span>
         </Button>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {/* Search */}
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
           <Input
             placeholder="Search titles..."
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
             onKeyDown={handleSearchKeyDown}
-            className="h-8 pl-8 pr-7 w-48 text-sm"
+            className="h-8 pl-8 pr-7 w-full sm:w-48 text-sm"
           />
           {searchValue && (
             <button

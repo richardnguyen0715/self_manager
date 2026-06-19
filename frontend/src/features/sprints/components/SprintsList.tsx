@@ -34,7 +34,7 @@ function SkeletonRow() {
     <div className="flex items-center gap-4 px-4 py-3 animate-pulse">
       <div className="h-4 bg-muted rounded w-40" />
       <div className="h-5 bg-muted rounded w-16" />
-      <div className="h-4 bg-muted rounded w-28 ml-auto" />
+      <div className="h-4 bg-muted rounded w-28 ml-auto hidden sm:block" />
     </div>
   );
 }
@@ -131,8 +131,8 @@ function SprintRow({ sprint }: SprintRowProps) {
         </p>
       </div>
 
-      {/* Capacity bar */}
-      <div className="w-44 shrink-0">
+      {/* Capacity bar — hidden on mobile, shown sm+ */}
+      <div className="hidden sm:block w-44 shrink-0">
         <CapacityBar
           planned={sprint.planned_points}
           capacity={sprint.capacity_points}
@@ -149,8 +149,8 @@ function SprintRow({ sprint }: SprintRowProps) {
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Actions — always visible on touch, hover-only on pointer devices */}
+      <div className="flex items-center gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         {sprint.status === "planned" && (
           <Button
             size="sm"
@@ -292,7 +292,7 @@ export function SprintsList() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-semibold">Sprints</h1>
           {total > 0 && (
@@ -302,7 +302,7 @@ export function SprintsList() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Status filter */}
           <select
             value={filters.status ?? "all"}

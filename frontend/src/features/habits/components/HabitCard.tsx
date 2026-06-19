@@ -161,7 +161,7 @@ export function HabitCard({ habit, todayValue, todayCompleted }: HabitCardProps)
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                className="h-7 w-7 shrink-0 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"
                 aria-label="Habit actions"
               >
                 <MoreVertical className="h-4 w-4" />

@@ -634,9 +634,9 @@ export function WorkItemDetail({ workItemId, onClose }: WorkItemDetailProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b">
+      <div className="flex items-center justify-between gap-2 px-4 md:px-6 py-3 border-b flex-wrap">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0 truncate">
           {epicInfo && (
             <>
               <span className="truncate">{epicInfo.epicTitle}</span>
@@ -667,10 +667,10 @@ export function WorkItemDetail({ workItemId, onClose }: WorkItemDetailProps) {
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
         {/* Left column */}
         <ScrollArea className="flex-1">
-          <div className="px-6 py-5 space-y-6">
+          <div className="px-4 md:px-6 py-5 space-y-6">
             {/* Title */}
             <div>
               {editingTitle ? (
@@ -769,7 +769,7 @@ export function WorkItemDetail({ workItemId, onClose }: WorkItemDetailProps) {
         </ScrollArea>
 
         {/* Right Details rail */}
-        <div className="w-72 shrink-0 border-l overflow-y-auto">
+        <div className="w-full lg:w-64 xl:w-72 shrink-0 border-t lg:border-t-0 lg:border-l overflow-y-auto">
           <div className="px-4 py-5">
             <DetailsRail workItem={workItem} epicInfo={epicInfo} />
           </div>

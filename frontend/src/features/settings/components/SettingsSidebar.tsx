@@ -51,7 +51,7 @@ export function SettingsSidebar() {
   return (
     <nav
       aria-label="Settings navigation"
-      className="flex flex-col gap-1 w-56 shrink-0"
+      className="flex flex-row md:flex-col gap-1 md:w-56 md:shrink-0 overflow-x-auto md:overflow-x-visible pb-1 md:pb-0"
     >
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon;
@@ -62,7 +62,7 @@ export function SettingsSidebar() {
             key={item.id}
             onClick={() => setActiveSection(item.id)}
             className={cn(
-              "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors text-left w-full",
+              "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors text-left shrink-0 md:w-full",
               isActive
                 ? "bg-accent text-accent-foreground font-medium"
                 : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
@@ -76,8 +76,8 @@ export function SettingsSidebar() {
               )}
             />
             <div className="flex flex-col min-w-0">
-              <span>{item.label}</span>
-              <span className="text-xs text-muted-foreground truncate leading-tight">
+              <span className="whitespace-nowrap">{item.label}</span>
+              <span className="text-xs text-muted-foreground truncate leading-tight hidden md:block">
                 {item.description}
               </span>
             </div>

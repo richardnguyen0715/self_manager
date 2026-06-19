@@ -158,41 +158,43 @@ export function HabitList() {
       </div>
 
       {/* ── Filters ── */}
-      <div className="flex flex-wrap gap-2">
-        <div className="flex items-center gap-1.5">
-          <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">Frequency:</span>
-        </div>
-        {(["all", "daily", "weekly", "custom"] as FreqFilter[]).map((f) => (
+      <div className="overflow-x-auto pb-1 -mb-1">
+        <div className="flex flex-wrap gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Frequency:</span>
+          </div>
+          {(["all", "daily", "weekly", "custom"] as FreqFilter[]).map((f) => (
+            <FilterPill
+              key={f}
+              label={f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
+              active={filterFrequency === f}
+              onClick={() => setFilterFrequency(f)}
+            />
+          ))}
+
+          <div className="w-px bg-border shrink-0" />
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-xs text-muted-foreground">Type:</span>
+          </div>
+          {(["all", "check", "count", "duration"] as TypeFilter[]).map((t) => (
+            <FilterPill
+              key={t}
+              label={t === "all" ? "All" : t.charAt(0).toUpperCase() + t.slice(1)}
+              active={filterType === t}
+              onClick={() => setFilterType(t)}
+            />
+          ))}
+
+          <div className="w-px bg-border shrink-0" />
+
           <FilterPill
-            key={f}
-            label={f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
-            active={filterFrequency === f}
-            onClick={() => setFilterFrequency(f)}
+            label="Show archived"
+            active={showArchived}
+            onClick={() => setShowArchived(!showArchived)}
           />
-        ))}
-
-        <div className="w-px bg-border" />
-
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">Type:</span>
         </div>
-        {(["all", "check", "count", "duration"] as TypeFilter[]).map((t) => (
-          <FilterPill
-            key={t}
-            label={t === "all" ? "All" : t.charAt(0).toUpperCase() + t.slice(1)}
-            active={filterType === t}
-            onClick={() => setFilterType(t)}
-          />
-        ))}
-
-        <div className="w-px bg-border" />
-
-        <FilterPill
-          label="Show archived"
-          active={showArchived}
-          onClick={() => setShowArchived(!showArchived)}
-        />
       </div>
 
       {/* ── Habit grid ── */}

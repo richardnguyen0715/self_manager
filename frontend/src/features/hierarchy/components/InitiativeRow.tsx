@@ -121,13 +121,13 @@ export function InitiativeRow({ initiative }: InitiativeRowProps) {
         <InitiativeStatusBadge status={initiative.status} />
 
         {/* Epic count */}
-        <Badge variant="outline" className="text-xs shrink-0">
+        <Badge variant="outline" className="text-xs shrink-0 hidden sm:inline-flex">
           {epics.length} epics
         </Badge>
 
         {/* Progress (only when expanded and epics loaded) */}
         {isExpanded && epics.length > 0 && (
-          <div className="flex items-center gap-2 shrink-0 w-36">
+          <div className="hidden md:flex items-center gap-2 shrink-0 w-36">
             <GoalProgressBar
               value={rollupPct}
               showLabel={false}
@@ -141,7 +141,7 @@ export function InitiativeRow({ initiative }: InitiativeRowProps) {
 
         {/* Points rollup */}
         {isExpanded && epics.length > 0 && (
-          <span className="text-xs text-muted-foreground tabular-nums shrink-0 w-16 text-right">
+          <span className="hidden md:inline text-xs text-muted-foreground tabular-nums shrink-0 w-16 text-right">
             {donePoints}/{totalPoints}pt
           </span>
         )}

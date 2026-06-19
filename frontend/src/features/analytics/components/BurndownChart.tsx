@@ -244,7 +244,7 @@ export function BurndownChart({
           Remaining story points per day vs. ideal burn rate
         </p>
       </CardHeader>
-      <CardContent className="pl-2">
+      <CardContent className="px-3 sm:px-6 pt-0 pb-4">
         {sprintsLoading ? (
           <ChartSkeleton />
         ) : sprints.length === 0 ? (
@@ -253,11 +253,13 @@ export function BurndownChart({
           </div>
         ) : (
           <div className="space-y-4">
-            <SprintSelector
-              sprints={sprints}
-              selected={resolvedId}
-              onSelect={setSelectedSprintId}
-            />
+            <div className="overflow-x-auto pb-1">
+              <SprintSelector
+                sprints={sprints}
+                selected={resolvedId}
+                onSelect={setSelectedSprintId}
+              />
+            </div>
             <BurndownContent sprintId={resolvedId} />
           </div>
         )}

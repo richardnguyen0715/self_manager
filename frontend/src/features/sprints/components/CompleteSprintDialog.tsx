@@ -46,7 +46,7 @@ export function CompleteSprintDialog() {
       open={isCompleteDialogOpen}
       onOpenChange={(open) => !open && closeDialog()}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[95vw] max-w-full sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-emerald-500" />

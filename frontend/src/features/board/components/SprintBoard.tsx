@@ -95,19 +95,19 @@ export function SprintBoard() {
   ).length;
 
   return (
-    <div className="flex flex-col h-full gap-4 min-h-0">
+    <div className="flex flex-col h-full gap-4 min-h-0 px-4 md:px-6">
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-3 shrink-0">
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold leading-tight">
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold leading-tight truncate max-w-[16rem] sm:max-w-none">
               {activeSprint ? activeSprint.name : "All work items"}
             </h2>
             {activeSprint && (
               <Badge
                 variant="secondary"
                 className={cn(
-                  "text-[10px] px-1.5 py-0 h-4 font-medium uppercase tracking-wide",
+                  "text-[10px] px-1.5 py-0 h-4 font-medium uppercase tracking-wide shrink-0",
                   activeSprint.status === "active" &&
                     "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
                 )}
@@ -125,7 +125,7 @@ export function SprintBoard() {
           )}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
             <span className="font-medium text-foreground">{doneCount}</span>
@@ -134,7 +134,7 @@ export function SprintBoard() {
             <SprintProgressBar doneCount={doneCount} totalCount={totalCount} />
           </div>
           {activeSprint && (
-            <Button size="sm" variant="outline" asChild>
+            <Button size="sm" variant="outline" asChild className="shrink-0">
               <Link href={`/sprints/${activeSprint.id}`}>Sprint detail</Link>
             </Button>
           )}

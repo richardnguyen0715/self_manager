@@ -62,7 +62,7 @@ export function HabitLogDialog({ open, habit }: HabitLogDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && closeModal()}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="w-[95vw] max-w-sm sm:w-full">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {habit.color && (

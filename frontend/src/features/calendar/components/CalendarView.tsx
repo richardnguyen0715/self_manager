@@ -125,10 +125,10 @@ export function CalendarView() {
           </div>
         )}
 
-        {/* Main content area */}
+        {/* Main content area — stacks vertically on mobile, side-by-side on lg+ */}
         <div
           className={cn(
-            "flex flex-1 min-h-0 rounded-lg border overflow-hidden",
+            "flex flex-col lg:flex-row flex-1 min-h-0 rounded-lg border overflow-hidden",
             isLoading && "relative",
           )}
         >
@@ -139,8 +139,8 @@ export function CalendarView() {
             </div>
           )}
 
-          {/* Calendar body */}
-          <div className="flex flex-col flex-1 min-h-0 min-w-0">
+          {/* Calendar body — horizontal scroll on small screens for day/week grids */}
+          <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-x-auto">
             {view === "month" ? (
               <MonthGrid
                 anchorDate={anchorDate}
@@ -157,7 +157,7 @@ export function CalendarView() {
             )}
           </div>
 
-          {/* Unscheduled tasks sidebar (hidden in month view on small screens) */}
+          {/* Unscheduled tasks panel — full-width below calendar on mobile, sidebar on lg+ */}
           <UnscheduledTasksPanel />
         </div>
       </div>

@@ -149,7 +149,7 @@ export function SprintDetail({ sprintId }: SprintDetailProps) {
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
           <Button
             variant="ghost"
             size="icon"

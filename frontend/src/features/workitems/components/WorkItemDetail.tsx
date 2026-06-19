@@ -103,7 +103,7 @@ function LinkPicker({ workItemId, onClose }: LinkPickerProps) {
   }
 
   return (
-    <div className="rounded-md border bg-popover shadow-md p-3 space-y-2 w-72">
+    <div className="rounded-md border bg-popover shadow-md p-3 space-y-2 w-full sm:w-72">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">Link work item</span>
         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onClose}>
@@ -567,7 +567,7 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex lg:h-full lg:min-h-0 flex-col">
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-4 flex-wrap">
         <button
@@ -595,10 +595,10 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
       </div>
 
       {/* Two-column layout */}
-      <div className="flex flex-1 min-h-0 gap-6">
+      <div className="flex flex-col lg:flex-row lg:flex-1 lg:min-h-0 gap-6">
         {/* ── Left column ─────────────────────────────────────────────── */}
-        <ScrollArea className="flex-1 min-w-0">
-          <div className="space-y-6 pr-4 pb-6">
+        <ScrollArea className="lg:flex-1 min-w-0">
+          <div className="space-y-6 pr-0 lg:pr-4 pb-6">
             {/* Title + action buttons */}
             <div className="space-y-2">
               {editingTitle ? (
@@ -1191,7 +1191,7 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
         </ScrollArea>
 
         {/* ── Right rail ──────────────────────────────────────────────── */}
-        <div className="w-72 shrink-0 space-y-4">
+        <div className="w-full lg:w-72 lg:shrink-0 space-y-4">
           {/* Status dropdown */}
           <DropdownMenuPrimitive.Root>
             <DropdownMenuPrimitive.Trigger asChild>

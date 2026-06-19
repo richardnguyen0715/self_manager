@@ -17,7 +17,7 @@ export function DashboardGreeting() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-foreground">
+      <h2 className="text-lg font-semibold text-foreground sm:text-xl">
         {getGreeting()}, {firstName}
       </h2>
       <p className="text-sm text-muted-foreground">{today}</p>

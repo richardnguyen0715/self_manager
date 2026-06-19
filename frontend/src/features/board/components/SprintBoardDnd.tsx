@@ -242,7 +242,7 @@ export function SprintBoardDnd({ sprintId }: SprintBoardDndProps) {
         onDragOver={onDragOver}
         onDragEnd={onDragEnd}
       >
-        <div className="flex gap-4 h-full items-start pb-4">
+        <div className="flex gap-4 h-full items-start pb-4 w-max min-w-full">
           {/* Column-level horizontal SortableContext for column drag-reorder */}
           <SortableContext
             items={columnIds}
@@ -264,7 +264,7 @@ export function SprintBoardDnd({ sprintId }: SprintBoardDndProps) {
           <button
             type="button"
             onClick={() => setAddColumnOpen(true)}
-            className="flex-shrink-0 flex items-center gap-2 w-72 rounded-xl border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground hover:bg-muted/40 transition-colors self-start"
+            className="flex-shrink-0 flex items-center gap-2 w-[260px] sm:w-72 rounded-xl border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground hover:bg-muted/40 transition-colors self-start"
           >
             <Plus className="h-4 w-4" />
             Add column

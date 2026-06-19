@@ -22,7 +22,7 @@ export function PeriodSelector() {
         {dateRange.from} &mdash; {dateRange.to}
       </span>
       <div
-        className="flex items-center gap-1 p-1 rounded-md bg-muted"
+        className="flex flex-wrap items-center gap-1 p-1 rounded-md bg-muted"
         role="group"
         aria-label="Select time period"
       >

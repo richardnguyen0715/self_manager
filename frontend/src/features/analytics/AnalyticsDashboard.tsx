@@ -60,7 +60,7 @@ export function AnalyticsDashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header row: period picker + refresh */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <PeriodSelector />
@@ -100,8 +100,8 @@ export function AnalyticsDashboard() {
         </div>
       )}
 
-      {/* Main charts — two column on wide screens */}
-      <div className="grid gap-6 xl:grid-cols-2">
+      {/* Main charts — two column on large screens */}
+      <div className="grid gap-6 lg:grid-cols-2">
         <ProductivityChart
           data={dailyQuery.data}
           isLoading={dailyQuery.isLoading}
@@ -113,14 +113,14 @@ export function AnalyticsDashboard() {
       </div>
 
       {/* Second row */}
-      <div className="grid gap-6 xl:grid-cols-3">
-        {/* Time usage takes 1 col on xl */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Time usage takes 1 col on lg */}
         <TimeUsageChart
           data={timeUsageQuery.data}
           isLoading={timeUsageQuery.isLoading}
         />
-        {/* Daily review spans 2 cols on xl */}
-        <div className="xl:col-span-2">
+        {/* Daily review spans 2 cols on lg */}
+        <div className="lg:col-span-2">
           <WeeklyReview
             data={dailyQuery.data}
             isLoading={dailyQuery.isLoading}
@@ -147,8 +147,8 @@ export function AnalyticsDashboard() {
         </p>
       </div>
 
-      {/* Velocity + time-by-epic side by side on wide screens */}
-      <div className="grid gap-6 xl:grid-cols-2">
+      {/* Velocity + time-by-epic side by side on large screens */}
+      <div className="grid gap-6 lg:grid-cols-2">
         <SprintVelocityChart
           data={velocityQuery.data}
           isLoading={velocityQuery.isLoading}

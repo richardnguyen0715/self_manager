@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Bell, Command } from "lucide-react";
+import { Search, Bell, Command, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUIStore } from "@/stores";
 
@@ -9,16 +9,43 @@ interface HeaderProps {
 }
 
 export function Header({ title }: HeaderProps) {
-  const { openCommandPalette } = useUIStore();
+  const { openCommandPalette, setMobileNavOpen } = useUIStore();
 
   return (
-    <header className="flex h-14 items-center justify-between border-b bg-background px-6">
+    <header className="flex h-14 items-center gap-2 border-b bg-background px-4 md:px-6">
+      {/* Hamburger — visible only below lg where the sidebar is off-canvas */}
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Open navigation menu"
+        className="shrink-0 lg:hidden"
+        onClick={() => setMobileNavOpen(true)}
+      >
+        <Menu className="h-5 w-5" />
+      </Button>
+
+      {/* Page title */}
       {title && (
-        <h1 className="text-lg font-semibold text-foreground">{title}</h1>
+        <h1 className="truncate text-lg font-semibold text-foreground">
+          {title}
+        </h1>
       )}
 
+      {/* Right-side actions */}
       <div className="ml-auto flex items-center gap-2">
-        {/* Command palette trigger */}
+        {/* Search — full pill on sm+, icon-only on xs */}
+        {/* Icon-only button visible below sm */}
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Search"
+          className="sm:hidden"
+          onClick={openCommandPalette}
+        >
+          <Search className="h-4 w-4" />
+        </Button>
+
+        {/* Full command palette trigger visible on sm+ */}
         <Button
           variant="outline"
           size="sm"

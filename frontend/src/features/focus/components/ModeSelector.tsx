@@ -51,7 +51,11 @@ export function ModeSelector() {
 
   return (
     <>
-      <div className="flex items-center gap-2" role="group" aria-label="Focus mode">
+      <div
+        className="flex flex-wrap items-center justify-center gap-2"
+        role="group"
+        aria-label="Focus mode"
+      >
         {FOCUS_MODES.map((cfg) => {
           const isActive = selectedMode === cfg.mode;
           const subtitle =
@@ -66,7 +70,7 @@ export function ModeSelector() {
               disabled={isDisabled}
               aria-pressed={isActive}
               className={cn(
-                "flex flex-col items-center rounded-xl border px-4 py-2.5 text-center text-sm transition-all",
+                "flex flex-col items-center rounded-xl border px-3 py-2.5 text-center text-sm transition-all sm:px-4",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 "disabled:pointer-events-none disabled:opacity-50",
                 isActive
@@ -82,7 +86,7 @@ export function ModeSelector() {
       </div>
 
       <Dialog open={customDialogOpen} onOpenChange={setCustomDialogOpen}>
-        <DialogContent className="max-w-xs">
+        <DialogContent className="w-[95vw] max-w-xs sm:w-full">
           <DialogHeader>
             <DialogTitle>Custom Timer</DialogTitle>
           </DialogHeader>

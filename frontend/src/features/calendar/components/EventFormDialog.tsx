@@ -151,7 +151,7 @@ export function EventFormDialog() {
 
   return (
     <Dialog open={eventDialogOpen} onOpenChange={(open) => !open && closeEventDialog()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[95vw] max-w-full sm:w-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Event" : "New Event"}</DialogTitle>
         </DialogHeader>
@@ -201,7 +201,7 @@ export function EventFormDialog() {
 
             {/* Start / End */}
             {!isAllDay && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="event-start">Start</Label>
                   <Input
@@ -232,7 +232,7 @@ export function EventFormDialog() {
             )}
 
             {isAllDay && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="event-start-date">Start date</Label>
                   <Controller

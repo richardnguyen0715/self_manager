@@ -9,13 +9,13 @@ function TimerSkeleton() {
   return (
     <div className="flex flex-col items-center gap-6">
       {/* mode selector placeholder */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-14 w-24 animate-pulse rounded-xl bg-muted" />
+          <div key={i} className="h-14 w-20 animate-pulse rounded-xl bg-muted sm:w-24" />
         ))}
       </div>
-      {/* ring placeholder */}
-      <div className="h-[260px] w-[260px] animate-pulse rounded-full bg-muted" />
+      {/* ring placeholder — scales down on small screens */}
+      <div className="aspect-square w-[min(80vw,260px)] animate-pulse rounded-full bg-muted" />
       {/* controls placeholder */}
       <div className="h-10 w-40 animate-pulse rounded-md bg-muted" />
     </div>
@@ -24,9 +24,9 @@ function TimerSkeleton() {
 
 export function FocusFeature() {
   return (
-    <div className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[1fr_320px]">
+    <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[1fr_320px] lg:gap-8">
       {/* Left: timer */}
-      <div className="flex flex-col items-center justify-start py-8">
+      <div className="flex flex-col items-center justify-start py-6 lg:py-8">
         <Suspense fallback={<TimerSkeleton />}>
           <FocusTimer />
         </Suspense>

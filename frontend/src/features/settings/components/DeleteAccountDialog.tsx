@@ -51,7 +51,7 @@ export function DeleteAccountDialog() {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[95vw] max-w-full sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-destructive">
             <AlertTriangle className="h-5 w-5" />
@@ -111,10 +111,11 @@ export function DeleteAccountDialog() {
             </p>
           )}
 
-          <DialogFooter className="mt-4">
+          <DialogFooter className="mt-4 flex-col-reverse sm:flex-row gap-2 sm:gap-0">
             <Button
               type="button"
               variant="outline"
+              className="w-full sm:w-auto"
               onClick={() => handleOpenChange(false)}
             >
               Cancel
@@ -122,6 +123,7 @@ export function DeleteAccountDialog() {
             <Button
               type="submit"
               variant="destructive"
+              className="w-full sm:w-auto"
               disabled={!canSubmit}
             >
               {deleteAccount.isPending && (

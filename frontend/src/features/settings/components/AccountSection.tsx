@@ -26,7 +26,7 @@ export function AccountSection() {
         description="Manage your password and account security."
       />
 
-      <div className="space-y-6 max-w-lg">
+      <div className="space-y-6 max-w-lg w-full">
         {/* Password */}
         <Card>
           <CardContent className="pt-6 space-y-4">
@@ -41,6 +41,7 @@ export function AccountSection() {
             </div>
             <Button
               variant="outline"
+              className="w-full sm:w-auto"
               onClick={() => setChangePasswordOpen(true)}
             >
               Change password
@@ -63,6 +64,7 @@ export function AccountSection() {
             </div>
             <Button
               variant="outline"
+              className="w-full sm:w-auto"
               onClick={() => logoutAll.mutate()}
               disabled={logoutAll.isPending}
             >
@@ -99,6 +101,7 @@ export function AccountSection() {
               </div>
               <Button
                 variant="destructive"
+                className="w-full sm:w-auto"
                 onClick={() => setDeleteAccountOpen(true)}
               >
                 Delete my account

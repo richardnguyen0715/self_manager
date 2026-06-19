@@ -38,9 +38,9 @@ export function CalendarToolbar() {
     useCalendarStore();
 
   return (
-    <div className="flex items-center justify-between gap-2 pb-4 border-b">
+    <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b">
       {/* Left: nav controls */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0">
         <Button variant="outline" size="sm" onClick={goToToday}>
           Today
         </Button>
@@ -62,13 +62,13 @@ export function CalendarToolbar() {
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <h2 className="text-base font-semibold tabular-nums min-w-[200px]">
+        <h2 className="text-sm sm:text-base font-semibold tabular-nums truncate min-w-0">
           {formatViewTitle(view, anchorDate)}
         </h2>
       </div>
 
       {/* Right: view switcher + create */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         {/* View toggle */}
         <div className="flex rounded-md border overflow-hidden">
           {(["day", "week", "month"] as CalendarView[]).map((v) => (
@@ -76,7 +76,7 @@ export function CalendarToolbar() {
               key={v}
               onClick={() => setView(v)}
               className={cn(
-                "px-3 py-1.5 text-sm font-medium transition-colors",
+                "px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors",
                 view === v
                   ? "bg-primary text-primary-foreground"
                   : "bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
@@ -89,7 +89,7 @@ export function CalendarToolbar() {
 
         <Button size="sm" onClick={() => openEventDialog()}>
           <CalendarDays className="h-4 w-4" />
-          New Event
+          <span className="hidden sm:inline">New Event</span>
         </Button>
       </div>
     </div>

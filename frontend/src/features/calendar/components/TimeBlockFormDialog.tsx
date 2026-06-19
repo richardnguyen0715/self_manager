@@ -258,7 +258,7 @@ export function TimeBlockFormDialog() {
       open={timeBlockDialogOpen}
       onOpenChange={(open) => !open && closeTimeBlockDialog()}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[95vw] max-w-full sm:w-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Time Block" : "New Time Block"}
@@ -286,7 +286,7 @@ export function TimeBlockFormDialog() {
             </div>
 
             {/* Start / End */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="tb-start">Start</Label>
                 <Input

@@ -233,7 +233,7 @@ export function NotificationsSection() {
         description="Choose how and when you receive notifications."
       />
 
-      <div className="space-y-6 max-w-lg">
+      <div className="space-y-6 max-w-lg w-full">
         {/* Deadline reminders */}
         <Card>
           <CardContent className="pt-6 space-y-5">

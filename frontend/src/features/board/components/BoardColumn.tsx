@@ -317,7 +317,7 @@ export function BoardColumn({ column, items, sprintId }: BoardColumnProps) {
       ref={sortableRef}
       style={style}
       className={cn(
-        "flex flex-col w-72 flex-shrink-0 rounded-xl border bg-muted/40",
+        "flex flex-col w-[260px] sm:w-72 min-w-[260px] flex-shrink-0 rounded-xl border bg-muted/40",
         "border-t-[3px]",
         column.accentClass,
         isColumnDragging && "opacity-40 shadow-none",

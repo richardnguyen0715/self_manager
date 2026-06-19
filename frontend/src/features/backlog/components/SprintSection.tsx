@@ -171,7 +171,7 @@ export function SprintSection({ sprint, allSprints }: SprintSectionProps) {
       )}
     >
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-card">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-4 py-2.5 border-b bg-card">
         {/* Collapse toggle */}
         <button
           type="button"
@@ -189,7 +189,7 @@ export function SprintSection({ sprint, allSprints }: SprintSectionProps) {
         {/* Sprint name */}
         <Link
           href={`/sprints/${sprint.id}`}
-          className="text-sm font-semibold hover:text-primary transition-colors truncate max-w-[12rem]"
+          className="text-sm font-semibold hover:text-primary transition-colors truncate max-w-[10rem] sm:max-w-[12rem]"
         >
           {sprint.name}
         </Link>
@@ -204,7 +204,7 @@ export function SprintSection({ sprint, allSprints }: SprintSectionProps) {
           {sprint.status.charAt(0).toUpperCase() + sprint.status.slice(1)}
         </Badge>
 
-        {/* Date range */}
+        {/* Date range — hidden on mobile */}
         {dateRange && (
           <span className="hidden sm:inline text-xs text-muted-foreground whitespace-nowrap">
             {dateRange}
@@ -216,18 +216,22 @@ export function SprintSection({ sprint, allSprints }: SprintSectionProps) {
           ({rawItems.length} {rawItems.length === 1 ? "item" : "items"})
         </span>
 
-        {/* Capacity */}
+        {/* Capacity — hidden below md */}
         {capacityLabel && (
           <span className="text-xs text-muted-foreground hidden md:inline whitespace-nowrap">
             {capacityLabel}
           </span>
         )}
 
-        {/* Spacer */}
-        <div className="flex-1" />
+        {/* Spacer — pushes right-side controls to end */}
+        <div className="flex-1 min-w-0" />
 
-        {/* Stats */}
-        {!isCollapsed && <SprintStats items={rawItems} />}
+        {/* Stats — hidden on mobile to avoid crowding */}
+        {!isCollapsed && (
+          <span className="hidden sm:flex">
+            <SprintStats items={rawItems} />
+          </span>
+        )}
 
         {/* Primary action */}
         {sprint.status === "planned" && (
@@ -243,7 +247,8 @@ export function SprintSection({ sprint, allSprints }: SprintSectionProps) {
             ) : (
               <Rocket className="h-3 w-3" />
             )}
-            Start sprint
+            <span className="hidden sm:inline">Start sprint</span>
+            <span className="sm:hidden">Start</span>
           </Button>
         )}
         {sprint.status === "active" && (
@@ -259,14 +264,16 @@ export function SprintSection({ sprint, allSprints }: SprintSectionProps) {
             ) : (
               <CheckCircle2 className="h-3 w-3" />
             )}
-            Complete sprint
+            <span className="hidden sm:inline">Complete sprint</span>
+            <span className="sm:hidden">Complete</span>
           </Button>
         )}
         {sprint.status === "completed" && (
           <Button size="sm" variant="ghost" className="h-7 text-xs" asChild>
             <Link href={`/sprints/${sprint.id}`}>
               <LinkIcon className="h-3 w-3 mr-1" />
-              View review
+              <span className="hidden sm:inline">View review</span>
+              <span className="sm:hidden">Review</span>
             </Link>
           </Button>
         )}
@@ -339,8 +346,8 @@ export function SprintSection({ sprint, allSprints }: SprintSectionProps) {
                 <span className="hidden sm:inline w-10 text-center">Sub</span>
                 <span className="hidden sm:inline w-4 text-center">P</span>
                 <span className="w-24 text-center">Status</span>
-                <span className="hidden sm:inline w-10 text-center">Pts</span>
-                <span className="hidden sm:inline w-16 text-right">Due</span>
+                <span className="hidden md:inline w-10 text-center">Pts</span>
+                <span className="hidden md:inline w-16 text-right">Due</span>
                 <span className="w-7 shrink-0" />
               </div>
               {filtered.map((item) => (

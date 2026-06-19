@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 interface TimerRingProps {
   /** 0–1 progress (0 = full circle, 1 = empty) */
   progress: number;
-  /** pixels */
+  /** pixels — used for SVG math (viewBox) and as the max size on sm+ */
   size?: number;
   strokeWidth?: number;
   /** tailwind color class for the progress arc, e.g. "text-primary" */
@@ -32,14 +32,24 @@ export function TimerRing({
   const dashOffset = circumference * clamped;
 
   return (
+    /*
+     * Responsive wrapper:
+     *   Mobile  — fills up to 80vw, capped at the prop size in px.
+     *   sm+     — fixed pixel size from the prop (inline style).
+     * The SVG uses viewBox so it scales naturally inside the wrapper.
+     * The absolute centre overlay mirrors the wrapper dimensions.
+     */
     <div
       className={cn("relative inline-flex items-center justify-center", className)}
-      style={{ width: size, height: size }}
+      style={{
+        width: `min(80vw, ${size}px)`,
+        height: `min(80vw, ${size}px)`,
+      }}
     >
       <svg
-        width={size}
-        height={size}
         viewBox={`0 0 ${size} ${size}`}
+        width="100%"
+        height="100%"
         className="-rotate-90"
         aria-hidden
       >
@@ -68,7 +78,7 @@ export function TimerRing({
           )}
         />
       </svg>
-      {/* Centre content */}
+      {/* Centre content — absolutely positioned over the SVG */}
       <div className="absolute inset-0 flex items-center justify-center">
         {children}
       </div>

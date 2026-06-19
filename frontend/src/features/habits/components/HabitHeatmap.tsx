@@ -204,7 +204,7 @@ export function HabitHeatmapDialog({ open, habit }: HabitHeatmapDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && closeModal()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="w-[95vw] max-w-2xl sm:w-full">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {habit.color && (
@@ -218,7 +218,7 @@ export function HabitHeatmapDialog({ open, habit }: HabitHeatmapDialogProps) {
         </DialogHeader>
 
         {/* Stat pills */}
-        <div className="flex gap-4 text-sm">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:flex sm:flex-wrap sm:gap-4">
           <div className="flex flex-col">
             <span className="text-muted-foreground text-xs">Current streak</span>
             <span className="font-semibold">

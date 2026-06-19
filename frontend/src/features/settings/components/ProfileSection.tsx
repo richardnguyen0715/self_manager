@@ -117,11 +117,11 @@ export function ProfileSection() {
         description="Update your display name, avatar, and timezone."
       />
 
-      <div className="space-y-8 max-w-lg">
+      <div className="space-y-8 max-w-lg w-full">
         {/* Avatar */}
         <Card>
           <CardContent className="pt-6">
-            <div className="flex items-center gap-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
               {/* Avatar preview */}
               <div className="relative shrink-0">
                 {avatarUrl ? (
@@ -266,7 +266,7 @@ export function ProfileSection() {
             </p>
           )}
 
-          <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button
               type="submit"
               disabled={!isDirty || updateProfile.isPending}

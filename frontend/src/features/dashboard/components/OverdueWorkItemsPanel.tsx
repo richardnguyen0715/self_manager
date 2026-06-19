@@ -101,15 +101,15 @@ export function OverdueWorkItemsPanel({ items }: OverdueWorkItemsPanelProps) {
   return (
     <Card>
       <CardHeader className="pb-2 pt-5 px-5">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-destructive" />
-            Overdue Work Items
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="min-w-0 text-sm font-semibold flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0 text-destructive" />
+            <span className="truncate">Overdue Work Items</span>
           </CardTitle>
           {list.length > 0 && (
             <Badge
               variant="secondary"
-              className="text-[10px] bg-destructive/10 text-destructive font-semibold"
+              className="shrink-0 text-[10px] bg-destructive/10 text-destructive font-semibold"
             >
               {list.length}
             </Badge>

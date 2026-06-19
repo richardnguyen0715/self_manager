@@ -121,7 +121,7 @@ export function SessionControls() {
   // ── Break phase controls ──────────────────────────────────────────────────
   if (isBreak) {
     return (
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-center gap-3">
         <Button
           variant="outline"
           size="lg"
@@ -153,11 +153,11 @@ export function SessionControls() {
 
   // ── Work phase controls (active or paused) ───────────────────────────────
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
       {isPaused ? (
         <Button
           size="lg"
-          className="gap-2 px-6"
+          className="gap-2 px-5 sm:px-6"
           onClick={handleResume}
           disabled={isMutating}
         >
@@ -168,7 +168,7 @@ export function SessionControls() {
         <Button
           size="lg"
           variant="secondary"
-          className="gap-2 px-6"
+          className="gap-2 px-5 sm:px-6"
           onClick={handlePause}
           disabled={isMutating}
         >

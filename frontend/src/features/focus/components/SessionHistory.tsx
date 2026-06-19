@@ -60,20 +60,20 @@ function SessionRow({ session }: { session: FocusSession }) {
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="truncate text-sm font-medium">
             {MODE_LABEL[session.mode]}
           </span>
           <Badge
             variant={
               isCompleted ? "default" : isAbandoned ? "destructive" : "secondary"
             }
-            className="text-xs"
+            className="shrink-0 text-xs"
           >
             {status}
           </Badge>
         </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">
           {formatDate(session.started_at)} at {formatTime(session.started_at)}
           {session.duration_seconds != null && session.duration_seconds > 0 && (
             <> &middot; {formatDurationSeconds(session.duration_seconds)}</>

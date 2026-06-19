@@ -56,22 +56,47 @@ const BOTTOM_ITEMS: NavItem[] = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  /**
+   * "desktop" — static sidebar inside the flex layout (lg+), supports
+   *             the collapsed/expanded toggle via useUIStore.sidebarOpen.
+   * "mobile"  — always-expanded drawer panel; shown via CSS translate in
+   *             AppShell; nav clicks close the drawer via closeMobileNav.
+   */
+  variant?: "desktop" | "mobile";
+}
+
+export function Sidebar({ variant = "desktop" }: SidebarProps) {
   const pathname = usePathname();
-  const { sidebarOpen, toggleSidebar } = useUIStore();
+  const { sidebarOpen, toggleSidebar, closeMobileNav } = useUIStore();
+
+  // Mobile drawer is always expanded; desktop respects sidebarOpen toggle.
+  const collapsed = variant === "desktop" && !sidebarOpen;
+
+  // On mobile, clicking a nav item closes the drawer.
+  const handleNavClick = variant === "mobile" ? closeMobileNav : undefined;
 
   return (
     <aside
       className={cn(
         "relative flex h-screen flex-col border-r bg-sidebar transition-all duration-300",
-        sidebarOpen ? "w-60" : "w-16",
+        // Desktop: width collapses; mobile: always full w-60
+        variant === "desktop"
+          ? sidebarOpen
+            ? "w-60"
+            : "w-16"
+          : "w-60",
       )}
     >
       {/* Logo */}
       <div className="flex h-14 items-center border-b px-4">
-        <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 font-semibold"
+          onClick={handleNavClick}
+        >
           <Zap className="h-5 w-5 shrink-0 text-primary" />
-          {sidebarOpen && (
+          {!collapsed && (
             <span className="text-sm font-semibold text-sidebar-foreground">
               ManageMyLife
             </span>
@@ -80,8 +105,8 @@ export function Sidebar() {
       </div>
 
       {/* Project switcher */}
-      <div className={cn("px-2 py-2", !sidebarOpen && "px-1")}>
-        <ProjectSwitcher collapsed={!sidebarOpen} />
+      <div className={cn("px-2 py-2", collapsed && "px-1")}>
+        <ProjectSwitcher collapsed={collapsed} />
       </div>
 
       <Separator />
@@ -91,7 +116,8 @@ export function Sidebar() {
         <NavLink
           item={{ label: "Projects", href: "/projects", icon: FolderOpen }}
           isActive={pathname.startsWith("/projects")}
-          collapsed={!sidebarOpen}
+          collapsed={collapsed}
+          onNavClick={handleNavClick}
         />
       </div>
 
@@ -105,7 +131,8 @@ export function Sidebar() {
               key={item.href}
               item={item}
               isActive={pathname.startsWith(item.href)}
-              collapsed={!sidebarOpen}
+              collapsed={collapsed}
+              onNavClick={handleNavClick}
             />
           ))}
         </nav>
@@ -121,26 +148,29 @@ export function Sidebar() {
               key={item.href}
               item={item}
               isActive={pathname.startsWith(item.href)}
-              collapsed={!sidebarOpen}
+              collapsed={collapsed}
+              onNavClick={handleNavClick}
             />
           ))}
         </nav>
       </div>
 
-      {/* Toggle button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={toggleSidebar}
-        className="absolute -right-3 top-[4.5rem] z-10 h-6 w-6 rounded-full border bg-background shadow-sm hover:bg-accent"
-        aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-      >
-        {sidebarOpen ? (
-          <ChevronLeft className="h-3 w-3" />
-        ) : (
-          <ChevronRight className="h-3 w-3" />
-        )}
-      </Button>
+      {/* Toggle button — desktop only */}
+      {variant === "desktop" && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleSidebar}
+          className="absolute -right-3 top-[4.5rem] z-10 h-6 w-6 rounded-full border bg-background shadow-sm hover:bg-accent"
+          aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+        >
+          {sidebarOpen ? (
+            <ChevronLeft className="h-3 w-3" />
+          ) : (
+            <ChevronRight className="h-3 w-3" />
+          )}
+        </Button>
+      )}
     </aside>
   );
 }
@@ -149,14 +179,16 @@ interface NavLinkProps {
   item: NavItem;
   isActive: boolean;
   collapsed: boolean;
+  onNavClick?: () => void;
 }
 
-function NavLink({ item, isActive, collapsed }: NavLinkProps) {
+function NavLink({ item, isActive, collapsed, onNavClick }: NavLinkProps) {
   const Icon = item.icon;
 
   const linkContent = (
     <Link
       href={item.href}
+      onClick={onNavClick}
       className={cn(
         "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
         "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",

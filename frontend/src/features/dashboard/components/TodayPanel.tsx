@@ -71,7 +71,7 @@ export function TodayPanel({ summary }: TodayPanelProps) {
 
       {/* Tab bar */}
       <div
-        className="flex gap-1 border-b px-4 pb-0"
+        className="flex gap-1 overflow-x-auto border-b px-4 pb-0 [&::-webkit-scrollbar]:hidden"
         role="tablist"
         aria-label="Today panel sections"
       >
@@ -87,7 +87,7 @@ export function TodayPanel({ summary }: TodayPanelProps) {
               id={`tab-${tab.id}`}
               onClick={() => setActivePanel(tab.id)}
               className={cn(
-                "relative flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors",
+                "relative flex shrink-0 items-center gap-1.5 px-2.5 py-2.5 text-sm font-medium transition-colors sm:px-3",
                 "text-muted-foreground hover:text-foreground",
                 isActive &&
                   "text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:rounded-full after:bg-primary",

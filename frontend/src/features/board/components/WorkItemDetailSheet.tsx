@@ -335,11 +335,11 @@ export function WorkItemDetailSheet({ sprintId }: WorkItemDetailSheetProps) {
       </div>
 
       {/* ── Two-column layout ─────────────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0 gap-5">
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 gap-5">
         {/* ── Left column ─────────────────────────────────────────────────── */}
         <div className="flex flex-1 min-w-0 flex-col">
           <ScrollArea className="flex-1">
-            <div className="space-y-5 pr-3">
+            <div className="space-y-5 lg:pr-3">
               {/* Title + action toolbar */}
               <div className="space-y-2">
                 {editingTitle ? (
@@ -646,7 +646,7 @@ export function WorkItemDetailSheet({ sprintId }: WorkItemDetailSheetProps) {
         </div>
 
         {/* ── Right rail ──────────────────────────────────────────────────── */}
-        <div className="w-64 shrink-0 flex flex-col gap-3">
+        <div className="w-full lg:w-64 lg:shrink-0 flex flex-col gap-3">
           {/* Status dropdown */}
           <DropdownMenuPrimitive.Root>
             <DropdownMenuPrimitive.Trigger asChild>
@@ -922,13 +922,17 @@ function SheetWrapper({
   children: React.ReactNode;
   onClose: () => void;
 }) {
-  // Resizable width, persisted across opens.
+  // Resizable width, persisted across opens (desktop only — mobile is always full-width).
   const [width, setWidth] = useState<number>(() => {
     if (typeof window === "undefined") return 768;
     const saved = Number(localStorage.getItem("mml_sheet_width"));
     return saved >= 480 ? saved : 768;
   });
   const dragging = useRef(false);
+
+  // On mobile (<640px) always use full viewport width; ignore saved width.
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+  const panelMaxWidth = isMobile ? "100vw" : `${width}px`;
 
   useEffect(() => {
     function onMove(e: MouseEvent) {
@@ -963,18 +967,18 @@ function SheetWrapper({
         aria-hidden="true"
       />
 
-      {/* Panel */}
+      {/* Panel — full-width on mobile, constrained + resizable on sm+ */}
       <div
-        className="relative ml-auto flex flex-col w-full bg-background border-l shadow-2xl h-full overflow-hidden"
-        style={{ maxWidth: `${width}px` }}
+        className="relative ml-auto flex flex-col w-full sm:w-auto bg-background border-l shadow-2xl h-full overflow-hidden"
+        style={{ maxWidth: panelMaxWidth }}
       >
-        {/* Resize handle (left edge) */}
+        {/* Resize handle (left edge) — hidden on mobile where it's always full-width */}
         <div
           onMouseDown={() => {
             dragging.current = true;
             document.body.style.userSelect = "none";
           }}
-          className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize z-20 hover:bg-primary/40 transition-colors"
+          className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize z-20 hover:bg-primary/40 transition-colors hidden sm:block"
           aria-label="Resize panel"
         />
         {/* Close button */}
@@ -991,7 +995,7 @@ function SheetWrapper({
         </div>
 
         {/* Content */}
-        <div className="flex flex-1 flex-col p-6 pt-12 min-h-0">
+        <div className="flex flex-1 flex-col p-4 sm:p-6 pt-12 min-h-0 overflow-y-auto">
           {children}
         </div>
       </div>

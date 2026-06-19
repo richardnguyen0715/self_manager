@@ -256,7 +256,7 @@ export function CreateWorkItemDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && closeDialog()}>
-      <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-xl max-h-[90vh] overflow-y-auto sm:w-auto">
         <DialogHeader>
           <DialogTitle>Create Work Item</DialogTitle>
           <DialogDescription className="sr-only">
@@ -298,7 +298,7 @@ export function CreateWorkItemDialog({
           </div>
 
           {/* Type + Priority */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="wi-type">Type</Label>
               <Controller
@@ -332,7 +332,7 @@ export function CreateWorkItemDialog({
           </div>
 
           {/* Status + Story Points */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="wi-status">Status</Label>
               <Controller
@@ -376,7 +376,7 @@ export function CreateWorkItemDialog({
           </div>
 
           {/* Epic + Sprint */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {epics.length > 0 && (
               <div className="space-y-1.5">
                 <Label htmlFor="wi-epic">Epic</Label>

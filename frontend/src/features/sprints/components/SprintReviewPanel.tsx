@@ -121,7 +121,7 @@ export function SprintReviewPanel({ sprintId }: SprintReviewPanelProps) {
   return (
     <div className="space-y-5">
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           label="Planned"
           value={review.planned_points}

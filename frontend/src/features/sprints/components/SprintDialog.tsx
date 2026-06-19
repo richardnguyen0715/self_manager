@@ -135,7 +135,7 @@ export function SprintDialog() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && closeDialog()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="w-[95vw] max-w-full sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Sprint" : "Create Sprint"}</DialogTitle>
           <DialogDescription className="sr-only">
@@ -177,7 +177,7 @@ export function SprintDialog() {
             </div>
 
             {/* Dates */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="sprint-start">
                   Start date <span className="text-destructive">*</span>

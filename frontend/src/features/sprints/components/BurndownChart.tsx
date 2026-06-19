@@ -58,7 +58,7 @@ export function BurndownChart({ sprintId }: BurndownChartProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-sm font-semibold">Burndown</p>
           <p className="text-xs text-muted-foreground mt-0.5">

@@ -51,11 +51,11 @@ export function FocusTimer() {
     : "text-muted-foreground";
 
   return (
-    <div className="flex flex-col items-center gap-6">
+    <div className="flex w-full flex-col items-center gap-5 sm:gap-6">
       {/* Mode selector (only show when idle) */}
       {isIdle && <ModeSelector />}
 
-      {/* Ring timer */}
+      {/* Ring timer — scales down on mobile via TimerRing's responsive wrapper */}
       <TimerRing
         progress={progress}
         size={260}
@@ -68,7 +68,7 @@ export function FocusTimer() {
           </span>
           <span
             className={cn(
-              "text-5xl font-bold tabular-nums tracking-tight",
+              "text-4xl font-bold tabular-nums tracking-tight sm:text-5xl",
               isPaused && "opacity-60",
             )}
           >

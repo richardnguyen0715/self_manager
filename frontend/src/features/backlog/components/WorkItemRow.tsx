@@ -160,20 +160,22 @@ export function WorkItemRow({
       {/* Status */}
       <WorkItemStatusBadge status={item.status} />
 
-      {/* Story points */}
+      {/* Story points — hidden below md to match column header */}
       {item.story_points != null ? (
-        <Badge variant="outline" className="text-xs tabular-nums shrink-0 hidden sm:inline-flex">
+        <Badge variant="outline" className="text-xs tabular-nums shrink-0 hidden md:inline-flex">
           {item.story_points} pt
         </Badge>
       ) : (
-        <span className="hidden sm:inline text-xs text-muted-foreground w-8 text-center">—</span>
+        <span className="hidden md:inline text-xs text-muted-foreground w-8 text-center">—</span>
       )}
 
-      {/* Due date */}
+      {/* Due date — hidden below md to match column header */}
       {item.due_date ? (
-        <DueDateLabel dateStr={item.due_date} />
+        <span className="hidden md:inline">
+          <DueDateLabel dateStr={item.due_date} />
+        </span>
       ) : (
-        <span className="hidden sm:inline w-14" />
+        <span className="hidden md:inline w-14" />
       )}
 
       {/* Actions menu */}

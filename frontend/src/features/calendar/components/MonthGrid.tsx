@@ -42,7 +42,7 @@ function MonthDayCell({ day, anchorDate, events, timeBlocks }: MonthDayCellProps
     <div
       ref={setNodeRef}
       className={cn(
-        "min-h-[100px] border-r border-b p-1 last:border-r-0 flex flex-col gap-0.5",
+        "min-h-[60px] sm:min-h-[100px] border-r border-b p-0.5 sm:p-1 last:border-r-0 flex flex-col gap-0.5",
         !isCurrentMonth && "bg-muted/30",
         isOver && "bg-primary/5",
       )}
@@ -134,6 +134,7 @@ interface MonthGridProps {
 }
 
 const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DOW_LABELS_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 
 export function MonthGrid({ anchorDate, events, timeBlocks }: MonthGridProps) {
   const monthStart = startOfMonth(anchorDate);
@@ -150,42 +151,46 @@ export function MonthGrid({ anchorDate, events, timeBlocks }: MonthGridProps) {
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      {/* Day-of-week headers */}
-      <div className="grid grid-cols-7 border-b">
-        {DOW_LABELS.map((label) => (
-          <div
-            key={label}
-            className="text-center text-xs font-medium text-muted-foreground py-2 uppercase tracking-wide"
-          >
-            {label}
-          </div>
-        ))}
-      </div>
+    <div className="flex flex-col flex-1 min-h-0 overflow-x-auto">
+      {/* Inner wrapper enforces a readable minimum width on tiny screens */}
+      <div className="flex flex-col flex-1 min-h-0" style={{ minWidth: 280 }}>
+        {/* Day-of-week headers */}
+        <div className="grid grid-cols-7 border-b">
+          {DOW_LABELS.map((label, i) => (
+            <div
+              key={label}
+              className="text-center text-xs font-medium text-muted-foreground py-2 uppercase tracking-wide"
+            >
+              <span className="hidden sm:inline">{label}</span>
+              <span className="sm:hidden">{DOW_LABELS_SHORT[i]}</span>
+            </div>
+          ))}
+        </div>
 
-      {/* Weeks */}
-      <div className="flex-1 overflow-y-auto">
-        {weeks.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-7">
-            {week.map((day) => {
-              const dayEvents = events.filter((e) =>
-                isSameDay(parseISO(e.start_time), day),
-              );
-              const dayBlocks = timeBlocks.filter((b) =>
-                isSameDay(parseISO(b.start_time), day),
-              );
-              return (
-                <MonthDayCell
-                  key={day.toISOString()}
-                  day={day}
-                  anchorDate={anchorDate}
-                  events={dayEvents}
-                  timeBlocks={dayBlocks}
-                />
-              );
-            })}
-          </div>
-        ))}
+        {/* Weeks */}
+        <div className="flex-1 overflow-y-auto">
+          {weeks.map((week, wi) => (
+            <div key={wi} className="grid grid-cols-7">
+              {week.map((day) => {
+                const dayEvents = events.filter((e) =>
+                  isSameDay(parseISO(e.start_time), day),
+                );
+                const dayBlocks = timeBlocks.filter((b) =>
+                  isSameDay(parseISO(b.start_time), day),
+                );
+                return (
+                  <MonthDayCell
+                    key={day.toISOString()}
+                    day={day}
+                    anchorDate={anchorDate}
+                    events={dayEvents}
+                    timeBlocks={dayBlocks}
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -77,10 +77,12 @@ export function HabitHeatmap({ data, dateRange, isLoading }: HabitHeatmapProps) 
           </div>
         ) : (
           <TooltipProvider delayDuration={200}>
+            <div className="overflow-x-auto">
             <div
-              className="grid gap-1"
+              className="grid gap-1 min-w-0"
               style={{
                 gridTemplateColumns: `repeat(auto-fill, minmax(14px, 1fr))`,
+                minWidth: `${Math.min(days.length, 30) * 18}px`,
               }}
               role="grid"
               aria-label="Habit completion heatmap"
@@ -112,6 +114,7 @@ export function HabitHeatmap({ data, dateRange, isLoading }: HabitHeatmapProps) 
                   </Tooltip>
                 );
               })}
+            </div>
             </div>
 
             {/* Legend */}

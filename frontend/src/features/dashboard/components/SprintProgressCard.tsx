@@ -156,7 +156,7 @@ export function SprintProgressCard({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 pt-1">
+        <div className="flex flex-wrap items-center gap-2 pt-1">
           <Button variant="outline" size="sm" className="gap-1 text-xs h-7" asChild>
             <Link href={`/sprints/${sprint.id}`}>
               <Layers className="h-3 w-3" />

@@ -129,8 +129,8 @@ export function BacklogFilterBar({ epics }: BacklogFilterBarProps) {
 
   return (
     <div className="flex flex-wrap items-center gap-2 mb-4">
-      {/* Search */}
-      <div className="relative flex-1 min-w-48">
+      {/* Search — full width on mobile, grows on larger screens */}
+      <div className="relative w-full sm:flex-1 sm:min-w-48 sm:w-auto">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
           placeholder="Search backlog..."
@@ -150,13 +150,14 @@ export function BacklogFilterBar({ epics }: BacklogFilterBarProps) {
         )}
       </div>
 
+      {/* Filter selects — wrap naturally on mobile */}
       {/* Type filter */}
       <FilterSelect<WorkItemType | "all">
         value={filters.type}
         onChange={(v) => setFilter("type", v)}
         placeholder="Type"
         options={TYPE_OPTIONS}
-        className="w-36"
+        className="w-32 sm:w-36"
       />
 
       {/* Priority filter */}
@@ -165,7 +166,7 @@ export function BacklogFilterBar({ epics }: BacklogFilterBarProps) {
         onChange={(v) => setFilter("priority", v)}
         placeholder="Priority"
         options={PRIORITY_OPTIONS}
-        className="w-36"
+        className="w-32 sm:w-36"
       />
 
       {/* Epic filter */}
@@ -175,7 +176,7 @@ export function BacklogFilterBar({ epics }: BacklogFilterBarProps) {
           onChange={(v) => setFilter("epic_id", v)}
           placeholder="Epic"
           options={epicOptions}
-          className="w-44"
+          className="w-36 sm:w-44"
         />
       )}
 

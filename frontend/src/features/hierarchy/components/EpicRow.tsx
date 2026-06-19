@@ -57,16 +57,16 @@ function WorkItemRow({ item }: { item: WorkItemListItem }) {
       <td className="py-2 px-2 flex-1">
         <span className="text-sm font-medium">{item.title}</span>
       </td>
-      <td className="py-2 px-2">
+      <td className="py-2 px-2 hidden sm:table-cell">
         <PriorityBadge priority={item.priority} showLabel={false} />
       </td>
       <td className="py-2 px-2">
         <WorkItemStatusBadge status={item.status} />
       </td>
-      <td className="py-2 px-2 text-xs text-muted-foreground tabular-nums">
+      <td className="py-2 px-2 text-xs text-muted-foreground tabular-nums hidden md:table-cell">
         {item.story_points != null ? `${item.story_points}pt` : "—"}
       </td>
-      <td className="py-2 pr-4 text-xs text-muted-foreground tabular-nums">
+      <td className="py-2 pr-4 text-xs text-muted-foreground tabular-nums hidden sm:table-cell">
         {item.due_date
           ? new Date(item.due_date).toLocaleDateString(undefined, {
               month: "short",
@@ -144,7 +144,7 @@ export function EpicRow({ epic }: EpicRowProps) {
         <EpicStatusChip status={epic.status} />
 
         {/* Progress */}
-        <div className="flex items-center gap-2 shrink-0 w-40">
+        <div className="hidden sm:flex items-center gap-2 shrink-0 w-32 md:w-40">
           <GoalProgressBar value={progressPct} showLabel={false} size="sm" />
           <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
             {doneItems}/{totalItems}
@@ -152,7 +152,7 @@ export function EpicRow({ epic }: EpicRowProps) {
         </div>
 
         {/* Points */}
-        <span className="text-xs text-muted-foreground tabular-nums shrink-0 w-12 text-right">
+        <span className="hidden md:inline text-xs text-muted-foreground tabular-nums shrink-0 w-12 text-right">
           {epic.done_points ?? 0}/{epic.total_points ?? 0}pt
         </span>
 
@@ -224,24 +224,24 @@ export function EpicRow({ epic }: EpicRowProps) {
             </p>
           )}
           {workItems.length > 0 && (
-            <div className="border rounded-md overflow-hidden">
-              <table className="w-full">
+            <div className="border rounded-md overflow-x-auto">
+              <table className="w-full min-w-[360px]">
                 <thead>
                   <tr className="bg-muted/50 border-b">
                     <th className="py-1.5 pl-4 pr-2 w-8" />
                     <th className="py-1.5 px-2 text-left text-xs font-medium text-muted-foreground">
                       Title
                     </th>
-                    <th className="py-1.5 px-2 text-left text-xs font-medium text-muted-foreground">
+                    <th className="py-1.5 px-2 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
                       Pri
                     </th>
                     <th className="py-1.5 px-2 text-left text-xs font-medium text-muted-foreground">
                       Status
                     </th>
-                    <th className="py-1.5 px-2 text-left text-xs font-medium text-muted-foreground">
+                    <th className="py-1.5 px-2 text-left text-xs font-medium text-muted-foreground hidden md:table-cell">
                       Pts
                     </th>
-                    <th className="py-1.5 pr-4 text-left text-xs font-medium text-muted-foreground">
+                    <th className="py-1.5 pr-4 text-left text-xs font-medium text-muted-foreground hidden sm:table-cell">
                       Due
                     </th>
                   </tr>

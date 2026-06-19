@@ -58,7 +58,7 @@ export function SprintDashboardSkeleton() {
       </div>
 
       {/* Goal progress + overdue + habits row */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {[0, 1, 2].map((i) => (
           <Card key={i}>
             <CardHeader className="pb-2 pt-5 px-5">

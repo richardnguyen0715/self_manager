@@ -36,7 +36,7 @@ function SummaryStrip({ goals }: { goals: Goal[] }) {
   const completed = goals.filter((g) => g.status === "completed").length;
 
   return (
-    <div className="flex items-center gap-6 flex-wrap">
+    <div className="flex items-center gap-4 md:gap-6 flex-wrap">
       {[
         {
           label: "Goals",
@@ -206,13 +206,13 @@ export function HierarchyView() {
   return (
     <div className="flex h-full gap-0">
       {/* Main tree panel */}
-      <div className="flex flex-col flex-1 min-w-0 gap-6">
+      <div className="flex flex-col flex-1 min-w-0 gap-4 md:gap-6">
         {/* Header row */}
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
-              <Network className="h-6 w-6 text-primary" />
-              <h1 className="text-2xl font-bold tracking-tight">Hierarchy</h1>
+              <Network className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight">Hierarchy</h1>
             </div>
             <p className="text-sm text-muted-foreground">
               Goal → Initiative → Epic → Work Item portfolio view with progress
@@ -283,8 +283,8 @@ export function HierarchyView() {
       {/* Work Item detail slide-over panel */}
       {workItemDetailOpen && selectedWorkItemId && (
         <>
-          <Separator orientation="vertical" className="mx-0 h-auto" />
-          <div className="w-[680px] shrink-0 border-l bg-background flex flex-col overflow-hidden">
+          <Separator orientation="vertical" className="mx-0 h-auto hidden md:block" />
+          <div className="fixed inset-0 z-40 bg-background flex flex-col overflow-hidden md:static md:inset-auto md:z-auto md:w-[480px] lg:w-[680px] md:shrink-0 md:border-l">
             <WorkItemDetail
               workItemId={selectedWorkItemId}
               onClose={closeWorkItemDetail}

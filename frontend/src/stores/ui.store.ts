@@ -4,6 +4,8 @@ interface UIState {
   sidebarOpen: boolean;
   commandPaletteOpen: boolean;
   activeModal: string | null;
+  /** Mobile off-canvas drawer state (below lg breakpoint) */
+  mobileNavOpen: boolean;
 
   // Actions
   toggleSidebar: () => void;
@@ -12,12 +14,15 @@ interface UIState {
   closeCommandPalette: () => void;
   openModal: (id: string) => void;
   closeModal: () => void;
+  setMobileNavOpen: (open: boolean) => void;
+  closeMobileNav: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
   sidebarOpen: true,
   commandPaletteOpen: false,
   activeModal: null,
+  mobileNavOpen: false,
 
   toggleSidebar: () =>
     set((state) => ({ sidebarOpen: !state.sidebarOpen })),
@@ -31,4 +36,8 @@ export const useUIStore = create<UIState>((set) => ({
   openModal: (id) => set({ activeModal: id }),
 
   closeModal: () => set({ activeModal: null }),
+
+  setMobileNavOpen: (open) => set({ mobileNavOpen: open }),
+
+  closeMobileNav: () => set({ mobileNavOpen: false }),
 }));

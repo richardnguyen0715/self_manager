@@ -106,7 +106,7 @@ export function TimeBlockPicker() {
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="w-[95vw] max-w-sm sm:w-full">
           <DialogHeader>
             <DialogTitle>Select a time block</DialogTitle>
           </DialogHeader>

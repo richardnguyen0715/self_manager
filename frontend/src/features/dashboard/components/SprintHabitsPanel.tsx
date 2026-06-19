@@ -87,13 +87,13 @@ export function SprintHabitsPanel({ habits }: SprintHabitsPanelProps) {
   return (
     <Card>
       <CardHeader className="pb-2 pt-5 px-5">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Repeat2 className="h-4 w-4 text-violet-500" />
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="min-w-0 text-sm font-semibold flex items-center gap-2">
+            <Repeat2 className="h-4 w-4 shrink-0 text-violet-500" />
             Habits
           </CardTitle>
           {list.length > 0 && (
-            <span className="text-xs text-muted-foreground tabular-nums">
+            <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
               {completedCount}/{list.length}
             </span>
           )}

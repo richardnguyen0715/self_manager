@@ -105,7 +105,7 @@ export function SprintVelocityChart({
             : "Planned vs. completed story points per sprint"}
         </p>
       </CardHeader>
-      <CardContent className="pl-2">
+      <CardContent className="pl-1 sm:pl-2">
         {isLoading ? (
           <ChartSkeleton />
         ) : chartData.length === 0 ? (

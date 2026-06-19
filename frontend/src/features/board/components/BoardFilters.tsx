@@ -24,7 +24,7 @@ const PRIORITIES: { value: Priority | "all"; label: string }[] = [
 ];
 
 const selectCls =
-  "h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
+  "h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring max-w-[9rem] sm:max-w-none";
 
 export function BoardFilters() {
   const { filters, setFilters, resetFilters } = useBoardStore();

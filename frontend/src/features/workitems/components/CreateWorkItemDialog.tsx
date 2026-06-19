@@ -205,7 +205,7 @@ export function CreateWorkItemDialog() {
       open={isCreateDialogOpen}
       onOpenChange={(open) => !open && closeCreateDialog()}
     >
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Create Work Item</DialogTitle>
           <DialogDescription className="sr-only">
@@ -249,7 +249,7 @@ export function CreateWorkItemDialog() {
           </div>
 
           {/* Type + Status */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="wi-type">Type</Label>
               <Controller
@@ -283,7 +283,7 @@ export function CreateWorkItemDialog() {
           </div>
 
           {/* Priority + Points */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="wi-priority">Priority</Label>
               <Controller
