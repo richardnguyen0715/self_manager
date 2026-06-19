@@ -6,14 +6,18 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* ./
-RUN \
-  if [ -f pnpm-lock.yaml ]; then \
-    corepack enable pnpm && pnpm install --frozen-lockfile; \
-  elif [ -f yarn.lock ]; then \
-    yarn --frozen-lockfile; \
-  else \
-    npm ci; \
-  fi
+# Resilient install: retry on flaky registry networks (slow server egress).
+RUN npm config set fetch-retries 5 \
+ && npm config set fetch-retry-mintimeout 20000 \
+ && npm config set fetch-retry-maxtimeout 180000 \
+ && npm config set fetch-timeout 600000 \
+ && if [ -f pnpm-lock.yaml ]; then \
+      corepack enable pnpm && pnpm install --frozen-lockfile; \
+    elif [ -f yarn.lock ]; then \
+      yarn --frozen-lockfile --network-timeout 600000; \
+    else \
+      npm ci; \
+    fi
 
 # ──────────────────────────────────────────────────────────────
 # Stage 2: builder – compile Next.js app
