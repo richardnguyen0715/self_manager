@@ -2,6 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
+  // Lint is enforced separately; don't fail the production build on lint nits
+  // (unused imports etc). Type-checking (tsc) still runs and gates the build.
+  eslint: { ignoreDuringBuilds: true },
   images: {
     remotePatterns: [
       {
