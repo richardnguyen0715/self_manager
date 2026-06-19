@@ -27,6 +27,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG SQLX_OFFLINE=true
 ENV SQLX_OFFLINE=${SQLX_OFFLINE}
 
+# Cap compile parallelism + trim debug info to keep peak memory low on small
+# servers (avoids OOM during the release build).
+ARG CARGO_BUILD_JOBS=2
+ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
+ENV CARGO_PROFILE_RELEASE_DEBUG=0
+
 WORKDIR /app
 
 # Cache dependencies
