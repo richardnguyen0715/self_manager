@@ -1,7 +1,7 @@
 # ──────────────────────────────────────────────────────────────
 # Stage 1: chef – compute recipe (dependency cache layer)
 # ──────────────────────────────────────────────────────────────
-FROM rust:1.83-slim-bookworm AS chef
+FROM rust:1-slim-bookworm AS chef
 RUN cargo install cargo-chef --locked
 WORKDIR /app
 
