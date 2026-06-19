@@ -33,7 +33,7 @@ function StatCardItem({
   const content = (
     <Card
       className={cn(
-        "group transition-shadow hover:shadow-md",
+        "group h-full transition-shadow hover:shadow-md",
         href && "cursor-pointer",
       )}
     >
@@ -48,7 +48,7 @@ function StatCardItem({
         </div>
         <div className="min-w-0">
           <p className="text-xs font-medium text-muted-foreground">{label}</p>
-          <p className="text-2xl font-bold leading-tight tracking-tight text-foreground">
+          <p className="truncate text-2xl font-bold leading-tight tracking-tight text-foreground">
             {value}
           </p>
           {subtitle && (
@@ -78,8 +78,8 @@ export function StatCards({ stats }: StatCardsProps) {
   // habit_completion_rate_today is 0.0–1.0; format as percentage
   const habitRateLabel =
     stats.habit_completion_rate_today != null
-      ? `${Math.round(stats.habit_completion_rate_today * 100)}% today`
-      : "No data yet";
+      ? `${Math.round(stats.habit_completion_rate_today * 100)}%`
+      : "—";
 
   return (
     <section aria-label="Today's quick stats">
