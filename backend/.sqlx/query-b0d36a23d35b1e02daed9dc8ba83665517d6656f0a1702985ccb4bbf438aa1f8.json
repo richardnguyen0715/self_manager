@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM spaces\n        WHERE id      = $1\n          AND user_id = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b0d36a23d35b1e02daed9dc8ba83665517d6656f0a1702985ccb4bbf438aa1f8"
+}

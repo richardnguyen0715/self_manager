@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH RECURSIVE anc AS (\n                SELECT id, parent_id FROM pages WHERE id = $1\n                UNION ALL\n                SELECT p.id, p.parent_id\n                FROM pages p\n                JOIN anc ON anc.parent_id = p.id\n            )\n            SELECT EXISTS(SELECT 1 FROM anc WHERE id = $2)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ae379bc6859053363dfc30215d22b648ec267c5e7e8ac0a87c1d295f7596f0bd"
+}

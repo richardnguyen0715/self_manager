@@ -88,7 +88,13 @@ async fn main() -> anyhow::Result<()> {
         .nest("/work-items",    modules::work_item::router())
         .nest("/backlog",       modules::backlog::router())
         // ── Board columns (dynamic board) ─────────────────────────────────────
-        .nest("/board-columns", modules::board_column::router());
+        .nest("/board-columns", modules::board_column::router())
+        // ── Docs ──────────────────────────────────────────────────────────────
+        .nest("/spaces", modules::space::router())
+        .nest(
+            "/pages",
+            modules::page::router().merge(modules::doc_comment::router()),
+        );
 
     let app = Router::new()
         // ── Health check (used by Docker healthcheck + load balancers) ─────────

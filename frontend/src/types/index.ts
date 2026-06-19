@@ -897,6 +897,85 @@ export interface AgileListResponse<T> {
   total: number;
 }
 
+// ─── Docs ──────────────────────────────────────────────────────────────────────
+
+export type PageKind = "page" | "whiteboard";
+export type PageStatus = "draft" | "published";
+
+export interface Space {
+  id: string;
+  user_id: string;
+  project_id: string | null;
+  name: string;
+  icon: string | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Opaque TipTap/ProseMirror doc + Excalidraw scene
+export type TipTapDoc = Record<string, unknown>;
+export type ExcalidrawScene = Record<string, unknown>;
+
+export interface Page {
+  id: string;
+  space_id: string;
+  parent_id: string | null;
+  user_id: string;
+  title: string;
+  kind: PageKind;
+  content: TipTapDoc;
+  excalidraw: ExcalidrawScene | null;
+  status: PageStatus;
+  position: number;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+}
+
+// GET /api/pages?space_id= returns nested tree nodes
+export interface PageTreeNode {
+  id: string;
+  space_id: string;
+  parent_id: string | null;
+  title: string;
+  kind: PageKind;
+  status: PageStatus;
+  position: number;
+  children: PageTreeNode[];
+}
+
+export interface PageSearchResult {
+  id: string;
+  space_id: string;
+  title: string;
+  kind: PageKind;
+}
+
+export interface PageVersionSummary {
+  id: string;
+  page_id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+}
+
+export interface PageVersion extends PageVersionSummary {
+  content: TipTapDoc;
+}
+
+export interface PageComment {
+  id: string;
+  page_id: string;
+  user_id: string;
+  body: string;
+  created_at: string;
+}
+
+export interface PageImageUploadResponse {
+  url: string; // "/uploads/<file>"
+}
+
 // ─── API Endpoint Paths (REST contract — verbatim from backend) ─────────────────
 
 export const API_ENDPOINTS = {
@@ -1100,4 +1179,24 @@ export const API_ENDPOINTS = {
   ANALYTICS_VELOCITY: "/api/analytics/velocity",
   ANALYTICS_BURNDOWN: "/api/analytics/burndown",
   ANALYTICS_TIME_BY_EPIC: "/api/analytics/time-by-epic",
+
+  // ── Docs: Spaces (/api/spaces) ────────────────────────────────────────────
+  SPACES: "/api/spaces",                                  // GET ?project_id? / POST
+  SPACE_BY_ID: (id: string) => `/api/spaces/${id}`,       // GET / PATCH / DELETE
+
+  // ── Docs: Pages (/api/pages) ──────────────────────────────────────────────
+  PAGES: "/api/pages",                                    // GET ?space_id= / POST
+  PAGE_BY_ID: (id: string) => `/api/pages/${id}`,         // GET / PATCH / DELETE
+  PAGES_SEARCH: "/api/pages/search",                      // GET ?q=&space_id?
+  PAGE_MOVE: "/api/pages/move",                           // POST { id, parent_id?, position }
+  PAGE_PUBLISH: (id: string) => `/api/pages/${id}/publish`,
+  PAGE_VERSIONS: (id: string) => `/api/pages/${id}/versions`,            // GET / POST
+  PAGE_VERSION_BY_ID: (id: string, vid: string) =>
+    `/api/pages/${id}/versions/${vid}`,                                  // GET
+  PAGE_VERSION_RESTORE: (id: string, vid: string) =>
+    `/api/pages/${id}/versions/${vid}/restore`,                          // POST
+  PAGE_IMAGES: (id: string) => `/api/pages/${id}/images`,                // POST multipart
+  PAGE_COMMENTS: (id: string) => `/api/pages/${id}/comments`,            // GET / POST
+  PAGE_COMMENT_BY_ID: (id: string, cid: string) =>
+    `/api/pages/${id}/comments/${cid}`,                                  // DELETE
 } as const;

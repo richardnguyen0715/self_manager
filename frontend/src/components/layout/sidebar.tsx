@@ -20,6 +20,7 @@ import {
   SquareKanban,
   Network,
   FolderOpen,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Habits", href: "/habits", icon: Repeat2 },
   { label: "Focus", href: "/focus", icon: Timer },
   { label: "Hierarchy", href: "/hierarchy", icon: Network },
+  { label: "Docs", href: "/docs", icon: FileText },
   { label: "Goals", href: "/goals", icon: Target },
   { label: "Analytics", href: "/analytics", icon: BarChart3 },
 ];

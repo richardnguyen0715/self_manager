@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COALESCE(MAX(position), -1) + 1\n        FROM pages\n        WHERE space_id = $1\n          AND ($2::uuid IS NULL OR parent_id = $2)\n          AND ($2::uuid IS NOT NULL OR parent_id IS NULL)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "?column?",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "54e443431ea55707071e53f27f99481aff608c9b6a1718d1146a826b5bdd1cda"
+}

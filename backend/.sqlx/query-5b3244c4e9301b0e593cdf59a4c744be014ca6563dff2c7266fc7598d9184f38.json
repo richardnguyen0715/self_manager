@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM page_comments\n        WHERE  id      = $1\n          AND  page_id = $2\n          AND  user_id = $3\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5b3244c4e9301b0e593cdf59a4c744be014ca6563dff2c7266fc7598d9184f38"
+}
