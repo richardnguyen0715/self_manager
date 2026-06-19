@@ -931,6 +931,12 @@ export interface Page {
   created_at: string;
   updated_at: string;
   published_at: string | null;
+  // V2 Notion-parity fields
+  icon: string | null;
+  cover_url: string | null;
+  is_public: boolean;
+  public_slug: string | null;
+  is_template: boolean;
 }
 
 // GET /api/pages?space_id= returns nested tree nodes
@@ -942,6 +948,11 @@ export interface PageTreeNode {
   kind: PageKind;
   status: PageStatus;
   position: number;
+  // V2 Notion-parity fields included in tree
+  icon: string | null;
+  is_public: boolean;
+  public_slug: string | null;
+  is_template: boolean;
   children: PageTreeNode[];
 }
 
@@ -950,6 +961,9 @@ export interface PageSearchResult {
   space_id: string;
   title: string;
   kind: PageKind;
+  // V2 additions
+  icon: string | null;
+  snippet: string | null;
 }
 
 export interface PageVersionSummary {
@@ -974,6 +988,191 @@ export interface PageComment {
 
 export interface PageImageUploadResponse {
   url: string; // "/uploads/<file>"
+}
+
+// ─── Docs V2: Page backlinks + public state ────────────────────────────────────
+
+/** Single backlink: a page that contains an @page mention pointing at this page. */
+export interface PageBacklink {
+  source_page_id: string;
+  title: string;
+  space_id: string;
+}
+
+/** Response shape from POST /api/pages/:id/public */
+export interface PagePublicState {
+  is_public: boolean;
+  public_slug: string | null;
+}
+
+/** Outbound link ref (GET /api/pages/:id/links). */
+export interface PageLinkRef {
+  target_page_id: string;
+  title: string;
+  space_id: string;
+}
+
+// ─── Docs V2: Database types ───────────────────────────────────────────────────
+
+export type DatabaseColumnType =
+  | "text"
+  | "number"
+  | "date"
+  | "checkbox"
+  | "select"
+  | "multi_select"
+  | "status"
+  | "url";
+
+export interface SelectOption {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface Database {
+  id: string;
+  space_id: string;
+  user_id: string;
+  title: string;
+  icon: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DatabaseColumn {
+  id: string;
+  database_id: string;
+  name: string;
+  type: DatabaseColumnType;
+  options: SelectOption[];
+  position: number;
+  created_at: string;
+}
+
+export interface DatabaseRow {
+  id: string;
+  database_id: string;
+  /** Map of column id → typed value. Missing key = empty cell. */
+  values: Record<string, unknown>;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type DatabaseViewType = "table" | "board";
+
+export interface ViewFilter {
+  column_id: string;
+  op: "eq" | "neq" | "contains" | "gt" | "lt" | "is_empty" | "is_not_empty";
+  value?: unknown;
+}
+
+export interface ViewSort {
+  column_id: string;
+  direction: "asc" | "desc";
+}
+
+export interface DatabaseViewConfig {
+  /** Board only: must be a select|status column id. */
+  group_by_column_id?: string;
+  /** AND-combined filter conditions. */
+  filters?: ViewFilter[];
+  sorts?: ViewSort[];
+  /** Table only: explicit column display order. */
+  column_order?: string[];
+  /** Table only: hidden column ids. */
+  hidden_column_ids?: string[];
+}
+
+export interface DatabaseView {
+  id: string;
+  database_id: string;
+  name: string;
+  type: DatabaseViewType;
+  config: DatabaseViewConfig;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Response from GET /api/databases/:id — full detail with columns and views. */
+export interface DatabaseDetail {
+  database: Database;
+  columns: DatabaseColumn[];
+  views: DatabaseView[];
+}
+
+/** One group bucket in a board-view response. */
+export interface BoardGroup {
+  option_id: string | null;
+  option_name: string;
+  rows: DatabaseRow[];
+}
+
+/**
+ * Response from GET /api/databases/:id/views/:viewId/rows.
+ * Table: { rows: DatabaseRow[] }
+ * Board: { groups: BoardGroup[] }
+ */
+export interface ViewRowsResponse {
+  rows?: DatabaseRow[];
+  groups?: BoardGroup[];
+}
+
+// ─── Docs V2: Search result types ─────────────────────────────────────────────
+
+export interface PageSearchHit {
+  id: string;
+  space_id: string;
+  title: string;
+  icon: string | null;
+  snippet: string;
+}
+
+export interface DatabaseSearchHit {
+  id: string;
+  space_id: string;
+  title: string;
+  icon: string | null;
+  matched_rows: number;
+}
+
+/** Response from GET /api/docs/search */
+export interface DocSearchResult {
+  pages: PageSearchHit[];
+  databases: DatabaseSearchHit[];
+}
+
+// ─── Docs V2: Public page types (unauthenticated) ─────────────────────────────
+
+/** Lightweight child reference within a public page. */
+export interface PublicPageRef {
+  id: string;
+  title: string;
+  icon: string | null;
+  public_slug: string | null;
+}
+
+/** Full public page response from GET /api/public/pages/:slug */
+export interface PublicPage {
+  id: string;
+  title: string;
+  icon: string | null;
+  cover_url: string | null;
+  content: TipTapDoc;
+  updated_at: string;
+  /** Direct child pages that are also is_public = true. */
+  children: PublicPageRef[];
+}
+
+/** Recursive tree node for GET /api/public/pages/:slug/tree */
+export interface PublicPageTreeNode {
+  id: string;
+  title: string;
+  icon: string | null;
+  public_slug: string | null;
+  children: PublicPageTreeNode[];
 }
 
 // ─── API Endpoint Paths (REST contract — verbatim from backend) ─────────────────
@@ -1199,4 +1398,54 @@ export const API_ENDPOINTS = {
   PAGE_COMMENTS: (id: string) => `/api/pages/${id}/comments`,            // GET / POST
   PAGE_COMMENT_BY_ID: (id: string, cid: string) =>
     `/api/pages/${id}/comments/${cid}`,                                  // DELETE
+
+  // ── Docs V2: Page additions ────────────────────────────────────────────────
+  // POST /api/pages/:id/public  { public: bool } → PagePublicState
+  PAGE_PUBLIC: (id: string) => `/api/pages/${id}/public`,
+  // POST /api/pages/:id/cover  multipart → { url }
+  PAGE_COVER: (id: string) => `/api/pages/${id}/cover`,
+  // GET /api/pages/templates?space_id?
+  PAGES_TEMPLATES: "/api/pages/templates",
+  // POST /api/pages/from-template  { space_id, parent_id?, template_id, title? }
+  PAGE_FROM_TEMPLATE: "/api/pages/from-template",
+  // GET /api/pages/:id/backlinks → PageBacklink[]
+  PAGE_BACKLINKS: (id: string) => `/api/pages/${id}/backlinks`,
+  // GET /api/pages/:id/links → PageLinkRef[]
+  PAGE_LINKS: (id: string) => `/api/pages/${id}/links`,
+
+  // ── Docs V2: Databases (/api/databases) ───────────────────────────────────
+  // GET ?space_id= / POST
+  DATABASES: "/api/databases",
+  // GET / PATCH / DELETE /api/databases/:id
+  DATABASE_BY_ID: (id: string) => `/api/databases/${id}`,
+  // GET /api/databases/:id/columns / POST
+  DATABASE_COLUMNS: (id: string) => `/api/databases/${id}/columns`,
+  // PATCH / DELETE /api/databases/:id/columns/:colId
+  DATABASE_COLUMN_BY_ID: (id: string, colId: string) =>
+    `/api/databases/${id}/columns/${colId}`,
+  // GET /api/databases/:id/rows / POST
+  DATABASE_ROWS: (id: string) => `/api/databases/${id}/rows`,
+  // PATCH /api/databases/:id/rows  (batch update)
+  DATABASE_ROWS_BATCH: (id: string) => `/api/databases/${id}/rows`,
+  // PATCH / DELETE /api/databases/:id/rows/:rowId
+  DATABASE_ROW_BY_ID: (id: string, rowId: string) =>
+    `/api/databases/${id}/rows/${rowId}`,
+  // GET /api/databases/:id/views / POST
+  DATABASE_VIEWS: (id: string) => `/api/databases/${id}/views`,
+  // PATCH / DELETE /api/databases/:id/views/:viewId
+  DATABASE_VIEW_BY_ID: (id: string, viewId: string) =>
+    `/api/databases/${id}/views/${viewId}`,
+  // GET /api/databases/:id/views/:viewId/rows
+  DATABASE_VIEW_ROWS: (id: string, viewId: string) =>
+    `/api/databases/${id}/views/${viewId}/rows`,
+
+  // ── Docs V2: Search (/api/docs) ───────────────────────────────────────────
+  // GET /api/docs/search?q=&space_id?
+  DOCS_SEARCH: "/api/docs/search",
+
+  // ── Docs V2: Public (unauthenticated, /api/public) ────────────────────────
+  // GET /api/public/pages/:slug
+  PUBLIC_PAGE: (slug: string) => `/api/public/pages/${slug}`,
+  // GET /api/public/pages/:slug/tree
+  PUBLIC_PAGE_TREE: (slug: string) => `/api/public/pages/${slug}/tree`,
 } as const;

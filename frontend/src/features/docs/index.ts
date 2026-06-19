@@ -37,6 +37,38 @@ export {
   useDeleteComment,
   // Upload
   useUploadPageImage,
+  // V2: Page meta
+  useTogglePagePublic,
+  useUploadPageCover,
+  usePageTemplates,
+  useCreateFromTemplate,
+  usePageBacklinks,
+  usePageLinks,
+  // V2: Databases
+  useDatabases,
+  useDatabase,
+  useCreateDatabase,
+  useUpdateDatabase,
+  useDeleteDatabase,
+  useDatabaseColumns,
+  useCreateColumn,
+  useUpdateColumn,
+  useDeleteColumn,
+  useDatabaseRows,
+  useCreateRow,
+  useUpdateRow,
+  useBatchUpdateRows,
+  useDeleteRow,
+  useDatabaseViews,
+  useCreateView,
+  useUpdateView,
+  useDeleteView,
+  useViewRows,
+  // V2: Docs search
+  useDocsSearch,
+  // V2: Public (unauthenticated)
+  usePublicPage,
+  usePublicPageTree,
 } from "./hooks/useDocs";
 
 // ── Payload types ──────────────────────────────────────────────────────────────
@@ -47,6 +79,19 @@ export type {
   UpdatePagePayload,
   MovePagePayload,
   CreateCommentPayload,
+  // V2
+  TogglePagePublicPayload,
+  CreateFromTemplatePayload,
+  CreateDatabasePayload,
+  UpdateDatabasePayload,
+  CreateColumnPayload,
+  UpdateColumnPayload,
+  CreateRowPayload,
+  UpdateRowPayload,
+  BatchRowUpdate,
+  BatchUpdateRowsPayload,
+  CreateViewPayload,
+  UpdateViewPayload,
 } from "./hooks/useDocs";
 
 // ── Shared entity types (re-exported from @/types via types.ts) ────────────────
@@ -63,4 +108,27 @@ export type {
   PageVersion,
   PageComment,
   PageImageUploadResponse,
+  // V2
+  PageBacklink,
+  PagePublicState,
+  PageLinkRef,
+  Database,
+  DatabaseColumn,
+  DatabaseColumnType,
+  DatabaseRow,
+  DatabaseView,
+  DatabaseViewType,
+  DatabaseViewConfig,
+  DatabaseDetail,
+  BoardGroup,
+  ViewRowsResponse,
+  SelectOption,
+  ViewFilter,
+  ViewSort,
+  DocSearchResult,
+  PageSearchHit,
+  DatabaseSearchHit,
+  PublicPageRef,
+  PublicPage,
+  PublicPageTreeNode,
 } from "./types";

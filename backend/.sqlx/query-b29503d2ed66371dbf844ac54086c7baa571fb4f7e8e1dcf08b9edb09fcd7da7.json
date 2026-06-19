@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH RECURSIVE subtree AS (\n            -- Anchor: direct public children of the root\n            SELECT id, parent_id, title, icon, public_slug, position\n            FROM pages\n            WHERE parent_id = $1\n              AND is_public  = true\n              AND status = 'published'\n              AND is_template = false\n\n            UNION ALL\n\n            -- Recursive step: public children of already-selected nodes\n            SELECT p.id, p.parent_id, p.title, p.icon, p.public_slug, p.position\n            FROM pages p\n            JOIN subtree s ON p.parent_id = s.id\n            WHERE p.is_public = true\n              AND p.status = 'published'\n              AND p.is_template = false\n        )\n        SELECT\n            id            AS \"id!\",\n            parent_id,\n            title         AS \"title!\",\n            icon,\n            public_slug,\n            position      AS \"position!\"\n        FROM subtree\n        ORDER BY position ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "parent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "title!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "icon",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "public_slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "position!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "b29503d2ed66371dbf844ac54086c7baa571fb4f7e8e1dcf08b9edb09fcd7da7"
+}

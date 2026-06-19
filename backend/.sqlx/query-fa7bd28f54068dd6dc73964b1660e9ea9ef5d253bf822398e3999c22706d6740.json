@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO database_columns (database_id, name, type, options, position)\n        VALUES ($1, 'Name', 'text', $2, 0)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fa7bd28f54068dd6dc73964b1660e9ea9ef5d253bf822398e3999c22706d6740"
+}

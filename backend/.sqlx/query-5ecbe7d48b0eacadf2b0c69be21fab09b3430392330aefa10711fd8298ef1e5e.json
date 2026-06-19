@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO page_links (source_page_id, target_page_id, user_id)\n            VALUES ($1, $2, $3)\n            ON CONFLICT (source_page_id, target_page_id) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5ecbe7d48b0eacadf2b0c69be21fab09b3430392330aefa10711fd8298ef1e5e"
+}

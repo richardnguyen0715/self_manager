@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            id            AS \"id!\",\n            space_id      AS \"space_id!\",\n            title         AS \"title!\",\n            icon,\n            matched_rows  AS \"matched_rows!\"\n        FROM (\n            -- Arm 1: title similarity (pg_trgm)\n            SELECT\n                d.id,\n                d.space_id,\n                d.title,\n                d.icon,\n                0::bigint AS matched_rows\n            FROM databases d\n            WHERE d.user_id = $1\n              AND ($2::uuid IS NULL OR d.space_id = $2)\n              AND similarity(d.title, $3) > 0.1\n\n            UNION\n\n            -- Arm 2: databases with ≥1 row whose values text contains the query\n            SELECT\n                d.id,\n                d.space_id,\n                d.title,\n                d.icon,\n                COUNT(r.id) AS matched_rows\n            FROM databases d\n            JOIN database_rows r ON r.database_id = d.id\n            WHERE d.user_id = $1\n              AND ($2::uuid IS NULL OR d.space_id = $2)\n              AND r.values::text ILIKE $4\n            GROUP BY d.id, d.space_id, d.title, d.icon\n            HAVING COUNT(r.id) > 0\n        ) results\n        ORDER BY title\n        LIMIT $5\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "space_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "title!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "icon",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "matched_rows!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "d26cef0946b9e3b01d876a160294f0b40d426bb59ace2c63cba71d593ca7c68c"
+}

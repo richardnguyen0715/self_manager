@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO database_views (database_id, name, type, config, position)\n        VALUES ($1, 'Default View', 'table', $2, 0)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c076a3f79843f3a9a9a35401752d068918c188330da53095ef85407be6ddfee5"
+}

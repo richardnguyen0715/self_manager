@@ -28,6 +28,14 @@ import {
   StickyNote,
   CheckCircle,
   Type,
+  ToggleLeft,
+  MessageSquare,
+  Bookmark,
+  Frame,
+  Youtube,
+  Highlighter,
+  Database,
+  AtSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -255,37 +263,236 @@ export const SLASH_ITEMS: SlashCommandItem[] = [
         .run();
     },
   },
+  // ── V2 new blocks ────────────────────────────────────────────────────────
+  {
+    title: "Toggle",
+    description: "Collapsible block",
+    icon: ToggleLeft,
+    command: ({ editor, range }) => {
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .insertToggle()
+        .run();
+    },
+  },
+  {
+    title: "Callout",
+    description: "Emoji callout block",
+    icon: MessageSquare,
+    command: ({ editor, range }) => {
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .insertCallout("info")
+        .run();
+    },
+  },
+  {
+    title: "Bookmark",
+    description: "Link preview card",
+    icon: Bookmark,
+    // command is a no-op placeholder; buildSlashItems overrides with URL dialog
+    command: () => {},
+  },
+  {
+    title: "Embed",
+    description: "Embed any URL in an iframe",
+    icon: Frame,
+    // command is a no-op placeholder; buildSlashItems overrides with URL dialog
+    command: () => {},
+  },
+  {
+    title: "Video",
+    description: "YouTube or video URL",
+    icon: Youtube,
+    // command is a no-op placeholder; buildSlashItems overrides with URL dialog
+    command: () => {},
+  },
+  {
+    title: "Highlight",
+    description: "Highlight text",
+    icon: Highlighter,
+    command: ({ editor, range }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (editor.chain().focus().deleteRange(range) as any)
+        .toggleHighlight()
+        .run();
+    },
+  },
+  {
+    title: "Database",
+    description: "Embed a database view",
+    icon: Database,
+    // command is a no-op placeholder; buildSlashItems overrides with ID dialog
+    command: () => {},
+  },
+  {
+    title: "Mention Page",
+    description: "@mention a page",
+    icon: AtSign,
+    command: ({ editor, range }) => {
+      // Trigger @page mention by deleting the slash and inserting @
+      editor.chain().focus().deleteRange(range).insertContent("@").run();
+    },
+  },
 ];
 
 // ── buildSlashItems ──────────────────────────────────────────────────────────
-// Returns a copy of SLASH_ITEMS with the Image command wired to open the
-// supplied in-app dialog instead of window.prompt.
+// Returns a copy of SLASH_ITEMS with URL-dependent commands wired to open
+// in-app dialogs (Image, Bookmark, Embed, Video, Database).
 //
-// onRequestImageUrl receives a callback that must be called with the URL once
-// the user confirms the dialog (or not called at all if they cancel).
-export function buildSlashItems(
+// Each `onRequest*` receives a callback that is called with the URL/id once
+// the user confirms (or not called if they cancel).
+
+export interface SlashItemsOptions {
   onRequestImageUrl: (
     onUrl: (url: string, editor: Editor, range: Range) => void,
     editor: Editor,
     range: Range,
-  ) => void,
+  ) => void;
+  onRequestBookmarkUrl?: (
+    onUrl: (url: string, editor: Editor, range: Range) => void,
+    editor: Editor,
+    range: Range,
+  ) => void;
+  onRequestEmbedUrl?: (
+    onUrl: (url: string, editor: Editor, range: Range) => void,
+    editor: Editor,
+    range: Range,
+  ) => void;
+  onRequestVideoUrl?: (
+    onUrl: (url: string, editor: Editor, range: Range) => void,
+    editor: Editor,
+    range: Range,
+  ) => void;
+  onRequestDatabaseId?: (
+    onId: (id: string, editor: Editor, range: Range) => void,
+    editor: Editor,
+    range: Range,
+  ) => void;
+}
+
+export function buildSlashItems(
+  onRequestImageUrlOrOptions:
+    | SlashItemsOptions["onRequestImageUrl"]
+    | SlashItemsOptions,
+  // Legacy overload: single function
+  _unused?: never,
 ): SlashCommandItem[] {
+  // Normalise: accept either the old single-function signature or the options
+  // object so callers from before V2 keep working.
+  const opts: SlashItemsOptions =
+    typeof onRequestImageUrlOrOptions === "function"
+      ? { onRequestImageUrl: onRequestImageUrlOrOptions }
+      : onRequestImageUrlOrOptions;
+
   return SLASH_ITEMS.map((item) => {
-    if (item.title !== "Image") return item;
-    return {
-      ...item,
-      command: ({ editor, range }: { editor: Editor; range: Range }) => {
-        onRequestImageUrl(
-          (url, ed, r) => {
-            if (url) {
-              ed.chain().focus().deleteRange(r).setImage({ src: url }).run();
-            }
+    switch (item.title) {
+      case "Image":
+        return {
+          ...item,
+          command: ({ editor, range }: { editor: Editor; range: Range }) => {
+            opts.onRequestImageUrl(
+              (url, ed, r) => {
+                if (url) {
+                  ed.chain().focus().deleteRange(r).setImage({ src: url }).run();
+                }
+              },
+              editor,
+              range,
+            );
           },
-          editor,
-          range,
-        );
-      },
-    };
+        };
+
+      case "Bookmark":
+        if (!opts.onRequestBookmarkUrl) return item;
+        return {
+          ...item,
+          command: ({ editor, range }: { editor: Editor; range: Range }) => {
+            opts.onRequestBookmarkUrl!(
+              (url, ed, r) => {
+                if (url) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (ed.chain().focus().deleteRange(r) as any)
+                    .insertBookmark({ href: url })
+                    .run();
+                }
+              },
+              editor,
+              range,
+            );
+          },
+        };
+
+      case "Embed":
+        if (!opts.onRequestEmbedUrl) return item;
+        return {
+          ...item,
+          command: ({ editor, range }: { editor: Editor; range: Range }) => {
+            opts.onRequestEmbedUrl!(
+              (url, ed, r) => {
+                if (url) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (ed.chain().focus().deleteRange(r) as any)
+                    .insertEmbed(url)
+                    .run();
+                }
+              },
+              editor,
+              range,
+            );
+          },
+        };
+
+      case "Video":
+        if (!opts.onRequestVideoUrl) return item;
+        return {
+          ...item,
+          command: ({ editor, range }: { editor: Editor; range: Range }) => {
+            opts.onRequestVideoUrl!(
+              (url, ed, r) => {
+                if (url) {
+                  // setYoutubeVideo is from @tiptap/extension-youtube
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (ed.chain().focus().deleteRange(r) as any)
+                    .setYoutubeVideo({ src: url })
+                    .run();
+                }
+              },
+              editor,
+              range,
+            );
+          },
+        };
+
+      case "Database":
+        if (!opts.onRequestDatabaseId) return item;
+        return {
+          ...item,
+          command: ({ editor, range }: { editor: Editor; range: Range }) => {
+            opts.onRequestDatabaseId!(
+              (id, ed, r) => {
+                if (id) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (ed.chain().focus().deleteRange(r) as any)
+                    .insertDatabaseEmbed(id)
+                    .run();
+                }
+              },
+              editor,
+              range,
+            );
+          },
+        };
+
+      default:
+        return item;
+    }
   });
 }
 

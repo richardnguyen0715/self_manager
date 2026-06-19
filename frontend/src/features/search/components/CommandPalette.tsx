@@ -19,6 +19,7 @@ import {
   Loader2,
   X,
   ArrowRight,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores";
@@ -26,6 +27,7 @@ import { useSearchStore } from "../store";
 import { useSearchQuery } from "../hooks/useSearch";
 import { useQuickCreateTask, useQuickCreateHabit } from "../hooks/useQuickCreate";
 import { SearchResultItem } from "./SearchResultItem";
+import { DocsSearchGroup, useDocsSearchDebounced } from "@/features/docs/search";
 import type { SearchResult, SearchResultKind } from "../types";
 
 // ─── Navigation items (always visible, filtered by query) ─────────────────────
@@ -200,10 +202,20 @@ export function CommandPalette() {
 
   // Search query (fires only when inputValue has content)
   const trimmed = inputValue.trim();
-  const { data: searchData, isFetching } = useSearchQuery(
+  const { data: searchData, isFetching: isTasksFetching } = useSearchQuery(
     { q: trimmed, limit: 20 },
     { enabled: commandPaletteOpen && trimmed.length > 0 },
   );
+
+  // Docs search — pages + databases (debounced ~250 ms)
+  const {
+    data: docsData,
+    isFetching: isDocsFetching,
+  } = useDocsSearchDebounced(
+    commandPaletteOpen ? trimmed : "",
+  );
+
+  const isFetching = isTasksFetching || isDocsFetching;
 
   // Flatten per-kind arrays from SearchResponse { tasks?, projects?, habits? }
   const results: SearchResult[] = [
@@ -211,6 +223,10 @@ export function CommandPalette() {
     ...(searchData?.projects ?? []).map((p): SearchResult => ({ ...p, kind: "project" as const })),
     ...(searchData?.habits ?? []).map((h): SearchResult => ({ ...h, kind: "habit" as const })),
   ];
+
+  const docsPages = docsData?.pages ?? [];
+  const docsDatabases = docsData?.databases ?? [];
+  const hasDocsResults = docsPages.length > 0 || docsDatabases.length > 0;
 
   // Close handler — resets inline mode too
   const handleClose = useCallback(() => {
@@ -242,7 +258,11 @@ export function CommandPalette() {
 
   const hasResults = results.length > 0;
   const showEmpty =
-    trimmed.length > 0 && !isFetching && !hasResults && !quickCreateMode;
+    trimmed.length > 0 &&
+    !isFetching &&
+    !hasResults &&
+    !hasDocsResults &&
+    !quickCreateMode;
 
   if (!commandPaletteOpen) return null;
 
@@ -352,31 +372,63 @@ export function CommandPalette() {
                 </Command.Item>
 
                 {trimmed.length > 0 && (
-                  <Command.Item
-                    value={`search-full-${trimmed}`}
-                    onSelect={() => {
-                      navigate(`/search?q=${encodeURIComponent(trimmed)}`);
-                    }}
-                    className={cn(
-                      "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-[15px]",
-                      "aria-selected:bg-accent",
-                    )}
-                  >
-                    <span className="flex h-8 w-8 items-center justify-center rounded bg-muted">
-                      <Search className="h-4 w-4 text-muted-foreground" />
-                    </span>
-                    <span>
-                      Search for{" "}
-                      <strong className="font-medium">&ldquo;{trimmed}&rdquo;</strong>
-                    </span>
-                    <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground" />
-                  </Command.Item>
+                  <>
+                    <Command.Item
+                      value={`search-full-${trimmed}`}
+                      onSelect={() => {
+                        navigate(`/search?q=${encodeURIComponent(trimmed)}`);
+                      }}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-[15px]",
+                        "aria-selected:bg-accent",
+                      )}
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center rounded bg-muted">
+                        <Search className="h-4 w-4 text-muted-foreground" />
+                      </span>
+                      <span>
+                        Search for{" "}
+                        <strong className="font-medium">&ldquo;{trimmed}&rdquo;</strong>
+                      </span>
+                      <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground" />
+                    </Command.Item>
+
+                    <Command.Item
+                      value={`search-docs-${trimmed}`}
+                      onSelect={() => {
+                        navigate(`/docs/search?q=${encodeURIComponent(trimmed)}`);
+                      }}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-[15px]",
+                        "aria-selected:bg-accent",
+                      )}
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center rounded bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+                        <BookOpen className="h-4 w-4" />
+                      </span>
+                      <span>
+                        Search docs for{" "}
+                        <strong className="font-medium">&ldquo;{trimmed}&rdquo;</strong>
+                      </span>
+                      <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground" />
+                    </Command.Item>
+                  </>
                 )}
               </Command.Group>
 
-              {/* Search results */}
+              {/* Task / project / habit search results */}
               {hasResults && (
                 <GroupedResults results={results} onNavigate={handleClose} />
+              )}
+
+              {/* Docs search results — Pages + Databases */}
+              {hasDocsResults && (
+                <DocsSearchGroup
+                  pages={docsPages}
+                  databases={docsDatabases}
+                  onNavigate={handleClose}
+                  maxPerGroup={4}
+                />
               )}
 
               {/* Navigate section */}

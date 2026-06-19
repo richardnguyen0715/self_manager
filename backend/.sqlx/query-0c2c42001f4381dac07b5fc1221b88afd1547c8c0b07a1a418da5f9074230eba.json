@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            id            AS \"id!\",\n            space_id      AS \"space_id!\",\n            title         AS \"title!\",\n            icon,\n            snippet       AS \"snippet!\"\n        FROM (\n            -- Arm 1: title similarity (pg_trgm)\n            SELECT\n                id,\n                space_id,\n                title,\n                icon,\n                ''::text AS snippet\n            FROM pages\n            WHERE user_id     = $1\n              AND is_template = false\n              AND ($2::uuid IS NULL OR space_id = $2)\n              AND similarity(title, $3) > 0.1\n\n            UNION\n\n            -- Arm 2: content jsonb text ILIKE\n            SELECT\n                id,\n                space_id,\n                title,\n                icon,\n                COALESCE(SUBSTRING(content::text FROM 1 FOR 160), '')::text AS snippet\n            FROM pages\n            WHERE user_id     = $1\n              AND is_template = false\n              AND ($2::uuid IS NULL OR space_id = $2)\n              AND content::text ILIKE $4\n        ) results\n        ORDER BY title\n        LIMIT $5\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "space_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "title!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "icon",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "snippet!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "0c2c42001f4381dac07b5fc1221b88afd1547c8c0b07a1a418da5f9074230eba"
+}

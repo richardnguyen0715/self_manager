@@ -1,6 +1,6 @@
 //! Axum request handlers for the `page` module.
 //!
-//! All routes require `Authorization: Bearer <access-token>`.
+//! All routes require `Authorization: Bearer <access-token>` unless noted.
 //! Handlers are thin: extract → validate → delegate to [`service`] → respond.
 
 use axum::{
@@ -19,9 +19,10 @@ use crate::shared::{
 
 use super::{
     models::{
-        CreatePageRequest, ImageUploadResponse, ListPagesQuery, MovePageRequest,
+        CreateFromTemplateRequest, CreatePageRequest, ImageUploadResponse, ListPagesQuery,
+        ListTemplatesQuery, MovePageRequest, PageBacklink, PageLinkRef, PagePublicStateResponse,
         PageResponse, PageSearchResult, PageTreeNode, PageVersionResponse, PageVersionSummary,
-        SearchPagesQuery, UpdatePageRequest,
+        SearchPagesQuery, SetPagePublicRequest, UpdatePageRequest,
     },
     service,
 };
@@ -29,9 +30,12 @@ use super::{
 /// Absolute path to the shared uploads directory.
 const UPLOADS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/uploads");
 
+/// Maximum accepted image upload size (10 MiB).
+const MAX_IMAGE_BYTES: usize = 10 * 1024 * 1024;
+
 // ── GET /api/pages?space_id=<uuid> ───────────────────────────────────────────
 
-/// Return all pages in a space as a nested tree (`PageTreeNode[]`).
+/// Return all non-template pages in a space as a nested tree (`PageTreeNode[]`).
 ///
 /// `space_id` query parameter is required. Returns `404` when the space does
 /// not exist or is not owned by the authenticated user.
@@ -60,6 +64,21 @@ pub async fn search_pages(
     Ok(Json(results))
 }
 
+// ── GET /api/pages/templates?space_id? ───────────────────────────────────────
+
+/// List template pages (`is_template = true`) for the authenticated user.
+///
+/// `space_id` is optional; when absent, templates from all user spaces are returned.
+/// This route must be registered **before** `/:id` in the router.
+pub async fn list_templates(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Query(query): Query<ListTemplatesQuery>,
+) -> AppResult<Json<Vec<PageResponse>>> {
+    let templates = service::list_templates(&state, auth.user_id, query.space_id).await?;
+    Ok(Json(templates))
+}
+
 // ── POST /api/pages/move ──────────────────────────────────────────────────────
 
 /// Reparent a page within its space and/or change its sibling position.
@@ -73,6 +92,23 @@ pub async fn move_page(
 ) -> AppResult<Json<PageResponse>> {
     let page = service::move_page(&state, auth.user_id, body).await?;
     Ok(Json(page))
+}
+
+// ── POST /api/pages/from-template ────────────────────────────────────────────
+
+/// Create a new page by deep-copying a template's content.
+///
+/// The template must be owned by the authenticated user. Returns `201 Created`.
+/// This route must be registered **before** `/:id` in the router.
+pub async fn create_from_template(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Json(body): Json<CreateFromTemplateRequest>,
+) -> AppResult<(StatusCode, Json<PageResponse>)> {
+    body.validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let page = service::create_from_template(&state, auth.user_id, body).await?;
+    Ok((StatusCode::CREATED, Json(page)))
 }
 
 // ── POST /api/pages ───────────────────────────────────────────────────────────
@@ -109,7 +145,8 @@ pub async fn get_page(
 
 /// Partially update a page (autosave path). Bumps `updated_at`.
 ///
-/// Only JSON fields present in the body are modified; absent fields are kept.
+/// V2: also accepts `icon` and `cover_url` fields. When `content` changes,
+/// `page_links` are re-synced from `@pageMention` nodes in the document.
 pub async fn update_page(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -124,8 +161,8 @@ pub async fn update_page(
 
 // ── DELETE /api/pages/:id ─────────────────────────────────────────────────────
 
-/// Delete a page. Children, versions, and comments are cascade-deleted by the
-/// database FK constraints.
+/// Delete a page. Children, versions, comments, and links are cascade-deleted by
+/// the database FK constraints.
 ///
 /// Returns `204 No Content` on success.
 pub async fn delete_page(
@@ -150,6 +187,55 @@ pub async fn publish_page(
 ) -> AppResult<Json<PageResponse>> {
     let page = service::publish_page(&state, auth.user_id, page_id).await?;
     Ok(Json(page))
+}
+
+// ── POST /api/pages/:id/public ────────────────────────────────────────────────
+
+/// Toggle public-site visibility for a page.
+///
+/// Body: `{ "public": true | false }`.
+/// - `true` mints a unique `public_slug` from the page title (if not already
+///   set) and sets `is_public = true`.
+/// - `false` sets `is_public = false`; the slug is preserved for re-use.
+///
+/// Returns `{ "is_public": bool, "public_slug": string | null }`.
+pub async fn set_page_public(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(page_id): Path<Uuid>,
+    Json(body): Json<SetPagePublicRequest>,
+) -> AppResult<Json<PagePublicStateResponse>> {
+    let result = service::set_page_public(&state, auth.user_id, page_id, body).await?;
+    Ok(Json(result))
+}
+
+// ── POST /api/pages/:id/cover ─────────────────────────────────────────────────
+
+/// Upload a cover image for a page.
+///
+/// Accepts `multipart/form-data` with a `file` field (image only). Writes the
+/// file to `uploads/`, sets `pages.cover_url`, and returns `{ "url": "..." }`.
+/// Returns `201 Created`.
+pub async fn upload_cover_image(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(page_id): Path<Uuid>,
+    mut multipart: Multipart,
+) -> AppResult<(StatusCode, Json<ImageUploadResponse>)> {
+    let uploads_dir = std::path::Path::new(UPLOADS_DIR);
+    let (filename, bytes) = extract_image_multipart(&mut multipart).await?;
+
+    let url = service::upload_cover_image(
+        &state,
+        auth.user_id,
+        page_id,
+        uploads_dir,
+        filename,
+        bytes,
+    )
+    .await?;
+
+    Ok((StatusCode::CREATED, Json(ImageUploadResponse { url })))
 }
 
 // ── GET /api/pages/:id/versions ───────────────────────────────────────────────
@@ -205,6 +291,34 @@ pub async fn restore_version(
     Ok(Json(page))
 }
 
+// ── GET /api/pages/:id/backlinks ──────────────────────────────────────────────
+
+/// Return all pages that mention this page (inbound backlinks).
+///
+/// Each entry includes `source_page_id`, `title`, and `space_id`.
+pub async fn list_backlinks(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(page_id): Path<Uuid>,
+) -> AppResult<Json<Vec<PageBacklink>>> {
+    let links = service::list_backlinks(&state, auth.user_id, page_id).await?;
+    Ok(Json(links))
+}
+
+// ── GET /api/pages/:id/links ──────────────────────────────────────────────────
+
+/// Return all outbound links from this page (pages this page mentions).
+///
+/// Useful for editor validation and link management.
+pub async fn list_outbound_links(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(page_id): Path<Uuid>,
+) -> AppResult<Json<Vec<PageLinkRef>>> {
+    let links = service::list_outbound_links(&state, auth.user_id, page_id).await?;
+    Ok(Json(links))
+}
+
 // ── POST /api/pages/:id/images ────────────────────────────────────────────────
 
 /// Upload an image for embedding in a page's editor content.
@@ -221,9 +335,28 @@ pub async fn upload_page_image(
     mut multipart: Multipart,
 ) -> AppResult<(StatusCode, Json<ImageUploadResponse>)> {
     let uploads_dir = std::path::Path::new(UPLOADS_DIR);
+    let (filename, bytes) = extract_image_multipart(&mut multipart).await?;
 
-    const MAX_IMAGE_BYTES: usize = 10 * 1024 * 1024; // 10 MB
+    let url = service::upload_page_image(
+        &state,
+        auth.user_id,
+        page_id,
+        uploads_dir,
+        filename,
+        bytes,
+    )
+    .await?;
 
+    Ok((StatusCode::CREATED, Json(ImageUploadResponse { url })))
+}
+
+// ── Shared multipart helper ───────────────────────────────────────────────────
+
+/// Extract the `file` field from a `multipart/form-data` request, validate that
+/// it is an image and within the size limit, and return `(filename, bytes)`.
+async fn extract_image_multipart(
+    multipart: &mut Multipart,
+) -> AppResult<(String, bytes::Bytes)> {
     let mut file_bytes: Option<bytes::Bytes> = None;
     let mut filename: Option<String> = None;
 
@@ -232,7 +365,6 @@ pub async fn upload_page_image(
     })? {
         let field_name = field.name().unwrap_or("").to_owned();
         if field_name == "file" {
-            // Only accept images — the URL is embedded in user-rendered content.
             let content_type = field.content_type().unwrap_or("").to_owned();
             if !content_type.starts_with("image/") {
                 return Err(AppError::Validation(format!(
@@ -262,17 +394,7 @@ pub async fn upload_page_image(
     let bytes = file_bytes.ok_or_else(|| {
         AppError::Validation("multipart field 'file' is required".to_owned())
     })?;
-    let original_filename = filename.unwrap_or_else(|| "image".to_owned());
+    let name = filename.unwrap_or_else(|| "image".to_owned());
 
-    let url = service::upload_page_image(
-        &state,
-        auth.user_id,
-        page_id,
-        uploads_dir,
-        original_filename,
-        bytes,
-    )
-    .await?;
-
-    Ok((StatusCode::CREATED, Json(ImageUploadResponse { url })))
+    Ok((name, bytes))
 }

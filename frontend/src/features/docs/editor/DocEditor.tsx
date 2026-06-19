@@ -16,8 +16,10 @@ import type { SuggestionProps, SuggestionKeyDownProps } from "@tiptap/suggestion
 import GlobalDragHandle from "tiptap-extension-global-drag-handle";
 import AutoJoiner from "tiptap-extension-auto-joiner";
 
-// ── Block gutter ("+") ───────────────────────────────────────────────────────
+// ── Block gutter / block menu ────────────────────────────────────────────────
 import { BlockGutter } from "./BlockGutter";
+import { BlockMenu } from "./BlockMenu";
+import type { BlockMenuState } from "./BlockMenu";
 
 // ── StarterKit ──────────────────────────────────────────────────────────────
 import StarterKit from "@tiptap/starter-kit";
@@ -37,6 +39,8 @@ import Placeholder from "@tiptap/extension-placeholder";
 import Mention from "@tiptap/extension-mention";
 import CharacterCount from "@tiptap/extension-character-count";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import Highlight from "@tiptap/extension-highlight";
+import Youtube from "@tiptap/extension-youtube";
 import { all, createLowlight } from "lowlight";
 
 // ── Tippy.js for suggestion popups ─────────────────────────────────────────
@@ -49,15 +53,31 @@ import { InfoPanel } from "./extensions/InfoPanel";
 import { Columns, Column } from "./extensions/Columns";
 import { Mermaid } from "./extensions/Mermaid";
 import { TableOfContents } from "./extensions/TableOfContents";
+import { Toggle, ToggleSummary } from "./extensions/Toggle";
+import { Callout } from "./extensions/Callout";
+import { Bookmark } from "./extensions/Bookmark";
+import { Embed } from "./extensions/Embed";
+import { DatabaseEmbed } from "./extensions/DatabaseEmbed";
+import { PageMention } from "./extensions/PageMention";
+import type { PageMentionAttrs } from "./extensions/PageMention";
 
 // ── Node views ──────────────────────────────────────────────────────────────
 import { InfoPanelView } from "./node-views/InfoPanelView";
 import { MermaidView } from "./node-views/MermaidView";
 import { TableOfContentsView } from "./node-views/TableOfContentsView";
+import { ToggleView } from "./node-views/ToggleView";
+import { CalloutView } from "./node-views/CalloutView";
+import { BookmarkView } from "./node-views/BookmarkView";
+import { EmbedView } from "./node-views/EmbedView";
+import { DatabaseEmbedView } from "./node-views/DatabaseEmbedView";
 
 // ── Slash menu ──────────────────────────────────────────────────────────────
 import type { SlashMenuHandle, SlashCommandItem } from "./SlashMenu";
 import { SlashMenu, buildSlashItems } from "./SlashMenu";
+
+// ── Page mention list ───────────────────────────────────────────────────────
+import { PageMentionList } from "./PageMentionList";
+import type { PageMentionListHandle } from "./PageMentionList";
 
 // ── Toolbar + template picker ───────────────────────────────────────────────
 import { Toolbar } from "./Toolbar";
@@ -67,35 +87,44 @@ import { TemplatesPicker } from "./TemplatesPicker";
 import { UrlDialog } from "./UrlDialog";
 
 // ── Hooks + types ───────────────────────────────────────────────────────────
-import { useUploadPageImage } from "@/features/docs";
-import type { TipTapDoc } from "@/types";
+import { useUploadPageImage, useSearchPages } from "@/features/docs";
+import type { TipTapDoc, PageSearchResult } from "@/types";
 import { cn } from "@/lib/utils";
 
 // ── Lowlight (all languages bundled) ────────────────────────────────────────
 const lowlight = createLowlight(all);
 
-// ── Slash-menu suggestion config ────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────────
 type SlashItem = SlashCommandItem;
 
-// Pending image insert: captures editor + range so the dialog can apply the
-// command after the user confirms.
-interface PendingImageInsert {
+interface PendingUrlInsert {
   onUrl: (url: string, editor: TipTapEditor, range: Range) => void;
   editor: TipTapEditor;
   range: Range;
 }
 
+type UrlRequestFn = (
+  onUrl: (url: string, editor: TipTapEditor, range: Range) => void,
+  editor: TipTapEditor,
+  range: Range,
+) => void;
+
+// ── buildSlashSuggestion ─────────────────────────────────────────────────────
+
 function buildSlashSuggestion(
-  onRequestImageUrl: (
-    onUrl: (url: string, editor: TipTapEditor, range: Range) => void,
-    editor: TipTapEditor,
-    range: Range,
-  ) => void,
+  onRequestImageUrl: UrlRequestFn,
+  onRequestBookmarkUrl: UrlRequestFn,
+  onRequestEmbedUrl: UrlRequestFn,
+  onRequestVideoUrl: UrlRequestFn,
+  onRequestDatabaseId: UrlRequestFn,
 ) {
-  // Build items once per suggestion config (stable reference is fine because
-  // onRequestImageUrl is passed by reference from the component and captured
-  // in the closure; see note in DocEditor about using a ref).
-  const items = buildSlashItems(onRequestImageUrl);
+  const items = buildSlashItems({
+    onRequestImageUrl,
+    onRequestBookmarkUrl,
+    onRequestEmbedUrl,
+    onRequestVideoUrl,
+    onRequestDatabaseId,
+  });
 
   return {
     char: "/",
@@ -182,17 +211,102 @@ function buildSlashSuggestion(
   };
 }
 
-// ── Mention suggestion (lightweight stub) ────────────────────────────────────
-const mentionSuggestion = {
-  items: ({ query }: { query: string }) =>
-    query.length > 0 ? [query] : [],
-  render: () => ({
-    onStart: () => {},
-    onUpdate: () => {},
-    onKeyDown: () => false,
-    onExit: () => {},
-  }),
-};
+// ── @page mention suggestion builder ────────────────────────────────────────
+
+function buildPageMentionSuggestion(
+  getSearchResults: (q: string) => PageSearchResult[],
+  isLoading: (q: string) => boolean,
+  onSelect: (attrs: PageMentionAttrs) => void,
+) {
+  return {
+    char: "@",
+    startOfLine: false,
+    command({
+      editor,
+      range,
+      props,
+    }: {
+      editor: TipTapEditor;
+      range: Range;
+      props: PageSearchResult;
+    }) {
+      // Delete the @ + query text, then insert the pageMention node
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .insertPageMention({ pageId: props.id, label: props.title })
+        .run();
+      onSelect({ pageId: props.id, label: props.title });
+    },
+    items({ query }: { query: string }): PageSearchResult[] {
+      return getSearchResults(query);
+    },
+    render() {
+      let rootEl: ReturnType<typeof createRoot> | null = null;
+      let popupInstance: ReturnType<typeof tippy> | null = null;
+      let listHandle: PageMentionListHandle | null = null;
+
+      return {
+        onStart(suggProps: SuggestionProps<PageSearchResult, PageSearchResult>) {
+          const container = document.createElement("div");
+          rootEl = createRoot(container);
+          rootEl.render(
+            <PageMentionList
+              ref={(r) => { listHandle = r; }}
+              items={suggProps.items}
+              loading={isLoading(suggProps.query ?? "")}
+              command={(item) => suggProps.command(item)}
+            />,
+          );
+
+          popupInstance = tippy("body", {
+            getReferenceClientRect: (suggProps.clientRect ?? (() => new DOMRect())) as () => DOMRect,
+            appendTo: () => document.body,
+            content: container,
+            showOnCreate: true,
+            interactive: true,
+            trigger: "manual",
+            placement: "bottom-start",
+            maxWidth: "none",
+          });
+        },
+
+        onUpdate(suggProps: SuggestionProps<PageSearchResult, PageSearchResult>) {
+          if (rootEl) {
+            rootEl.render(
+              <PageMentionList
+                ref={(r) => { listHandle = r; }}
+                items={suggProps.items}
+                loading={isLoading(suggProps.query ?? "")}
+                command={(item) => suggProps.command(item)}
+              />,
+            );
+          }
+          if (popupInstance?.[0]) {
+            popupInstance[0].setProps({
+              getReferenceClientRect: (suggProps.clientRect ?? (() => new DOMRect())) as () => DOMRect,
+            });
+          }
+        },
+
+        onKeyDown(kd: SuggestionKeyDownProps) {
+          if (kd.event.key === "Escape") {
+            popupInstance?.[0]?.hide();
+            return true;
+          }
+          return listHandle?.onKeyDown(kd) ?? false;
+        },
+
+        onExit() {
+          popupInstance?.[0]?.destroy();
+          rootEl?.unmount();
+        },
+      };
+    },
+  };
+}
 
 // ── Doc helpers ───────────────────────────────────────────────────────────────
 
@@ -244,12 +358,8 @@ export function DocEditor({
 }: DocEditorProps) {
   const uploadMutation = useUploadPageImage(pageId);
 
-  // Ref for the editor wrapper div — passed to BlockGutter so it can locate
-  // the drag-handle element that GlobalDragHandle appends to it.
   const editorWrapperRef = useRef<HTMLDivElement>(null);
 
-  // Keep onChange ref stable so the TipTap onUpdate closure always has
-  // the latest version without triggering editor recreation.
   const onChangeRef = useRef(onChange);
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -259,29 +369,83 @@ export function DocEditor({
     showTemplatePicker && !hasContent(value),
   );
 
-  // ── Image URL dialog state ────────────────────────────────────────────────
-  // Stores the pending slash-menu insert context so the dialog can apply the
-  // image command once the user confirms a URL.
-  const [imageDialogOpen, setImageDialogOpen] = useState(false);
-  const pendingImageRef = useRef<PendingImageInsert | null>(null);
+  // ── @page mention query ────────────────────────────────────────────────────
+  const [mentionQuery, setMentionQuery] = useState("");
+  const { data: mentionResults, isFetching: mentionLoading } = useSearchPages(
+    mentionQuery,
+    undefined,
+  );
 
-  // Stable ref for the callback so it can be captured by the suggestion config
-  // without requiring editor re-creation.
-  const requestImageUrlRef = useRef<
-    (
-      onUrl: (url: string, editor: TipTapEditor, range: Range) => void,
-      editor: TipTapEditor,
-      range: Range,
-    ) => void
-  >(
-    (onUrl, ed, range) => {
+  // Stable refs so suggestion config closures always get fresh values
+  const mentionResultsRef = useRef<PageSearchResult[]>([]);
+  const mentionLoadingRef = useRef(false);
+  useEffect(() => {
+    mentionResultsRef.current = mentionResults ?? [];
+    mentionLoadingRef.current = mentionLoading;
+  }, [mentionResults, mentionLoading]);
+
+  // ── Image URL dialog state ────────────────────────────────────────────────
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const pendingImageRef = useRef<PendingUrlInsert | null>(null);
+
+  // ── Bookmark URL dialog ───────────────────────────────────────────────────
+  const [bookmarkDialogOpen, setBookmarkDialogOpen] = useState(false);
+  const pendingBookmarkRef = useRef<PendingUrlInsert | null>(null);
+
+  // ── Embed URL dialog ──────────────────────────────────────────────────────
+  const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
+  const pendingEmbedRef = useRef<PendingUrlInsert | null>(null);
+
+  // ── Video URL dialog ──────────────────────────────────────────────────────
+  const [videoDialogOpen, setVideoDialogOpen] = useState(false);
+  const pendingVideoRef = useRef<PendingUrlInsert | null>(null);
+
+  // ── Database ID dialog ────────────────────────────────────────────────────
+  const [databaseDialogOpen, setDatabaseDialogOpen] = useState(false);
+  const pendingDatabaseRef = useRef<PendingUrlInsert | null>(null);
+
+  // ── Block menu state (turn into / duplicate) ──────────────────────────────
+  const [blockMenuState, setBlockMenuState] = useState<BlockMenuState>({
+    x: 0,
+    y: 0,
+    open: false,
+  });
+
+  // ── Stable request refs ───────────────────────────────────────────────────
+  const requestImageUrlRef = useRef(
+    (onUrl: PendingUrlInsert["onUrl"], ed: TipTapEditor, range: Range) => {
       pendingImageRef.current = { onUrl, editor: ed, range };
       setImageDialogOpen(true);
     },
   );
 
-  // Keep the callback ref current (no-op: the implementation only touches
-  // React state setters which are stable; nothing needs updating).
+  const requestBookmarkUrlRef = useRef(
+    (onUrl: PendingUrlInsert["onUrl"], ed: TipTapEditor, range: Range) => {
+      pendingBookmarkRef.current = { onUrl, editor: ed, range };
+      setBookmarkDialogOpen(true);
+    },
+  );
+
+  const requestEmbedUrlRef = useRef(
+    (onUrl: PendingUrlInsert["onUrl"], ed: TipTapEditor, range: Range) => {
+      pendingEmbedRef.current = { onUrl, editor: ed, range };
+      setEmbedDialogOpen(true);
+    },
+  );
+
+  const requestVideoUrlRef = useRef(
+    (onUrl: PendingUrlInsert["onUrl"], ed: TipTapEditor, range: Range) => {
+      pendingVideoRef.current = { onUrl, editor: ed, range };
+      setVideoDialogOpen(true);
+    },
+  );
+
+  const requestDatabaseIdRef = useRef(
+    (onUrl: PendingUrlInsert["onUrl"], ed: TipTapEditor, range: Range) => {
+      pendingDatabaseRef.current = { onUrl, editor: ed, range };
+      setDatabaseDialogOpen(true);
+    },
+  );
 
   const editor = useEditor({
     extensions: [
@@ -306,15 +470,41 @@ export function DocEditor({
       }),
       Placeholder.configure({
         placeholder: "Type '/' for commands",
-        // Show placeholder on every empty paragraph, not just the first child.
         includeChildren: true,
       }),
       CharacterCount,
-      Mention.configure({
-        HTMLAttributes: { class: "mention" },
-        suggestion: mentionSuggestion,
+      // ── V2: Highlight + Youtube (npm extensions) ──────────────────────
+      Highlight.configure({ multicolor: true }),
+      Youtube.configure({ controls: true, nocookie: true }),
+      // ── V2: Custom node extensions (with React node views) ────────────
+      Toggle.extend({
+        addNodeView() {
+          return ReactNodeViewRenderer(ToggleView);
+        },
       }),
-      // Custom node extensions with React node views
+      ToggleSummary,
+      Callout.extend({
+        addNodeView() {
+          return ReactNodeViewRenderer(CalloutView);
+        },
+      }),
+      Bookmark.extend({
+        addNodeView() {
+          return ReactNodeViewRenderer(BookmarkView);
+        },
+      }),
+      Embed.extend({
+        addNodeView() {
+          return ReactNodeViewRenderer(EmbedView);
+        },
+      }),
+      DatabaseEmbed.extend({
+        addNodeView() {
+          return ReactNodeViewRenderer(DatabaseEmbedView);
+        },
+      }),
+      PageMention,
+      // ── Existing custom nodes ──────────────────────────────────────────
       InfoPanel.extend({
         addNodeView() {
           return ReactNodeViewRenderer(InfoPanelView);
@@ -336,17 +526,48 @@ export function DocEditor({
       GlobalDragHandle.configure({
         dragHandleWidth: 24,
         scrollTreshold: 100,
+        customNodeTypes: ["toggle", "callout", "bookmark", "embed", "databaseEmbed"],
       }),
       AutoJoiner.configure({
         elementsToJoin: ["bulletList", "orderedList", "taskList"],
       }),
-      // Slash command (non-conflicting with Mention)
+      // ── @page mention suggestion ──────────────────────────────────────
+      Extension.create({
+        name: "pageMentionSuggestion",
+        addOptions() {
+          return {
+            suggestion: buildPageMentionSuggestion(
+              (q) => {
+                setMentionQuery(q);
+                return mentionResultsRef.current;
+              },
+              () => mentionLoadingRef.current,
+              () => {
+                // No extra client action needed; backlinks synced on content save
+              },
+            ),
+          };
+        },
+        addProseMirrorPlugins() {
+          return [
+            Suggestion({
+              editor: this.editor,
+              ...this.options.suggestion,
+            }),
+          ];
+        },
+      }),
+      // ── Slash command ─────────────────────────────────────────────────
       Extension.create({
         name: "slashCommand",
         addOptions() {
           return {
             suggestion: buildSlashSuggestion(
               (...args) => requestImageUrlRef.current(...args),
+              (...args) => requestBookmarkUrlRef.current(...args),
+              (...args) => requestEmbedUrlRef.current(...args),
+              (...args) => requestVideoUrlRef.current(...args),
+              (...args) => requestDatabaseIdRef.current(...args),
             ),
           };
         },
@@ -373,7 +594,7 @@ export function DocEditor({
     },
   });
 
-  // Sync externally changed value (e.g. version restore sets new content)
+  // Sync externally changed value (e.g. version restore)
   const valueRef = useRef(value);
   useEffect(() => {
     if (!editor || JSON.stringify(valueRef.current) === JSON.stringify(value)) return;
@@ -390,7 +611,6 @@ export function DocEditor({
     [uploadMutation],
   );
 
-  // Insert image by URL (called from Toolbar image URL dialog)
   const handleInsertImageUrl = useCallback(
     (url: string) => {
       if (!editor || !url) return;
@@ -415,7 +635,7 @@ export function DocEditor({
         const url = await handleImageUpload(file);
         editor.chain().focus().setImage({ src: url }).run();
       } catch {
-        // swallow — could add toast here
+        // swallow
       }
     };
 
@@ -424,25 +644,46 @@ export function DocEditor({
     return () => el.removeEventListener("paste", handlePaste);
   }, [editor, handleImageUpload, readOnly]);
 
+  // Context menu on editor to open BlockMenu
+  useEffect(() => {
+    if (!editor || readOnly) return;
+    const el = editor.view.dom;
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      setBlockMenuState({ x: e.clientX, y: e.clientY, open: true });
+    };
+    el.addEventListener("contextmenu", handleContextMenu);
+    return () => el.removeEventListener("contextmenu", handleContextMenu);
+  }, [editor, readOnly]);
+
   const handleTemplateSelect = (content: TipTapDoc) => {
     editor?.commands.setContent(normalizeDoc(content), false);
     onChangeRef.current(content);
   };
 
-  // Handle image dialog confirm from slash menu
-  const handleSlashImageConfirm = (url: string) => {
-    setImageDialogOpen(false);
-    const pending = pendingImageRef.current;
-    if (pending && url) {
-      pending.onUrl(url, pending.editor, pending.range);
-    }
-    pendingImageRef.current = null;
-  };
+  // ── Dialog confirm / cancel helpers ──────────────────────────────────────
 
-  const handleSlashImageCancel = () => {
-    setImageDialogOpen(false);
-    pendingImageRef.current = null;
-  };
+  const confirmDialog = (
+    pendingRef: React.MutableRefObject<PendingUrlInsert | null>,
+    setOpen: (v: boolean) => void,
+  ) =>
+    (url: string) => {
+      setOpen(false);
+      const pending = pendingRef.current;
+      if (pending && url) {
+        pending.onUrl(url, pending.editor, pending.range);
+      }
+      pendingRef.current = null;
+    };
+
+  const cancelDialog = (
+    pendingRef: React.MutableRefObject<PendingUrlInsert | null>,
+    setOpen: (v: boolean) => void,
+  ) =>
+    () => {
+      setOpen(false);
+      pendingRef.current = null;
+    };
 
   const charCount = editor?.storage.characterCount?.characters?.() ?? 0;
   const wordCount = editor?.storage.characterCount?.words?.() ?? 0;
@@ -459,11 +700,6 @@ export function DocEditor({
 
       {/* Notion-style centered page scroll area */}
       <div className="notion-page-scroll flex-1 overflow-y-auto">
-        {/*
-          notion-editor-wrapper: relative container that GlobalDragHandle
-          appends its .drag-handle element to. The group/editor class lets
-          the BlockGutter "+" button use group-hover visibility.
-        */}
         <div
           ref={editorWrapperRef}
           className="notion-editor-wrapper group/editor relative mx-auto"
@@ -472,19 +708,16 @@ export function DocEditor({
             editor={editor}
             className={cn(
               "notion-editor-content",
-              // Prose styling
               "prose prose-neutral dark:prose-invert max-w-none",
-              // Editor area min-height
               "[&_.ProseMirror]:min-h-[60vh] [&_.ProseMirror]:outline-none",
-              // Heading scroll margin for anchors
               "[&_h1]:scroll-mt-16 [&_h2]:scroll-mt-16 [&_h3]:scroll-mt-16",
-              // Task list reset
               "[&_.task-list]:list-none [&_.task-list]:pl-0",
               "[&_.task-list-item]:flex [&_.task-list-item]:items-baseline [&_.task-list-item]:gap-2",
               "[&_.task-list-item_input[type=checkbox]]:cursor-pointer",
-              // Mention chip
-              "[&_.mention]:rounded [&_.mention]:bg-primary/10 [&_.mention]:px-1",
-              "[&_.mention]:text-primary [&_.mention]:font-medium [&_.mention]:text-sm",
+              // @page mention chip
+              "[&_.page-mention]:rounded [&_.page-mention]:bg-primary/10 [&_.page-mention]:px-1",
+              "[&_.page-mention]:text-primary [&_.page-mention]:font-medium [&_.page-mention]:text-sm",
+              "[&_.page-mention]:no-underline hover:[&_.page-mention]:underline",
               // Columns layout
               "[&_.columns-block]:grid [&_.columns-block]:grid-cols-2 [&_.columns-block]:gap-4 [&_.columns-block]:my-3",
               "[&_.column-block]:min-w-0",
@@ -500,16 +733,19 @@ export function DocEditor({
               "[&_table]:w-full [&_table]:border-collapse",
               "[&_td,&_th]:border [&_td,&_th]:border-border [&_td,&_th]:px-3 [&_td,&_th]:py-1.5 [&_td,&_th]:text-sm",
               "[&_th]:bg-muted [&_th]:font-semibold",
+              // Highlight mark
+              "[&_mark]:rounded [&_mark]:px-0.5 [&_mark]:bg-yellow-200/80 dark:[&_mark]:bg-yellow-700/60",
+              // YouTube embed
+              "[&_.youtube-wrapper]:my-3 [&_.youtube-wrapper]:overflow-hidden [&_.youtube-wrapper]:rounded-lg",
             )}
           />
-          {/* "+" add-block button that tracks the drag handle position */}
           {editor && !readOnly && (
             <BlockGutter editor={editor} editorWrapperRef={editorWrapperRef} />
           )}
         </div>
       </div>
 
-      {/* Status bar — only when editable */}
+      {/* Status bar */}
       {!readOnly && (
         <div className="flex items-center justify-end gap-4 border-t bg-background/80 px-4 py-1 text-xs text-muted-foreground">
           <span>{wordCount} words</span>
@@ -524,14 +760,59 @@ export function DocEditor({
         onSelect={handleTemplateSelect}
       />
 
-      {/* Image URL dialog — shared between slash-menu Image item and toolbar */}
+      {/* Block menu (turn into / duplicate) */}
+      {editor && !readOnly && (
+        <BlockMenu
+          editor={editor}
+          state={blockMenuState}
+          onClose={() => setBlockMenuState((s) => ({ ...s, open: false }))}
+        />
+      )}
+
+      {/* ── URL dialogs ──────────────────────────────────────────────── */}
       <UrlDialog
         open={imageDialogOpen}
         title="Insert Image"
         label="Image URL"
         placeholder="https://example.com/image.png"
-        onConfirm={handleSlashImageConfirm}
-        onCancel={handleSlashImageCancel}
+        onConfirm={confirmDialog(pendingImageRef, setImageDialogOpen)}
+        onCancel={cancelDialog(pendingImageRef, setImageDialogOpen)}
+      />
+
+      <UrlDialog
+        open={bookmarkDialogOpen}
+        title="Add Bookmark"
+        label="URL"
+        placeholder="https://example.com"
+        onConfirm={confirmDialog(pendingBookmarkRef, setBookmarkDialogOpen)}
+        onCancel={cancelDialog(pendingBookmarkRef, setBookmarkDialogOpen)}
+      />
+
+      <UrlDialog
+        open={embedDialogOpen}
+        title="Embed URL"
+        label="URL"
+        placeholder="https://example.com"
+        onConfirm={confirmDialog(pendingEmbedRef, setEmbedDialogOpen)}
+        onCancel={cancelDialog(pendingEmbedRef, setEmbedDialogOpen)}
+      />
+
+      <UrlDialog
+        open={videoDialogOpen}
+        title="Insert Video"
+        label="YouTube / Video URL"
+        placeholder="https://www.youtube.com/watch?v=..."
+        onConfirm={confirmDialog(pendingVideoRef, setVideoDialogOpen)}
+        onCancel={cancelDialog(pendingVideoRef, setVideoDialogOpen)}
+      />
+
+      <UrlDialog
+        open={databaseDialogOpen}
+        title="Embed Database"
+        label="Database ID"
+        placeholder="uuid"
+        onConfirm={confirmDialog(pendingDatabaseRef, setDatabaseDialogOpen)}
+        onCancel={cancelDialog(pendingDatabaseRef, setDatabaseDialogOpen)}
       />
     </div>
   );

@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Globe,
-  Clock,
-  Edit,
   MessageSquare,
   History,
   Loader2,
@@ -27,6 +25,9 @@ import { DocEditor } from "@/features/docs/editor/DocEditor";
 import { Whiteboard } from "@/features/docs/whiteboard/Whiteboard";
 import { VersionHistoryPanel } from "@/features/docs/collab/VersionHistoryPanel";
 import { CommentsPanel } from "@/features/docs/collab/CommentsPanel";
+import { PageMetaHeader } from "@/features/docs/pages/PageMetaHeader";
+import { PageTemplatesPicker } from "@/features/docs/pages/PageTemplatesPicker";
+import type { TipTapDoc } from "@/types";
 
 // ─── Right panel tabs ─────────────────────────────────────────────────────────
 
@@ -77,8 +78,18 @@ export function DocsPageEditorPage({
   const [rightPanel, setRightPanel] = useState<RightPanel>(null);
   const [publishPending, setPublishPending] = useState(false);
 
-  // Debounce title save
+  // Templates picker — only on brand-new blank pages.
+  // `templatesDismissed` tracks whether the user has already closed it once
+  // so we don't re-open on every render.
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [templatesDismissed, setTemplatesDismissed] = useState(false);
+
+  // Ref for the editor content value to pass to DocEditor
+  const [editorContent, setEditorContent] = useState<TipTapDoc | null>(null);
+
+  // Debounce timers
   const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Title change (debounced 600 ms) ────────────────────────────────────────
   function handleTitleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -102,25 +113,42 @@ export function DocsPageEditorPage({
     }, 600);
   }
 
-  // ── Content change (wired from DocEditor via onChange) ────────────────────
+  // ── Content change (debounced 800 ms) ─────────────────────────────────────
   const handleContentChange = useCallback(
-    (doc: Record<string, unknown>) => {
-      setSaveStatus("saving");
-      updatePage.mutate(
-        { content: doc },
-        {
-          onSuccess: () => {
-            setSaveStatus("saved");
-            setTimeout(() => setSaveStatus("idle"), 2000);
+    (doc: TipTapDoc) => {
+      setEditorContent(doc);
+      setSaveStatus("idle");
+
+      if (contentTimer.current) clearTimeout(contentTimer.current);
+      contentTimer.current = setTimeout(() => {
+        setSaveStatus("saving");
+        updatePage.mutate(
+          { content: doc },
+          {
+            onSuccess: () => {
+              setSaveStatus("saved");
+              setTimeout(() => setSaveStatus("idle"), 2000);
+            },
+            onError: () => setSaveStatus("error"),
           },
-          onError: () => setSaveStatus("error"),
-        },
-      );
+        );
+      }, 800);
     },
     [updatePage],
   );
 
-  // ── Publish ────────────────────────────────────────────────────────────────
+  // ── Template select (local content) ───────────────────────────────────────
+  function handleTemplateSelectContent(content: TipTapDoc) {
+    setEditorContent(content);
+    updatePage.mutate({ content });
+  }
+
+  // ── Template select (server-created page) ─────────────────────────────────
+  function handleTemplateSelectFromServer(newPage: { id: string }) {
+    router.push(`/docs/${spaceId}/${newPage.id}`);
+  }
+
+  // ── Publish (internal draft → published status) ────────────────────────────
   function handlePublish() {
     setPublishPending(true);
     publishPage.mutate(pageId, {
@@ -175,6 +203,17 @@ export function DocsPageEditorPage({
   const isPublished = page.status === "published";
   const isWhiteboard = page.kind === "whiteboard";
 
+  // The content shown to DocEditor — prefer local editorContent for freshly
+  // applied templates, otherwise fall back to persisted page content.
+  const docContent = editorContent ?? (page.content ?? {});
+
+  // Show templates picker when page is blank (no content at all) and not yet dismissed
+  const isBlankPage =
+    !isWhiteboard &&
+    !page.content &&
+    !editorContent &&
+    !templatesDismissed;
+
   return (
     <div className="flex h-[calc(100vh-9rem)] flex-col overflow-hidden rounded-lg border">
       {/* ── Toolbar bar ─────────────────────────────────────────────────────── */}
@@ -196,26 +235,25 @@ export function DocsPageEditorPage({
           {page.status}
         </Badge>
 
+        {/* Public badge */}
+        {page.is_public && (
+          <Badge
+            variant="outline"
+            className="shrink-0 text-xs gap-1 border-green-400 text-green-600"
+          >
+            <Globe className="h-3 w-3" />
+            Public
+          </Badge>
+        )}
+
         {/* Save indicator */}
         <SaveIndicator status={saveStatus} />
 
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Action buttons */}
-        {isPublished ? (
-          <Button
-            asChild
-            size="sm"
-            variant="outline"
-            className="gap-1.5"
-          >
-            <Link href={`/docs/${spaceId}/${pageId}/published`}>
-              <Globe className="h-3.5 w-3.5" />
-              View Published
-            </Link>
-          </Button>
-        ) : (
+        {/* Publish button (internal draft → published status) */}
+        {!isPublished && (
           <Button
             size="sm"
             onClick={handlePublish}
@@ -272,74 +310,29 @@ export function DocsPageEditorPage({
       <div className="flex flex-1 overflow-hidden">
         {/* Editor / whiteboard column */}
         <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Title input — only for page kind */}
-          {!isWhiteboard && (
-            <div className="border-b px-8 py-4">
-              <input
-                className="w-full bg-transparent text-3xl font-bold text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
-                placeholder="Untitled"
-                value={title}
-                onChange={handleTitleChange}
-                maxLength={500}
-                aria-label="Page title"
-              />
-              {/* Author / date line */}
-              <p className="mt-1 text-xs text-muted-foreground">
-                {page.published_at
-                  ? `Published ${new Date(page.published_at).toLocaleDateString()}`
-                  : `Last updated ${new Date(page.updated_at).toLocaleDateString()}`}
-              </p>
-            </div>
-          )}
-
-          {/* Content area */}
           <div className="flex-1 overflow-auto">
             {isWhiteboard ? (
               <Whiteboard pageId={pageId} readOnly={false} />
             ) : (
-              <div className="mx-auto max-w-3xl px-8 py-6">
-                {/* Published view shows read-only + edit button */}
-                {isPublished ? (
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        Published{" "}
-                        {page.published_at
-                          ? new Date(page.published_at).toLocaleDateString()
-                          : ""}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          router.push(
-                            `/docs/${spaceId}/${pageId}/published`,
-                          )
-                        }
-                        className="gap-1.5"
-                      >
-                        <Edit className="h-3.5 w-3.5" />
-                        View published page
-                      </Button>
-                    </div>
-                    <DocEditor
-                      pageId={pageId}
-                      value={page.content ?? {}}
-                      onChange={handleContentChange}
-                      showTemplatePicker={false}
-                    />
-                  </div>
-                ) : (
+              <div className="mx-auto max-w-3xl">
+                {/* V2 page meta header: cover + icon + title + meta actions */}
+                <PageMetaHeader
+                  page={page}
+                  spaceId={spaceId}
+                  onTitleChange={handleTitleChange}
+                  titleValue={title}
+                  readOnly={false}
+                />
+
+                {/* Editor body */}
+                <div className="px-8 py-4">
                   <DocEditor
                     pageId={pageId}
-                    value={page.content ?? {}}
+                    value={docContent}
                     onChange={handleContentChange}
-                    showTemplatePicker={
-                      !page.content || Object.keys(page.content).length === 0
-                    }
+                    showTemplatePicker={isBlankPage}
                   />
-                )}
+                </div>
               </div>
             )}
           </div>
@@ -382,6 +375,19 @@ export function DocsPageEditorPage({
           </>
         )}
       </div>
+
+      {/* Templates picker — shown when user explicitly triggers or page is blank */}
+      <PageTemplatesPicker
+        open={templatePickerOpen || isBlankPage}
+        onClose={() => {
+          setTemplatePickerOpen(false);
+          setTemplatesDismissed(true);
+        }}
+        spaceId={spaceId}
+        parentId={page.parent_id ?? undefined}
+        onSelectContent={handleTemplateSelectContent}
+        onSelectFromServer={handleTemplateSelectFromServer}
+      />
     </div>
   );
 }

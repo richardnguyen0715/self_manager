@@ -1,0 +1,132 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO pages\n            (space_id, parent_id, user_id, title, kind, content, position, icon, cover_url)\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n        RETURNING\n            id, space_id, parent_id, user_id, title, kind, status, position,\n            content    AS \"content: serde_json::Value\",\n            excalidraw AS \"excalidraw: serde_json::Value\",\n            created_at, updated_at, published_at,\n            icon, cover_url, is_public, public_slug, is_template\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "space_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "parent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "position",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "content: serde_json::Value",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 9,
+        "name": "excalidraw: serde_json::Value",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "published_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "icon",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "cover_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "is_public",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 16,
+        "name": "public_slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 17,
+        "name": "is_template",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Int4",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "0e5b48f846a4cf7a0ca59b79b6066f56f7d1e9490e2e2f81954527bcba2c2e46"
+}

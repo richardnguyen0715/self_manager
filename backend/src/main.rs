@@ -90,16 +90,24 @@ async fn main() -> anyhow::Result<()> {
         // ── Board columns (dynamic board) ─────────────────────────────────────
         .nest("/board-columns", modules::board_column::router())
         // ── Docs ──────────────────────────────────────────────────────────────
-        .nest("/spaces", modules::space::router())
+        .nest("/spaces",    modules::space::router())
         .nest(
             "/pages",
             modules::page::router().merge(modules::doc_comment::router()),
-        );
+        )
+        .nest("/databases", modules::database::router())
+        .nest("/docs",      modules::doc_search::router());
+
+    // ── Public (unauthenticated) sub-router — no AuthUser extractor ──────────
+    let public_router = modules::public_docs::router();
 
     let app = Router::new()
         // ── Health check (used by Docker healthcheck + load balancers) ─────────
         .route("/health", axum::routing::get(|| async { "ok" }))
         .nest("/api", api_router)
+        // ── Public docs (no auth) — mounted separately so AuthUser is never
+        //    required; handlers rely solely on is_public SQL predicate ──────────
+        .nest("/api/public", public_router)
         .nest("/ws", modules::realtime::router())
         // ── Static file serving for uploads ───────────────────────────────────
         .nest_service("/uploads", ServeDir::new(uploads_dir))

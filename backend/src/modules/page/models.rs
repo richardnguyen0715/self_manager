@@ -1,7 +1,8 @@
 //! Data models and DTOs for the `page` module.
 //!
-//! # DB schema (from `migrations/0007_docs.sql`)
+//! # DB schema
 //!
+//! Original columns from `migrations/0007_docs.sql`:
 //! ```sql
 //! pages (
 //!   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -18,20 +19,32 @@
 //!   updated_at   timestamptz NOT NULL DEFAULT now(),
 //!   published_at timestamptz
 //! )
+//! ```
 //!
-//! page_versions (
-//!   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-//!   page_id    uuid NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
-//!   user_id    uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-//!   title      text NOT NULL,
-//!   content    jsonb NOT NULL,
-//!   created_at timestamptz NOT NULL DEFAULT now()
-//! )
+//! New Notion-parity columns added via `migrations/0008_docs_v2.sql`:
+//! ```sql
+//!   icon        text,
+//!   cover_url   text,
+//!   is_public   boolean NOT NULL DEFAULT false,
+//!   public_slug text (UNIQUE partial index where NOT NULL),
+//!   is_template boolean NOT NULL DEFAULT false
 //! ```
 //!
 //! `kind` and `status` are plain `text` with CHECK constraints (enum-as-text
 //! convention). They are bound and read as plain `&str` / `String`.
 //! `content` and `excalidraw` are `jsonb`, mapped to `serde_json::Value`.
+//!
+//! # `page_links` (backlinks, `0008_docs_v2.sql`)
+//! ```sql
+//! page_links (
+//!   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+//!   source_page_id uuid NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+//!   target_page_id uuid NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+//!   user_id        uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+//!   created_at     timestamptz NOT NULL DEFAULT now(),
+//!   UNIQUE (source_page_id, target_page_id)
+//! )
+//! ```
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -40,7 +53,7 @@ use validator::Validate;
 
 // ── DB rows ────────────────────────────────────────────────────────────────────
 
-/// Full `pages` row as returned from the database.
+/// Full `pages` row as returned from the database (including V2 columns).
 ///
 /// `content` and `excalidraw` are opaque `jsonb`; the backend stores and
 /// returns them as-is without further schema validation.
@@ -63,6 +76,17 @@ pub struct Page {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub published_at: Option<DateTime<Utc>>,
+    // ── V2 additions ────────────────────────────────────────────────────────
+    /// Emoji character or `null`.
+    pub icon: Option<String>,
+    /// `/uploads/<file>` or external URL; set by the cover upload endpoint.
+    pub cover_url: Option<String>,
+    /// When `true` the page is readable at `/api/public/pages/<public_slug>`.
+    pub is_public: bool,
+    /// Unique slug for the public site URL; minted on first `is_public = true`.
+    pub public_slug: Option<String>,
+    /// Template pages are excluded from the normal tree.
+    pub is_template: bool,
 }
 
 /// Full `page_versions` row.
@@ -76,9 +100,19 @@ pub struct PageVersion {
     pub created_at: DateTime<Utc>,
 }
 
+/// One row of the `page_links` table (directed backlink edge).
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct PageLink {
+    pub id: Uuid,
+    pub source_page_id: Uuid,
+    pub target_page_id: Uuid,
+    pub user_id: Uuid,
+    pub created_at: DateTime<Utc>,
+}
+
 // ── Response DTOs ──────────────────────────────────────────────────────────────
 
-/// Full page response serialised to JSON.
+/// Full page response serialised to JSON (includes V2 fields).
 #[derive(Debug, Serialize)]
 pub struct PageResponse {
     pub id: Uuid,
@@ -94,6 +128,11 @@ pub struct PageResponse {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub published_at: Option<DateTime<Utc>>,
+    pub icon: Option<String>,
+    pub cover_url: Option<String>,
+    pub is_public: bool,
+    pub public_slug: Option<String>,
+    pub is_template: bool,
 }
 
 impl From<Page> for PageResponse {
@@ -112,6 +151,11 @@ impl From<Page> for PageResponse {
             created_at: p.created_at,
             updated_at: p.updated_at,
             published_at: p.published_at,
+            icon: p.icon,
+            cover_url: p.cover_url,
+            is_public: p.is_public,
+            public_slug: p.public_slug,
+            is_template: p.is_template,
         }
     }
 }
@@ -128,6 +172,9 @@ pub struct PageTreeNode {
     pub kind: String,
     pub status: String,
     pub position: i32,
+    pub icon: Option<String>,
+    pub is_public: bool,
+    pub is_template: bool,
     pub children: Vec<PageTreeNode>,
 }
 
@@ -141,6 +188,9 @@ pub struct PageFlatRow {
     pub kind: String,
     pub status: String,
     pub position: i32,
+    pub icon: Option<String>,
+    pub is_public: bool,
+    pub is_template: bool,
 }
 
 /// Search result returned by `GET /api/pages/search?q=`.
@@ -150,6 +200,7 @@ pub struct PageSearchResult {
     pub space_id: Uuid,
     pub title: String,
     pub kind: String,
+    pub icon: Option<String>,
 }
 
 /// Version summary (no content body) for list endpoints.
@@ -198,10 +249,35 @@ impl From<PageVersion> for PageVersionSummary {
     }
 }
 
-/// Response body for the image upload endpoint.
+/// Response body for the image / cover upload endpoints.
 #[derive(Debug, Serialize)]
 pub struct ImageUploadResponse {
     pub url: String,
+}
+
+/// Response for `POST /:id/public` — public toggle state.
+#[derive(Debug, Serialize)]
+pub struct PagePublicStateResponse {
+    pub is_public: bool,
+    pub public_slug: Option<String>,
+}
+
+/// Backlink item returned by `GET /:id/backlinks`.
+///
+/// One entry per source page that contains a `@page` mention pointing at this page.
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct PageBacklink {
+    pub source_page_id: Uuid,
+    pub title: String,
+    pub space_id: Uuid,
+}
+
+/// Outbound link reference returned by `GET /:id/links`.
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct PageLinkRef {
+    pub target_page_id: Uuid,
+    pub title: String,
+    pub space_id: Uuid,
 }
 
 // ── Request DTOs ───────────────────────────────────────────────────────────────
@@ -221,6 +297,13 @@ pub struct SearchPagesQuery {
     pub space_id: Option<Uuid>,
 }
 
+/// Query params for `GET /api/pages/templates`.
+#[derive(Debug, Deserialize)]
+pub struct ListTemplatesQuery {
+    /// Optional space scope; `None` = templates across all user's spaces.
+    pub space_id: Option<Uuid>,
+}
+
 /// Body for `POST /api/pages`.
 #[derive(Debug, Deserialize, Validate)]
 pub struct CreatePageRequest {
@@ -236,6 +319,8 @@ pub struct CreatePageRequest {
 }
 
 /// Body for `PATCH /api/pages/:id` — all fields optional (autosave path).
+///
+/// V2 additions: `icon`, `cover_url`.
 #[derive(Debug, Deserialize, Validate)]
 pub struct UpdatePageRequest {
     #[validate(length(min = 1, max = 1000, message = "title must be 1–1000 characters"))]
@@ -250,6 +335,11 @@ pub struct UpdatePageRequest {
     pub position: Option<i32>,
     /// Reparent to a different page within the same space.
     pub parent_id: Option<Uuid>,
+    // ── V2 additions ────────────────────────────────────────────────────────
+    /// Emoji icon character; `None` = keep current; `Some("")` clears it.
+    pub icon: Option<String>,
+    /// Cover image URL; `None` = keep current; `Some("")` clears it.
+    pub cover_url: Option<String>,
 }
 
 /// Body for `POST /api/pages/move`.
@@ -261,4 +351,21 @@ pub struct MovePageRequest {
     pub parent_id: Option<Uuid>,
     /// New position among siblings.
     pub position: i32,
+}
+
+/// Body for `POST /api/pages/:id/public`.
+#[derive(Debug, Deserialize)]
+pub struct SetPagePublicRequest {
+    /// `true` = publish as public site; `false` = unpublish.
+    pub public: bool,
+}
+
+/// Body for `POST /api/pages/from-template`.
+#[derive(Debug, Deserialize, Validate)]
+pub struct CreateFromTemplateRequest {
+    pub space_id: Uuid,
+    pub template_id: Uuid,
+    pub parent_id: Option<Uuid>,
+    #[validate(length(min = 1, max = 1000, message = "title must be 1–1000 characters"))]
+    pub title: Option<String>,
 }

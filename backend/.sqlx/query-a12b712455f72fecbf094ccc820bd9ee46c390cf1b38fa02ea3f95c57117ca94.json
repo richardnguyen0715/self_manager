@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM database_rows WHERE id = $1 AND database_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a12b712455f72fecbf094ccc820bd9ee46c390cf1b38fa02ea3f95c57117ca94"
+}

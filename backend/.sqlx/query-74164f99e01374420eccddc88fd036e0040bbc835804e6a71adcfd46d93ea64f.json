@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            id,\n            title,\n            icon,\n            cover_url,\n            content AS \"content: serde_json::Value\",\n            updated_at\n        FROM pages\n        WHERE public_slug = $1\n          AND is_public   = true\n          AND status      = 'published'\n          AND is_template = false\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "icon",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "cover_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "content: serde_json::Value",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 5,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "74164f99e01374420eccddc88fd036e0040bbc835804e6a71adcfd46d93ea64f"
+}

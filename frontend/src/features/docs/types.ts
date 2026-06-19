@@ -19,6 +19,32 @@ export type {
   PageVersion,
   PageComment,
   PageImageUploadResponse,
+  // V2 page additions
+  PageBacklink,
+  PagePublicState,
+  PageLinkRef,
+  // V2 database
+  Database,
+  DatabaseColumn,
+  DatabaseColumnType,
+  DatabaseRow,
+  DatabaseView,
+  DatabaseViewType,
+  DatabaseViewConfig,
+  DatabaseDetail,
+  BoardGroup,
+  ViewRowsResponse,
+  SelectOption,
+  ViewFilter,
+  ViewSort,
+  // V2 search
+  DocSearchResult,
+  PageSearchHit,
+  DatabaseSearchHit,
+  // V2 public
+  PublicPageRef,
+  PublicPage,
+  PublicPageTreeNode,
 } from "@/types";
 
 export type {
@@ -28,4 +54,17 @@ export type {
   UpdatePagePayload,
   MovePagePayload,
   CreateCommentPayload,
+  // V2 payload types
+  TogglePagePublicPayload,
+  CreateFromTemplatePayload,
+  CreateDatabasePayload,
+  UpdateDatabasePayload,
+  CreateColumnPayload,
+  UpdateColumnPayload,
+  CreateRowPayload,
+  UpdateRowPayload,
+  BatchRowUpdate,
+  BatchUpdateRowsPayload,
+  CreateViewPayload,
+  UpdateViewPayload,
 } from "./hooks/useDocs";
