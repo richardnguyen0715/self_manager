@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            id, user_id, project_id, epic_id, sprint_id,\n            type::text  AS \"item_type!\",\n            title, description,\n            status::text   AS \"status!\",\n            priority::text AS \"priority!\",\n            story_points, position,\n            start_date, due_date, recurrence_rule, completed_at,\n            column_id,\n            labels AS \"labels!: Vec<String>\",\n            github_repo, github_branch, github_pr,\n            created_at, updated_at\n        FROM work_items\n        WHERE id = $1 AND user_id = $2\n        ",
+  "query": "\n        UPDATE work_items\n        SET\n            status       = ($3::text)::work_item_status,\n            completed_at = $4,\n            updated_at   = now()\n        WHERE id = $1 AND user_id = $2\n        RETURNING\n            id, user_id, project_id, epic_id, sprint_id,\n            type::text     AS \"item_type!\",\n            title, description,\n            status::text   AS \"status!\",\n            priority::text AS \"priority!\",\n            story_points, position,\n            start_date, due_date, recurrence_rule, completed_at,\n            column_id,\n            labels AS \"labels!: Vec<String>\",\n            pinned_fields AS \"pinned_fields!: Vec<String>\",\n            github_repo, github_branch, github_pr,\n            created_at, updated_at\n        ",
   "describe": {
     "columns": [
       {
@@ -95,26 +95,31 @@
       },
       {
         "ordinal": 18,
+        "name": "pinned_fields!: Vec<String>",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 19,
         "name": "github_repo",
         "type_info": "Text"
       },
       {
-        "ordinal": 19,
+        "ordinal": 20,
         "name": "github_branch",
         "type_info": "Text"
       },
       {
-        "ordinal": 20,
+        "ordinal": 21,
         "name": "github_pr",
         "type_info": "Text"
       },
       {
-        "ordinal": 21,
+        "ordinal": 22,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 22,
+        "ordinal": 23,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -122,7 +127,9 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Uuid"
+        "Uuid",
+        "Text",
+        "Timestamptz"
       ]
     },
     "nullable": [
@@ -144,6 +151,7 @@
       true,
       true,
       false,
+      false,
       true,
       true,
       true,
@@ -151,5 +159,5 @@
       false
     ]
   },
-  "hash": "21b1dafcaa3ecddce6a4fcda35cc25b04b3937db368643aff587ef38540e0e20"
+  "hash": "b11ca4e4d75bb4c234c8493a713924e45126e1b9824a91b407932084fed510bb"
 }

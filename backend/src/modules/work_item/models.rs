@@ -20,6 +20,7 @@
 //!   recurrence_rule text,
 //!   completed_at    timestamptz,
 //!   labels          text[] NOT NULL DEFAULT '{}',
+//!   pinned_fields   text[] NOT NULL DEFAULT '{}',
 //!   github_repo     text,
 //!   github_branch   text,
 //!   github_pr       text,
@@ -85,6 +86,7 @@ pub struct WorkItem {
     /// Board column assignment; `None` until the board is first opened (lazy seed).
     pub column_id: Option<Uuid>,
     pub labels: Vec<String>,
+    pub pinned_fields: Vec<String>,
     pub github_repo: Option<String>,
     pub github_branch: Option<String>,
     pub github_pr: Option<String>,
@@ -132,6 +134,7 @@ pub struct WorkItemResponse {
     /// Board column assignment.
     pub column_id: Option<Uuid>,
     pub labels: Vec<String>,
+    pub pinned_fields: Vec<String>,
     pub github_repo: Option<String>,
     pub github_branch: Option<String>,
     pub github_pr: Option<String>,
@@ -161,6 +164,7 @@ pub struct WorkItemListItem {
     /// Board column assignment.
     pub column_id: Option<Uuid>,
     pub labels: Vec<String>,
+    pub pinned_fields: Vec<String>,
     pub github_repo: Option<String>,
     pub github_branch: Option<String>,
     pub github_pr: Option<String>,
@@ -368,6 +372,9 @@ pub struct UpdateWorkItemRequest {
 
     /// When present, replaces the entire labels array.
     pub labels: Option<Vec<String>>,
+
+    /// When present, replaces the entire pinned_fields array.
+    pub pinned_fields: Option<Vec<String>>,
 
     pub github_repo: Option<String>,
 

@@ -162,6 +162,7 @@ export function useMoveItemToColumn() {
           github_repo: wi.github_repo ?? null,
           github_branch: wi.github_branch ?? null,
           github_pr: wi.github_pr ?? null,
+          pinned_fields: wi.pinned_fields ?? [],
           position: wi.position,
           subtask_count: (wi.subtasks ?? []).length,
           done_subtask_count: (wi.subtasks ?? []).filter((s) => s.is_done)
@@ -377,6 +378,7 @@ export function useMoveItem() {
           github_repo: wi.github_repo ?? null,
           github_branch: wi.github_branch ?? null,
           github_pr: wi.github_pr ?? null,
+          pinned_fields: wi.pinned_fields ?? [],
           position: wi.position,
           subtask_count: (wi.subtasks ?? []).length,
           done_subtask_count: (wi.subtasks ?? []).filter((s) => s.is_done)
@@ -422,6 +424,7 @@ export function useCreateBoardItem(sprintId: string) {
         github_repo: wi.github_repo ?? null,
         github_branch: wi.github_branch ?? null,
         github_pr: wi.github_pr ?? null,
+        pinned_fields: wi.pinned_fields ?? [],
         position: wi.position,
         subtask_count: 0,
         done_subtask_count: 0,

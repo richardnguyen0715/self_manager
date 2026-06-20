@@ -69,6 +69,7 @@ async fn fetch_work_item_with_subtasks(
             start_date, due_date, recurrence_rule, completed_at,
             column_id,
             labels AS "labels!: Vec<String>",
+            pinned_fields AS "pinned_fields!: Vec<String>",
             github_repo, github_branch, github_pr,
             created_at, updated_at
         FROM work_items
@@ -118,6 +119,7 @@ fn work_item_into_response(item: WorkItem, subtasks: Vec<WorkItemSubtask>) -> Wo
         completed_at: item.completed_at,
         column_id: item.column_id,
         labels: item.labels,
+        pinned_fields: item.pinned_fields,
         github_repo: item.github_repo,
         github_branch: item.github_branch,
         github_pr: item.github_pr,
@@ -179,6 +181,7 @@ pub async fn list_work_items(
             wi.position,
             wi.column_id,
             wi.labels          AS "labels!: Vec<String>",
+            wi.pinned_fields   AS "pinned_fields!: Vec<String>",
             wi.github_repo,
             wi.github_branch,
             wi.github_pr,
@@ -272,6 +275,22 @@ pub async fn create_work_item(
         .unwrap_or("medium");
     let position = 0_i32;
 
+    // Inherit the project from the sprint when not explicitly provided, so a
+    // work item created inside a sprint (e.g. board quick-create) is never
+    // orphaned with a NULL project_id and stays visible under project filters.
+    let project_id: Option<Uuid> = match (req.project_id, req.sprint_id) {
+        (Some(p), _) => Some(p),
+        (None, Some(sprint_id)) => sqlx::query_scalar!(
+            r#"SELECT project_id FROM sprints WHERE id = $1 AND user_id = $2"#,
+            sprint_id,
+            user_id,
+        )
+        .fetch_optional(&state.db)
+        .await?
+        .flatten(),
+        (None, None) => None,
+    };
+
     let item = sqlx::query_as!(
         WorkItem,
         r#"
@@ -299,11 +318,12 @@ pub async fn create_work_item(
             start_date, due_date, recurrence_rule, completed_at,
             column_id,
             labels AS "labels!: Vec<String>",
+            pinned_fields AS "pinned_fields!: Vec<String>",
             github_repo, github_branch, github_pr,
             created_at, updated_at
         "#,
         user_id,
-        req.project_id as Option<Uuid>,
+        project_id as Option<Uuid>,
         req.epic_id    as Option<Uuid>,
         req.sprint_id  as Option<Uuid>,
         item_type,
@@ -372,6 +392,7 @@ pub async fn update_work_item(
             start_date, due_date, recurrence_rule, completed_at,
             column_id,
             labels AS "labels!: Vec<String>",
+            pinned_fields AS "pinned_fields!: Vec<String>",
             github_repo, github_branch, github_pr,
             created_at, updated_at
         FROM work_items
@@ -457,6 +478,11 @@ pub async fn update_work_item(
         current.start_date
     };
     let new_labels = req.labels.as_deref().unwrap_or(&current.labels).to_vec();
+    let new_pinned_fields = req
+        .pinned_fields
+        .as_deref()
+        .unwrap_or(&current.pinned_fields)
+        .to_vec();
     let new_github_repo = if req.github_repo.is_some() {
         req.github_repo.clone()
     } else {
@@ -502,6 +528,7 @@ pub async fn update_work_item(
             recurrence_rule = $15,
             completed_at    = $16,
             labels          = $17,
+            pinned_fields   = $21,
             github_repo     = $18,
             github_branch   = $19,
             github_pr       = $20,
@@ -517,6 +544,7 @@ pub async fn update_work_item(
             start_date, due_date, recurrence_rule, completed_at,
             column_id,
             labels AS "labels!: Vec<String>",
+            pinned_fields AS "pinned_fields!: Vec<String>",
             github_repo, github_branch, github_pr,
             created_at, updated_at
         "#,
@@ -540,6 +568,7 @@ pub async fn update_work_item(
         new_github_repo,
         new_github_branch,
         new_github_pr,
+        &new_pinned_fields as &[String],
     )
     .fetch_optional(&state.db)
     .await?
@@ -661,6 +690,7 @@ pub async fn set_status(
             start_date, due_date, recurrence_rule, completed_at,
             column_id,
             labels AS "labels!: Vec<String>",
+            pinned_fields AS "pinned_fields!: Vec<String>",
             github_repo, github_branch, github_pr,
             created_at, updated_at
         "#,
@@ -730,6 +760,7 @@ pub async fn set_points(
             start_date, due_date, recurrence_rule, completed_at,
             column_id,
             labels AS "labels!: Vec<String>",
+            pinned_fields AS "pinned_fields!: Vec<String>",
             github_repo, github_branch, github_pr,
             created_at, updated_at
         "#,
@@ -848,6 +879,7 @@ pub async fn move_to_sprint(
             start_date, due_date, recurrence_rule, completed_at,
             column_id,
             labels AS "labels!: Vec<String>",
+            pinned_fields AS "pinned_fields!: Vec<String>",
             github_repo, github_branch, github_pr,
             created_at, updated_at
         "#,
@@ -906,6 +938,7 @@ pub async fn move_to_backlog(
             start_date, due_date, recurrence_rule, completed_at,
             column_id,
             labels AS "labels!: Vec<String>",
+            pinned_fields AS "pinned_fields!: Vec<String>",
             github_repo, github_branch, github_pr,
             created_at, updated_at
         "#,
@@ -1220,6 +1253,7 @@ pub async fn set_column(
                 start_date, due_date, recurrence_rule, completed_at,
                 column_id,
                 labels AS "labels!: Vec<String>",
+                pinned_fields AS "pinned_fields!: Vec<String>",
                 github_repo, github_branch, github_pr,
                 created_at, updated_at
             "#,
@@ -1249,6 +1283,7 @@ pub async fn set_column(
                 start_date, due_date, recurrence_rule, completed_at,
                 column_id,
                 labels AS "labels!: Vec<String>",
+                pinned_fields AS "pinned_fields!: Vec<String>",
                 github_repo, github_branch, github_pr,
                 created_at, updated_at
             "#,
@@ -1326,6 +1361,7 @@ pub async fn list_items_for_sprint(
             wi.position,
             wi.column_id,
             wi.labels          AS "labels!: Vec<String>",
+            wi.pinned_fields   AS "pinned_fields!: Vec<String>",
             wi.github_repo,
             wi.github_branch,
             wi.github_pr,
@@ -1409,6 +1445,7 @@ pub async fn list_items_for_epic(
             wi.position,
             wi.column_id,
             wi.labels          AS "labels!: Vec<String>",
+            wi.pinned_fields   AS "pinned_fields!: Vec<String>",
             wi.github_repo,
             wi.github_branch,
             wi.github_pr,

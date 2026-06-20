@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            UPDATE work_items\n            SET column_id  = $3,\n                status     = ($4::text)::work_item_status,\n                updated_at = now()\n            WHERE id = $1 AND user_id = $2\n            RETURNING\n                id, user_id, project_id, epic_id, sprint_id,\n                type::text     AS \"item_type!\",\n                title, description,\n                status::text   AS \"status!\",\n                priority::text AS \"priority!\",\n                story_points, position,\n                start_date, due_date, recurrence_rule, completed_at,\n                column_id,\n                labels AS \"labels!: Vec<String>\",\n                github_repo, github_branch, github_pr,\n                created_at, updated_at\n            ",
+  "query": "\n        INSERT INTO work_items (\n            user_id, project_id, epic_id, sprint_id, type, title, description,\n            status, priority, story_points, position,\n            start_date, due_date, recurrence_rule,\n            labels, github_repo, github_branch, github_pr\n        )\n        VALUES (\n            $1, $2, $3, $4,\n            ($5::text)::work_item_type,\n            $6, $7,\n            ($8::text)::work_item_status,\n            ($9::text)::task_priority,\n            $10, $11, $12, $13, $14, $15, $16, $17, $18\n        )\n        RETURNING\n            id, user_id, project_id, epic_id, sprint_id,\n            type::text     AS \"item_type!\",\n            title, description,\n            status::text   AS \"status!\",\n            priority::text AS \"priority!\",\n            story_points, position,\n            start_date, due_date, recurrence_rule, completed_at,\n            column_id,\n            labels AS \"labels!: Vec<String>\",\n            pinned_fields AS \"pinned_fields!: Vec<String>\",\n            github_repo, github_branch, github_pr,\n            created_at, updated_at\n        ",
   "describe": {
     "columns": [
       {
@@ -95,26 +95,31 @@
       },
       {
         "ordinal": 18,
+        "name": "pinned_fields!: Vec<String>",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 19,
         "name": "github_repo",
         "type_info": "Text"
       },
       {
-        "ordinal": 19,
+        "ordinal": 20,
         "name": "github_branch",
         "type_info": "Text"
       },
       {
-        "ordinal": 20,
+        "ordinal": 21,
         "name": "github_pr",
         "type_info": "Text"
       },
       {
-        "ordinal": 21,
+        "ordinal": 22,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 22,
+        "ordinal": 23,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -124,6 +129,20 @@
         "Uuid",
         "Uuid",
         "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int4",
+        "Int4",
+        "Timestamptz",
+        "Timestamptz",
+        "Text",
+        "TextArray",
+        "Text",
+        "Text",
         "Text"
       ]
     },
@@ -146,6 +165,7 @@
       true,
       true,
       false,
+      false,
       true,
       true,
       true,
@@ -153,5 +173,5 @@
       false
     ]
   },
-  "hash": "89b1810388f86974562f05cf1fcdd33510eb50c5c0795992cc1b775fa842c0d2"
+  "hash": "f6f688ad7a616a1d7de71f9a786ed991d115932d87a87ee8b6b6cbf46df6b5d2"
 }

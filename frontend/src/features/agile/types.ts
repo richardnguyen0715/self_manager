@@ -25,6 +25,8 @@ export interface CreateWorkItemPayload {
   github_repo?: string | null;
   github_branch?: string | null;
   github_pr?: string | null;
+  /** Detail-field keys pinned to show on the board card. */
+  pinned_fields?: string[];
   recurrence_rule?: string | null;
 }
 

@@ -4,15 +4,24 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   CalendarDays,
+  CalendarClock,
   Flag,
   GripVertical,
   CheckSquare,
+  Zap,
+  Layers,
+  Tag,
+  GitBranch,
+  Github,
+  GitPullRequest,
 } from "lucide-react";
 import { format, isPast, isToday, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import type { WorkItemListItem, Priority } from "@/types";
 import { WorkItemTypeBadge } from "@/features/agile/components/WorkItemTypeBadge";
+import { useSprintsList } from "@/features/sprints/hooks/useSprints";
+import { useEpics } from "@/features/agile/hooks/useEpics";
 import { useBoardStore } from "../store";
 
 // ─── Priority colour helpers ──────────────────────────────────────────────────
@@ -85,12 +94,44 @@ export function BoardCard({
   const doneSubtaskCount = item.done_subtask_count ?? 0;
   const allSubtasksDone = subtaskCount > 0 && doneSubtaskCount === subtaskCount;
 
+  // ── Detail-field lookups (sprint / epic names) ─────────────────────────────────
+  const sprints = useSprintsList().data?.data ?? [];
+  const epics = useEpics().data?.data ?? [];
+  const sprintName = item.sprint_id
+    ? sprints.find((s) => s.id === item.sprint_id)?.name ?? null
+    : null;
+  const epicTitle = item.epic_id
+    ? epics.find((e) => e.id === item.epic_id)?.title ?? null
+    : null;
+
+  const labels = item.labels ?? [];
+  const startDateLabel = item.start_date
+    ? format(parseISO(item.start_date), "MMM d")
+    : null;
+
+  // Only Details fields the user pinned (Pin icon in the detail sheet) render
+  // on the card.  Default = nothing pinned → clean card.
+  const pinned = item.pinned_fields ?? [];
+  const isPinned = (key: string) => pinned.includes(key);
+
+  const showSprint = isPinned("sprint") && !!sprintName;
+  const showParent = isPinned("parent") && !!epicTitle;
+  const showLabels = isPinned("labels") && labels.length > 0;
+  const showStart = isPinned("start_date") && !!startDateLabel;
+  const showRepo = isPinned("github_repo") && !!item.github_repo;
+  const showBranch = isPinned("github_branch") && !!item.github_branch;
+  const showPr = isPinned("github_pr") && !!item.github_pr;
+
+  // Whether any detail-field tag will render (controls the meta block).
+  const hasMeta =
+    showSprint || showParent || showLabels || showStart || showRepo || showBranch || showPr;
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "group relative rounded-lg border bg-card text-card-foreground shadow-sm",
+        "group relative overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm",
         "transition-shadow duration-150",
         isDragging && "opacity-40 shadow-none ring-2 ring-primary/20",
         isOverlay && "rotate-1 shadow-xl ring-2 ring-primary/30",
@@ -131,12 +172,64 @@ export function BoardCard({
         {/* Title */}
         <p
           className={cn(
-            "text-sm font-medium leading-snug line-clamp-2",
+            "text-sm font-medium leading-snug line-clamp-2 break-words [overflow-wrap:anywhere]",
             item.status === "done" && "line-through text-muted-foreground",
           )}
         >
           {item.title}
         </p>
+
+        {/* Detail-field tags */}
+        {hasMeta && (
+          <div className="flex flex-wrap items-center gap-1 pt-0.5">
+            {showSprint && (
+              <span className="inline-flex items-center gap-0.5 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                <Zap className="h-2.5 w-2.5 shrink-0" />
+                <span className="max-w-[8rem] truncate">{sprintName}</span>
+              </span>
+            )}
+            {showParent && (
+              <span className="inline-flex items-center gap-0.5 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+                <Layers className="h-2.5 w-2.5 shrink-0" />
+                <span className="max-w-[8rem] truncate">{epicTitle}</span>
+              </span>
+            )}
+            {showLabels &&
+              labels.map((label) => (
+                <span
+                  key={label}
+                  className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+                >
+                  <Tag className="h-2.5 w-2.5 shrink-0" />
+                  <span className="max-w-[7rem] truncate">{label}</span>
+                </span>
+              ))}
+            {showStart && (
+              <span className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                <CalendarClock className="h-2.5 w-2.5 shrink-0" />
+                {startDateLabel}
+              </span>
+            )}
+            {showRepo && (
+              <span className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                <Github className="h-2.5 w-2.5 shrink-0" />
+                <span className="max-w-[8rem] truncate">{item.github_repo}</span>
+              </span>
+            )}
+            {showBranch && (
+              <span className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                <GitBranch className="h-2.5 w-2.5 shrink-0" />
+                <span className="max-w-[8rem] truncate">{item.github_branch}</span>
+              </span>
+            )}
+            {showPr && (
+              <span className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                <GitPullRequest className="h-2.5 w-2.5 shrink-0" />
+                <span className="max-w-[6rem] truncate">{item.github_pr}</span>
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Footer row */}
         <div className="flex items-center justify-between gap-1 pt-0.5">

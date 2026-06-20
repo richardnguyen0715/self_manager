@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, createContext, useContext } from "react";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   ChevronRight,
@@ -28,6 +28,7 @@ import {
   GitBranch,
   Github,
   Tag,
+  Pin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -197,6 +198,57 @@ function InlineTextEditor({ value, placeholder, icon, onSave }: InlineTextEditor
         <span className="text-sm text-muted-foreground">{placeholder ?? "None"}</span>
       )}
       <Pencil className="h-3 w-3 ml-auto opacity-0 text-muted-foreground shrink-0" />
+    </button>
+  );
+}
+
+// ─── Date field (opens native picker reliably) ───────────────────────────────
+
+interface DateFieldProps {
+  value: string | null;
+  onChange: (iso: string | null) => void;
+}
+
+function DateField({ value, onChange }: DateFieldProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function openPicker() {
+    const el = inputRef.current;
+    if (!el) return;
+    // showPicker is the reliable cross-browser way to pop the calendar.
+    try {
+      el.showPicker();
+    } catch {
+      el.focus();
+      el.click();
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={openPicker}
+      className="relative flex items-center gap-1.5 text-sm cursor-pointer hover:text-primary transition-colors text-left"
+    >
+      <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      {value ? (
+        format(new Date(value), "MMM d, yyyy")
+      ) : (
+        <span className="text-muted-foreground">None</span>
+      )}
+      <input
+        ref={inputRef}
+        type="date"
+        value={value?.slice(0, 10) ?? ""}
+        onChange={(e) =>
+          onChange(e.target.value ? `${e.target.value}T00:00:00Z` : null)
+        }
+        // Kept in-flow but visually collapsed; showPicker() is triggered by the
+        // wrapping button so the whole row is clickable.
+        className="absolute bottom-0 left-0 h-0 w-0 opacity-0 pointer-events-none"
+        tabIndex={-1}
+        aria-hidden="true"
+      />
     </button>
   );
 }
@@ -444,13 +496,50 @@ function SubtaskRow({
   );
 }
 
+// ─── Pin context (pin Details fields onto the board card) ─────────────────────
+
+interface PinContextValue {
+  pinnedFields: string[];
+  togglePin: (fieldKey: string) => void;
+}
+
+const PinContext = createContext<PinContextValue | null>(null);
+
 // ─── Details rail row ─────────────────────────────────────────────────────────
 
-function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+function DetailRow({
+  label,
+  fieldKey,
+  children,
+}: {
+  label: string;
+  /** When set, a pin toggle is shown that pins this field to the board card. */
+  fieldKey?: string;
+  children: React.ReactNode;
+}) {
+  const pinCtx = useContext(PinContext);
+  const isPinned = !!fieldKey && !!pinCtx?.pinnedFields.includes(fieldKey);
+
   return (
-    <div className="flex items-start gap-3 py-2.5">
-      <span className="w-28 shrink-0 text-xs text-muted-foreground pt-0.5">{label}</span>
+    <div className="group/detail flex items-start gap-3 py-2.5">
+      <span className="w-24 shrink-0 text-xs text-muted-foreground pt-0.5">{label}</span>
       <div className="flex-1 min-w-0 text-sm">{children}</div>
+      {fieldKey && pinCtx && (
+        <button
+          type="button"
+          onClick={() => pinCtx.togglePin(fieldKey)}
+          title={isPinned ? "Unpin from card" : "Pin to card"}
+          aria-label={isPinned ? "Unpin from card" : "Pin to card"}
+          className={cn(
+            "mt-0.5 shrink-0 rounded p-0.5 transition-all",
+            isPinned
+              ? "text-primary"
+              : "text-muted-foreground/50 opacity-0 group-hover/detail:opacity-100 hover:text-foreground",
+          )}
+        >
+          <Pin className={cn("h-3.5 w-3.5", isPinned && "fill-current")} />
+        </button>
+      )}
     </div>
   );
 }
@@ -680,6 +769,18 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
   const progressPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
   const currentStatus = getStatusConf(workItem.status);
   const userInitial = user?.display_name?.[0]?.toUpperCase() ?? "U";
+
+  // Pin / unpin a Details field to the board card.
+  const pinnedFields = workItem.pinned_fields ?? [];
+  function togglePin(fieldKey: string) {
+    const next = pinnedFields.includes(fieldKey)
+      ? pinnedFields.filter((k) => k !== fieldKey)
+      : [...pinnedFields, fieldKey];
+    updateItem.mutate(
+      { pinned_fields: next },
+      { onSuccess: () => qc.invalidateQueries({ queryKey: boardKeys.all }) },
+    );
+  }
 
   function handleTitleSave() {
     const trimmed = titleDraft.trim();
@@ -1081,7 +1182,7 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
         </div>
 
         {/* ── Right rail ──────────────────────────────────────────────────── */}
-        <div className="w-full lg:w-64 lg:shrink-0 flex flex-col gap-3">
+        <div className="w-full lg:w-80 xl:w-96 lg:shrink-0 flex flex-col gap-3">
           {/* Status dropdown */}
           <DropdownMenuPrimitive.Root>
             <DropdownMenuPrimitive.Trigger asChild>
@@ -1139,9 +1240,10 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
             <div className="px-3 py-2.5 border-b flex items-center justify-between">
               <h3 className="text-sm font-semibold">Details</h3>
             </div>
+            <PinContext.Provider value={{ pinnedFields, togglePin }}>
             <div className="px-3 py-1 divide-y divide-border">
               {/* Assignee */}
-              <DetailRow label="Assignee">
+              <DetailRow label="Assignee" fieldKey="assignee">
                 <div className="flex items-center gap-1.5">
                   <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center">
                     <User className="h-3 w-3 text-primary" />
@@ -1151,7 +1253,7 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
               </DetailRow>
 
               {/* Priority — editable */}
-              <DetailRow label="Priority">
+              <DetailRow label="Priority" fieldKey="priority">
                 <DropdownMenuPrimitive.Root>
                   <DropdownMenuPrimitive.Trigger asChild>
                     <button
@@ -1204,7 +1306,7 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
               </DetailRow>
 
               {/* Parent (epic) — editable dropdown */}
-              <DetailRow label="Parent">
+              <DetailRow label="Parent" fieldKey="parent">
                 <DropdownMenuPrimitive.Root>
                   <DropdownMenuPrimitive.Trigger asChild>
                     <button
@@ -1257,37 +1359,20 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
               </DetailRow>
 
               {/* Due date — editable */}
-              <DetailRow label="Due date">
-                <label className="flex items-center gap-1.5 text-sm cursor-pointer hover:text-primary transition-colors">
-                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                  {workItem.due_date ? (
-                    format(new Date(workItem.due_date), "MMM d, yyyy")
-                  ) : (
-                    <span className="text-muted-foreground">None</span>
-                  )}
-                  <input
-                    type="date"
-                    value={workItem.due_date?.slice(0, 10) ?? ""}
-                    onChange={(e) =>
-                      updateItem.mutate(
-                        {
-                          due_date: e.target.value
-                            ? `${e.target.value}T00:00:00Z`
-                            : null,
-                        },
-                        {
-                          onSuccess: () =>
-                            qc.invalidateQueries({ queryKey: boardKeys.all }),
-                        },
-                      )
-                    }
-                    className="sr-only"
-                  />
-                </label>
+              <DetailRow label="Due date" fieldKey="due_date">
+                <DateField
+                  value={workItem.due_date ?? null}
+                  onChange={(due_date) =>
+                    updateItem.mutate(
+                      { due_date },
+                      { onSuccess: () => qc.invalidateQueries({ queryKey: boardKeys.all }) },
+                    )
+                  }
+                />
               </DetailRow>
 
               {/* Labels — chip input */}
-              <DetailRow label="Labels">
+              <DetailRow label="Labels" fieldKey="labels">
                 <LabelsEditor
                   labels={workItem.labels ?? []}
                   onSave={(labels) =>
@@ -1300,37 +1385,20 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
               </DetailRow>
 
               {/* Start date — editable */}
-              <DetailRow label="Start date">
-                <label className="flex items-center gap-1.5 text-sm cursor-pointer hover:text-primary transition-colors">
-                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                  {workItem.start_date ? (
-                    format(new Date(workItem.start_date), "MMM d, yyyy")
-                  ) : (
-                    <span className="text-muted-foreground">None</span>
-                  )}
-                  <input
-                    type="date"
-                    value={workItem.start_date?.slice(0, 10) ?? ""}
-                    onChange={(e) =>
-                      updateItem.mutate(
-                        {
-                          start_date: e.target.value
-                            ? `${e.target.value}T00:00:00Z`
-                            : null,
-                        },
-                        {
-                          onSuccess: () =>
-                            qc.invalidateQueries({ queryKey: boardKeys.all }),
-                        },
-                      )
-                    }
-                    className="sr-only"
-                  />
-                </label>
+              <DetailRow label="Start date" fieldKey="start_date">
+                <DateField
+                  value={workItem.start_date ?? null}
+                  onChange={(start_date) =>
+                    updateItem.mutate(
+                      { start_date },
+                      { onSuccess: () => qc.invalidateQueries({ queryKey: boardKeys.all }) },
+                    )
+                  }
+                />
               </DetailRow>
 
               {/* Sprint — editable dropdown */}
-              <DetailRow label="Sprint">
+              <DetailRow label="Sprint" fieldKey="sprint">
                 <DropdownMenuPrimitive.Root>
                   <DropdownMenuPrimitive.Trigger asChild>
                     <button
@@ -1383,7 +1451,7 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
               </DetailRow>
 
               {/* Story point estimate */}
-              <DetailRow label="Story points">
+              <DetailRow label="Story points" fieldKey="story_points">
                 <DropdownMenuPrimitive.Root>
                   <DropdownMenuPrimitive.Trigger asChild>
                     <button
@@ -1435,7 +1503,7 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
               </DetailRow>
 
               {/* GitHub repo — inline text input */}
-              <DetailRow label="GitHub repo">
+              <DetailRow label="GitHub repo" fieldKey="github_repo">
                 <InlineTextEditor
                   value={workItem.github_repo ?? ""}
                   placeholder="owner/repo"
@@ -1450,7 +1518,7 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
               </DetailRow>
 
               {/* GitHub branch — inline text input */}
-              <DetailRow label="GitHub branch">
+              <DetailRow label="GitHub branch" fieldKey="github_branch">
                 <InlineTextEditor
                   value={workItem.github_branch ?? ""}
                   placeholder="branch-name"
@@ -1465,7 +1533,7 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
               </DetailRow>
 
               {/* GitHub PR — inline text/link */}
-              <DetailRow label="GitHub PR">
+              <DetailRow label="GitHub PR" fieldKey="github_pr">
                 <GithubPrEditor
                   value={workItem.github_pr ?? ""}
                   onSave={(val) =>
@@ -1478,7 +1546,7 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
               </DetailRow>
 
               {/* Reporter */}
-              <DetailRow label="Reporter">
+              <DetailRow label="Reporter" fieldKey="reporter">
                 <div className="flex items-center gap-1.5">
                   <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center">
                     <span className="text-[9px] font-bold text-primary-foreground">
@@ -1489,6 +1557,7 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
                 </div>
               </DetailRow>
             </div>
+            </PinContext.Provider>
 
             {/* Timestamps */}
             <div className="px-3 py-2.5 border-t text-xs text-muted-foreground space-y-0.5">
@@ -1517,9 +1586,9 @@ function SheetWrapper({
 }) {
   // Resizable width — persisted across opens (desktop only; mobile is always full-width).
   const [width, setWidth] = useState<number>(() => {
-    if (typeof window === "undefined") return 768;
+    if (typeof window === "undefined") return 920;
     const saved = Number(localStorage.getItem("mml_sheet_width"));
-    return saved >= 480 ? saved : 768;
+    return saved >= 480 ? saved : 920;
   });
   const dragging = useRef(false);
   // Track the most recent width in a ref so the mouseup handler can save it

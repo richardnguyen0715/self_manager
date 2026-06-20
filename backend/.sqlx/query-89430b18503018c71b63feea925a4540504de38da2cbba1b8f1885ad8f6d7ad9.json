@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            wi.id,\n            wi.project_id,\n            wi.epic_id,\n            wi.sprint_id,\n            wi.type::text      AS \"item_type!\",\n            wi.title,\n            wi.status::text    AS \"status!\",\n            wi.priority::text  AS \"priority!\",\n            wi.story_points,\n            wi.start_date,\n            wi.due_date,\n            wi.position,\n            wi.column_id,\n            wi.labels          AS \"labels!: Vec<String>\",\n            wi.github_repo,\n            wi.github_branch,\n            wi.github_pr,\n            COUNT(s.id)                          AS \"subtask_count!: i64\",\n            COUNT(s.id) FILTER (WHERE s.is_done) AS \"done_subtask_count!: i64\",\n            wi.created_at,\n            wi.updated_at\n        FROM work_items wi\n        LEFT JOIN work_item_subtasks s ON s.work_item_id = wi.id\n        WHERE wi.sprint_id = $1\n          AND ($2::text IS NULL OR wi.status::text = $2)\n        GROUP BY wi.id\n        ORDER BY wi.position ASC, wi.created_at ASC\n        ",
+  "query": "\n        SELECT\n            wi.id,\n            wi.project_id,\n            wi.epic_id,\n            wi.sprint_id,\n            wi.type::text      AS \"item_type!\",\n            wi.title,\n            wi.status::text    AS \"status!\",\n            wi.priority::text  AS \"priority!\",\n            wi.story_points,\n            wi.start_date,\n            wi.due_date,\n            wi.position,\n            wi.column_id,\n            wi.labels          AS \"labels!: Vec<String>\",\n            wi.pinned_fields   AS \"pinned_fields!: Vec<String>\",\n            wi.github_repo,\n            wi.github_branch,\n            wi.github_pr,\n            COUNT(s.id)                          AS \"subtask_count!: i64\",\n            COUNT(s.id) FILTER (WHERE s.is_done) AS \"done_subtask_count!: i64\",\n            wi.created_at,\n            wi.updated_at\n        FROM work_items wi\n        LEFT JOIN work_item_subtasks s ON s.work_item_id = wi.id\n        WHERE wi.sprint_id = $1\n          AND ($2::text IS NULL OR wi.status::text = $2)\n        GROUP BY wi.id\n        ORDER BY wi.position ASC, wi.created_at ASC\n        ",
   "describe": {
     "columns": [
       {
@@ -75,36 +75,41 @@
       },
       {
         "ordinal": 14,
+        "name": "pinned_fields!: Vec<String>",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 15,
         "name": "github_repo",
         "type_info": "Text"
       },
       {
-        "ordinal": 15,
+        "ordinal": 16,
         "name": "github_branch",
         "type_info": "Text"
       },
       {
-        "ordinal": 16,
+        "ordinal": 17,
         "name": "github_pr",
         "type_info": "Text"
       },
       {
-        "ordinal": 17,
+        "ordinal": 18,
         "name": "subtask_count!: i64",
         "type_info": "Int8"
       },
       {
-        "ordinal": 18,
+        "ordinal": 19,
         "name": "done_subtask_count!: i64",
         "type_info": "Int8"
       },
       {
-        "ordinal": 19,
+        "ordinal": 20,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 20,
+        "ordinal": 21,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -130,6 +135,7 @@
       false,
       true,
       false,
+      false,
       true,
       true,
       true,
@@ -139,5 +145,5 @@
       false
     ]
   },
-  "hash": "9a60afe54dd774334b6cfb8a5abea527edf336a8fecb72320bb8a5f1e718e5b9"
+  "hash": "89430b18503018c71b63feea925a4540504de38da2cbba1b8f1885ad8f6d7ad9"
 }

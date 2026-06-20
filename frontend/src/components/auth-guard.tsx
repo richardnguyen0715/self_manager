@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth.store";
 
@@ -33,7 +33,24 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
+  // Wait for the persisted auth store to rehydrate from localStorage before
+  // making any redirect decision. Without this, a hard reload momentarily sees
+  // isAuthenticated=false and bounces the user /board -> /auth -> /dashboard,
+  // losing the page they were on.
+  const [hydrated, setHydrated] = useState(() =>
+    useAuthStore.persist.hasHydrated(),
+  );
+
   useEffect(() => {
+    setHydrated(useAuthStore.persist.hasHydrated());
+    const unsub = useAuthStore.persist.onFinishHydration(() =>
+      setHydrated(true),
+    );
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return; // don't decide until we know the real auth state
     const pub = isPublic(pathname);
     const pubReadonly = isPublicReadonly(pathname);
     if (!isAuthenticated && !pub) {
@@ -42,7 +59,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       // Only bounce authenticated users away from auth pages, not from public pages.
       router.replace("/dashboard");
     }
-  }, [isAuthenticated, pathname, router]);
+  }, [isAuthenticated, pathname, router, hydrated]);
 
   return <>{children}</>;
 }

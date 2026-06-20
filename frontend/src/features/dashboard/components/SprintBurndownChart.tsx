@@ -175,9 +175,9 @@ export function SprintBurndownChart({ burndown }: SprintBurndownChartProps) {
           role="img"
         >
           {/* Grid lines */}
-          {yTicks.map((t) => (
+          {yTicks.map((t, i) => (
             <line
-              key={t.label}
+              key={`grid-${i}`}
               x1={36}
               y1={t.y}
               x2={392}
@@ -190,9 +190,9 @@ export function SprintBurndownChart({ burndown }: SprintBurndownChartProps) {
           ))}
 
           {/* Y axis labels */}
-          {yTicks.map((t) => (
+          {yTicks.map((t, i) => (
             <text
-              key={t.label}
+              key={`yl-${i}`}
               x={32}
               y={t.y + 3.5}
               textAnchor="end"
@@ -205,9 +205,9 @@ export function SprintBurndownChart({ burndown }: SprintBurndownChartProps) {
           ))}
 
           {/* X axis labels */}
-          {xTicks.map((t) => (
+          {xTicks.map((t, i) => (
             <text
-              key={t.label}
+              key={`xl-${i}`}
               x={t.x}
               y={160 - 6}
               textAnchor="middle"

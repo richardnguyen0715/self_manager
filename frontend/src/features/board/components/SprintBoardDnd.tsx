@@ -8,6 +8,7 @@ import {
   KeyboardSensor,
   useSensor,
   useSensors,
+  useDroppable,
   closestCorners,
   type DragStartEvent,
   type DragOverEvent,
@@ -20,15 +21,49 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { createPortal } from "react-dom";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 import type { WorkItemListItem } from "@/types";
 import { BoardColumn } from "./BoardColumn";
 import { BoardCard } from "./BoardCard";
 import { useBoardStore, type BoardColumn as BoardColumnState } from "../store";
-import { useMoveItemToColumn, useReorderColumns, useCreateColumn } from "../hooks/useSprintBoard";
+import { useMoveItemToColumn, useReorderColumns, useCreateColumn, boardKeys } from "../hooks/useSprintBoard";
 import { matchesBoardFilters } from "./BoardFilters";
 import { useProjectStore } from "@/stores";
+import { useDeleteWorkItem } from "@/features/workitems/hooks/useWorkItems";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { AddColumnDialog } from "./AddColumnDialog";
+
+// ─── Delete drop-zone ───────────────────────────────────────────────────────
+// Appears while a card is being dragged; dropping a card here deletes it.
+
+function DeleteDropZone({ visible }: { visible: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: "delete-zone",
+    data: { type: "delete" },
+  });
+
+  if (!visible) return null;
+
+  return createPortal(
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "fixed left-4 top-24 z-50 flex w-44 flex-col items-center justify-center gap-1.5",
+        "rounded-xl border-2 border-dashed px-4 py-6 text-xs font-medium transition-all",
+        isOver
+          ? "border-destructive bg-destructive/15 text-destructive scale-105 shadow-lg"
+          : "border-destructive/40 bg-background/90 text-destructive/70 backdrop-blur",
+      )}
+      aria-label="Drop here to delete"
+    >
+      <Trash2 className={cn("h-6 w-6 transition-transform", isOver && "scale-110")} />
+      {isOver ? "Release to delete" : "Drag here to delete"}
+    </div>,
+    document.body,
+  );
+}
 
 // ─── Active drag state ────────────────────────────────────────────────────────
 
@@ -56,6 +91,9 @@ export function SprintBoardDnd({ sprintId }: SprintBoardDndProps) {
   const moveToColumn = useMoveItemToColumn();
   const reorderColumns = useReorderColumns();
   const createColumn = useCreateColumn();
+  const deleteItem = useDeleteWorkItem();
+  const confirm = useConfirm();
+  const qc = useQueryClient();
   const currentProjectId = useProjectStore((s) => s.currentProjectId);
 
   const [active, setActive] = useState<ActiveDrag | null>(null);
@@ -195,6 +233,29 @@ export function SprintBoardDnd({ sprintId }: SprintBoardDndProps) {
       // ── Card move ─────────────────────────────────────────────────────────
       if (activeData.type !== "board-card") return;
 
+      // ── Drop on delete zone → remove the work item ─────────────────────────
+      if (over.id === "delete-zone") {
+        const itemId = a.id as string;
+        void (async () => {
+          const ok = await confirm({
+            title: "Delete this work item?",
+            description: "This permanently deletes the item and its subtasks. This cannot be undone.",
+            confirmText: "Delete",
+            destructive: true,
+          });
+          // Restore the board from server regardless — the optimistic drag may
+          // have shuffled the item while passing over columns en route.
+          if (ok) {
+            deleteItem.mutate(itemId, {
+              onSettled: () => qc.invalidateQueries({ queryKey: boardKeys.all }),
+            });
+          } else {
+            qc.invalidateQueries({ queryKey: boardKeys.all });
+          }
+        })();
+        return;
+      }
+
       const currentCol = findColumnContainingItem(a.id as string);
       if (!currentCol) return;
 
@@ -242,7 +303,10 @@ export function SprintBoardDnd({ sprintId }: SprintBoardDndProps) {
         onDragOver={onDragOver}
         onDragEnd={onDragEnd}
       >
-        <div className="flex gap-4 h-full items-start pb-4 w-max min-w-full">
+        {/* Trash drop-zone — only while dragging a card */}
+        <DeleteDropZone visible={active?.kind === "card"} />
+
+        <div className="flex gap-4 h-full items-stretch pb-4 w-max min-w-full">
           {/* Column-level horizontal SortableContext for column drag-reorder */}
           <SortableContext
             items={columnIds}

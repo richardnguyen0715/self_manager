@@ -801,6 +801,7 @@ export interface WorkItem {
   github_repo: string | null;  // added by migration 0009
   github_branch: string | null; // added by migration 0009
   github_pr: string | null;    // added by migration 0009
+  pinned_fields: string[];     // text[] — added by migration 0010 (Details pinned to card)
   recurrence_rule: string | null;
   completed_at: string | null;
   created_at: string;
@@ -828,6 +829,7 @@ export interface WorkItemListItem {
   github_repo: string | null;  // added by migration 0009
   github_branch: string | null; // added by migration 0009
   github_pr: string | null;    // added by migration 0009
+  pinned_fields: string[];     // text[] — added by migration 0010 (Details pinned to card)
   position: number;
   subtask_count: number;
   done_subtask_count: number;

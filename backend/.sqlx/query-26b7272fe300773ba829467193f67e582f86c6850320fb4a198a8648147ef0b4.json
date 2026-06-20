@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        UPDATE work_items\n        SET\n            project_id      = $3,\n            epic_id         = $4,\n            sprint_id       = $5,\n            type            = ($6::text)::work_item_type,\n            title           = $7,\n            description     = $8,\n            status          = ($9::text)::work_item_status,\n            priority        = ($10::text)::task_priority,\n            story_points    = $11,\n            position        = $12,\n            start_date      = $13,\n            due_date        = $14,\n            recurrence_rule = $15,\n            completed_at    = $16,\n            labels          = $17,\n            github_repo     = $18,\n            github_branch   = $19,\n            github_pr       = $20,\n            updated_at      = now()\n        WHERE id = $1 AND user_id = $2\n        RETURNING\n            id, user_id, project_id, epic_id, sprint_id,\n            type::text     AS \"item_type!\",\n            title, description,\n            status::text   AS \"status!\",\n            priority::text AS \"priority!\",\n            story_points, position,\n            start_date, due_date, recurrence_rule, completed_at,\n            column_id,\n            labels AS \"labels!: Vec<String>\",\n            github_repo, github_branch, github_pr,\n            created_at, updated_at\n        ",
+  "query": "\n            UPDATE work_items\n            SET column_id  = $3,\n                status     = ($4::text)::work_item_status,\n                updated_at = now()\n            WHERE id = $1 AND user_id = $2\n            RETURNING\n                id, user_id, project_id, epic_id, sprint_id,\n                type::text     AS \"item_type!\",\n                title, description,\n                status::text   AS \"status!\",\n                priority::text AS \"priority!\",\n                story_points, position,\n                start_date, due_date, recurrence_rule, completed_at,\n                column_id,\n                labels AS \"labels!: Vec<String>\",\n                pinned_fields AS \"pinned_fields!: Vec<String>\",\n                github_repo, github_branch, github_pr,\n                created_at, updated_at\n            ",
   "describe": {
     "columns": [
       {
@@ -95,26 +95,31 @@
       },
       {
         "ordinal": 18,
+        "name": "pinned_fields!: Vec<String>",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 19,
         "name": "github_repo",
         "type_info": "Text"
       },
       {
-        "ordinal": 19,
+        "ordinal": 20,
         "name": "github_branch",
         "type_info": "Text"
       },
       {
-        "ordinal": 20,
+        "ordinal": 21,
         "name": "github_pr",
         "type_info": "Text"
       },
       {
-        "ordinal": 21,
+        "ordinal": 22,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 22,
+        "ordinal": 23,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -124,22 +129,6 @@
         "Uuid",
         "Uuid",
         "Uuid",
-        "Uuid",
-        "Uuid",
-        "Text",
-        "Text",
-        "Text",
-        "Text",
-        "Text",
-        "Int4",
-        "Int4",
-        "Timestamptz",
-        "Timestamptz",
-        "Text",
-        "Timestamptz",
-        "TextArray",
-        "Text",
-        "Text",
         "Text"
       ]
     },
@@ -162,6 +151,7 @@
       true,
       true,
       false,
+      false,
       true,
       true,
       true,
@@ -169,5 +159,5 @@
       false
     ]
   },
-  "hash": "a42468ce7eb77d2b7195c3f1264aed779e58d705813d939568a2aa8d987f3822"
+  "hash": "26b7272fe300773ba829467193f67e582f86c6850320fb4a198a8648147ef0b4"
 }
