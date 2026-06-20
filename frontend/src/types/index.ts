@@ -796,6 +796,11 @@ export interface WorkItem {
   story_points: number | null;
   position: number;
   due_date: string | null;
+  start_date: string | null;   // RFC 3339 — added by migration 0009
+  labels: string[];            // text[] — added by migration 0009
+  github_repo: string | null;  // added by migration 0009
+  github_branch: string | null; // added by migration 0009
+  github_pr: string | null;    // added by migration 0009
   recurrence_rule: string | null;
   completed_at: string | null;
   created_at: string;
@@ -818,6 +823,11 @@ export interface WorkItemListItem {
   priority: Priority;
   story_points: number | null;
   due_date: string | null;
+  start_date: string | null;   // RFC 3339 — added by migration 0009
+  labels: string[];            // text[] — added by migration 0009
+  github_repo: string | null;  // added by migration 0009
+  github_branch: string | null; // added by migration 0009
+  github_pr: string | null;    // added by migration 0009
   position: number;
   subtask_count: number;
   done_subtask_count: number;
@@ -982,6 +992,15 @@ export interface PageComment {
   id: string;
   page_id: string;
   user_id: string;
+  body: string;
+  created_at: string;
+}
+
+export interface WorkItemComment {
+  id: string;
+  work_item_id: string;
+  user_id: string;
+  author_name: string;
   body: string;
   created_at: string;
 }
@@ -1367,6 +1386,11 @@ export const API_ENDPOINTS = {
   // DELETE /api/work-items/:id/attachments/:att_id
   WORK_ITEM_ATTACHMENT_BY_ID: (id: string, attId: string) =>
     `/api/work-items/${id}/attachments/${attId}`,
+  // GET|POST /api/work-items/:id/comments
+  WORK_ITEM_COMMENTS: (id: string) => `/api/work-items/${id}/comments`,
+  // DELETE /api/work-items/:id/comments/:comment_id
+  WORK_ITEM_COMMENT_BY_ID: (id: string, commentId: string) =>
+    `/api/work-items/${id}/comments/${commentId}`,
 
   // ── Backlog (/api/backlog) ────────────────────────────────────────────────
   BACKLOG: "/api/backlog",

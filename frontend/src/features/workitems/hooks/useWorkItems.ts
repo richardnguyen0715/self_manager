@@ -12,6 +12,7 @@ import type {
   WorkItem,
   WorkItemListItem,
   WorkItemSubtask,
+  WorkItemComment,
   AgileListResponse,
   Epic,
   Sprint,
@@ -48,6 +49,7 @@ export const workItemKeys = {
   webLinks: (id: string) => [...workItemKeys.detail(id), "web-links"] as const,
   attachments: (id: string) =>
     [...workItemKeys.detail(id), "attachments"] as const,
+  comments: (id: string) => [...workItemKeys.detail(id), "comments"] as const,
 };
 
 function filtersToParams(
@@ -404,6 +406,47 @@ export function useDeleteAttachment(workItemId: string) {
         queryKey: workItemKeys.attachments(workItemId),
       });
       qc.invalidateQueries({ queryKey: workItemKeys.detail(workItemId) });
+    },
+  });
+}
+
+// ─── Work item comments ───────────────────────────────────────────────────────
+
+/** GET /api/work-items/:id/comments — WorkItemComment[] (oldest first) */
+export function useWorkItemComments(workItemId: string) {
+  return useQuery({
+    queryKey: workItemKeys.comments(workItemId),
+    queryFn: () =>
+      api.get<WorkItemComment[]>(API_ENDPOINTS.WORK_ITEM_COMMENTS(workItemId)),
+    enabled: Boolean(workItemId),
+  });
+}
+
+/** POST /api/work-items/:id/comments — { body } → WorkItemComment */
+export function useCreateWorkItemComment(workItemId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { body: string }) =>
+      api.post<WorkItemComment>(
+        API_ENDPOINTS.WORK_ITEM_COMMENTS(workItemId),
+        payload,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: workItemKeys.comments(workItemId) });
+    },
+  });
+}
+
+/** DELETE /api/work-items/:id/comments/:comment_id — 204 */
+export function useDeleteWorkItemComment(workItemId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId: string) =>
+      api.delete<void>(
+        API_ENDPOINTS.WORK_ITEM_COMMENT_BY_ID(workItemId, commentId),
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: workItemKeys.comments(workItemId) });
     },
   });
 }

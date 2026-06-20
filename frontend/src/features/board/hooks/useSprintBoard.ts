@@ -157,6 +157,11 @@ export function useMoveItemToColumn() {
           priority: wi.priority,
           story_points: wi.story_points,
           due_date: wi.due_date,
+          start_date: wi.start_date ?? null,
+          labels: wi.labels ?? [],
+          github_repo: wi.github_repo ?? null,
+          github_branch: wi.github_branch ?? null,
+          github_pr: wi.github_pr ?? null,
           position: wi.position,
           subtask_count: (wi.subtasks ?? []).length,
           done_subtask_count: (wi.subtasks ?? []).filter((s) => s.is_done)
@@ -221,6 +226,10 @@ export function useBoardItems(projectId: string | null) {
     if (!apiColumns) return;
 
     const firstColId = apiColumns[0]?.id ?? null;
+    // Build a set of all column IDs in the current scope so we can detect
+    // items whose column_id points to a column from a different scope (e.g.,
+    // a project-specific column when the board is in "All projects" mode).
+    const knownColumnIds = new Set(apiColumns.map((c) => c.id));
 
     const boardColumns: BoardColumn[] = apiColumns.map((col) => ({
       ...col,
@@ -230,6 +239,18 @@ export function useBoardItems(projectId: string | null) {
           if (item.column_id === col.id) return true;
           // null column_id items fall into the first column
           if (!item.column_id && col.id === firstColId) return true;
+          // Items whose column_id points to a column that is NOT in the
+          // current scope (e.g. a project-specific column while viewing "All
+          // projects") need a fallback: place them in the column whose
+          // mapped_status matches the item's status.  If no such column
+          // exists, fall back to the very first column so the item is never
+          // invisible.
+          if (item.column_id && !knownColumnIds.has(item.column_id)) {
+            const fallback =
+              apiColumns.find((c) => c.mapped_status === item.status) ??
+              apiColumns[0];
+            return col.id === (fallback?.id ?? firstColId);
+          }
           return false;
         })
         .sort((a, b) => a.position - b.position),
@@ -290,6 +311,7 @@ export function useSprintBoard(sprintId: string) {
     if (!apiColumns) return;
 
     const firstColId = apiColumns[0]?.id ?? null;
+    const knownColumnIds = new Set(apiColumns.map((c) => c.id));
 
     const boardColumns: BoardColumn[] = apiColumns.map((col) => ({
       ...col,
@@ -298,6 +320,13 @@ export function useSprintBoard(sprintId: string) {
         .filter((item) => {
           if (item.column_id === col.id) return true;
           if (!item.column_id && col.id === firstColId) return true;
+          // Fallback for items whose column_id belongs to a different scope
+          if (item.column_id && !knownColumnIds.has(item.column_id)) {
+            const fallback =
+              apiColumns.find((c) => c.mapped_status === item.status) ??
+              apiColumns[0];
+            return col.id === (fallback?.id ?? firstColId);
+          }
           return false;
         })
         .sort((a, b) => a.position - b.position),
@@ -343,6 +372,11 @@ export function useMoveItem() {
           priority: wi.priority,
           story_points: wi.story_points,
           due_date: wi.due_date,
+          start_date: wi.start_date ?? null,
+          labels: wi.labels ?? [],
+          github_repo: wi.github_repo ?? null,
+          github_branch: wi.github_branch ?? null,
+          github_pr: wi.github_pr ?? null,
           position: wi.position,
           subtask_count: (wi.subtasks ?? []).length,
           done_subtask_count: (wi.subtasks ?? []).filter((s) => s.is_done)
@@ -383,6 +417,11 @@ export function useCreateBoardItem(sprintId: string) {
         priority: wi.priority,
         story_points: wi.story_points,
         due_date: wi.due_date,
+        start_date: wi.start_date ?? null,
+        labels: wi.labels ?? [],
+        github_repo: wi.github_repo ?? null,
+        github_branch: wi.github_branch ?? null,
+        github_pr: wi.github_pr ?? null,
         position: wi.position,
         subtask_count: 0,
         done_subtask_count: 0,

@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH ins AS (\n            INSERT INTO work_item_comments (work_item_id, user_id, body)\n            VALUES ($1, $2, $3)\n            RETURNING id, work_item_id, user_id, body, created_at\n        )\n        SELECT\n            ins.id,\n            ins.work_item_id,\n            ins.user_id,\n            u.display_name AS \"author_name!\",\n            ins.body,\n            ins.created_at\n        FROM ins\n        JOIN users u ON u.id = ins.user_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "work_item_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "author_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "body",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "139280163e0b289dd10b72ed9bb637afc7db5a7fd542e4702ebafc0084e9e011"
+}

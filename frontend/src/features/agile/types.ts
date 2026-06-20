@@ -20,6 +20,11 @@ export interface CreateWorkItemPayload {
   priority?: Priority;
   story_points?: number | null;
   due_date?: string | null;
+  start_date?: string | null;
+  labels?: string[];
+  github_repo?: string | null;
+  github_branch?: string | null;
+  github_pr?: string | null;
   recurrence_rule?: string | null;
 }
 

@@ -1,6 +1,6 @@
 //! Data models and DTOs for the `work_item` module.
 //!
-//! # DB schema (from `migrations/0003_agile.sql`)
+//! # DB schema (from `migrations/0003_agile.sql` + `0009_workitem_details.sql`)
 //!
 //! ```sql
 //! work_items (
@@ -15,9 +15,14 @@
 //!   priority        task_priority NOT NULL DEFAULT 'medium',
 //!   story_points    int CHECK (story_points IN (1,3,5,8)),
 //!   position        int NOT NULL DEFAULT 0,
+//!   start_date      timestamptz,
 //!   due_date        timestamptz,
 //!   recurrence_rule text,
 //!   completed_at    timestamptz,
+//!   labels          text[] NOT NULL DEFAULT '{}',
+//!   github_repo     text,
+//!   github_branch   text,
+//!   github_pr       text,
 //!   created_at      timestamptz NOT NULL DEFAULT now(),
 //!   updated_at      timestamptz NOT NULL DEFAULT now()
 //! )
@@ -30,6 +35,14 @@
 //!   position     int NOT NULL DEFAULT 0,
 //!   created_at   timestamptz NOT NULL DEFAULT now(),
 //!   updated_at   timestamptz NOT NULL DEFAULT now()
+//! )
+//!
+//! work_item_comments (
+//!   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+//!   work_item_id uuid NOT NULL REFERENCES work_items(id) ON DELETE CASCADE,
+//!   user_id      uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+//!   body         text NOT NULL,
+//!   created_at   timestamptz NOT NULL DEFAULT now()
 //! )
 //! ```
 //!
@@ -65,11 +78,16 @@ pub struct WorkItem {
     pub priority: String,
     pub story_points: Option<i32>,
     pub position: i32,
+    pub start_date: Option<DateTime<Utc>>,
     pub due_date: Option<DateTime<Utc>>,
     pub recurrence_rule: Option<String>,
     pub completed_at: Option<DateTime<Utc>>,
     /// Board column assignment; `None` until the board is first opened (lazy seed).
     pub column_id: Option<Uuid>,
+    pub labels: Vec<String>,
+    pub github_repo: Option<String>,
+    pub github_branch: Option<String>,
+    pub github_pr: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -107,11 +125,16 @@ pub struct WorkItemResponse {
     pub priority: String,
     pub story_points: Option<i32>,
     pub position: i32,
+    pub start_date: Option<DateTime<Utc>>,
     pub due_date: Option<DateTime<Utc>>,
     pub recurrence_rule: Option<String>,
     pub completed_at: Option<DateTime<Utc>>,
     /// Board column assignment.
     pub column_id: Option<Uuid>,
+    pub labels: Vec<String>,
+    pub github_repo: Option<String>,
+    pub github_branch: Option<String>,
+    pub github_pr: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub subtasks: Vec<WorkItemSubtask>,
@@ -132,10 +155,15 @@ pub struct WorkItemListItem {
     pub status: String,
     pub priority: String,
     pub story_points: Option<i32>,
+    pub start_date: Option<DateTime<Utc>>,
     pub due_date: Option<DateTime<Utc>>,
     pub position: i32,
     /// Board column assignment.
     pub column_id: Option<Uuid>,
+    pub labels: Vec<String>,
+    pub github_repo: Option<String>,
+    pub github_branch: Option<String>,
+    pub github_pr: Option<String>,
     pub subtask_count: i64,
     pub done_subtask_count: i64,
     pub created_at: DateTime<Utc>,
@@ -281,12 +309,28 @@ pub struct CreateWorkItemRequest {
     /// Story points estimate; must be 1, 3, 5, or 8.
     pub story_points: Option<i32>,
 
+    /// Optional start date (RFC 3339 timestamp).
+    pub start_date: Option<DateTime<Utc>>,
+
     /// Optional due date (RFC 3339 timestamp).
     pub due_date: Option<DateTime<Utc>>,
 
     /// iCalendar RRULE string for recurring work items.
     #[validate(length(max = 500, message = "recurrence_rule must be ≤ 500 characters"))]
     pub recurrence_rule: Option<String>,
+
+    /// Free-form text labels.
+    #[serde(default)]
+    pub labels: Vec<String>,
+
+    /// GitHub repository name (e.g. `"owner/repo"`).
+    pub github_repo: Option<String>,
+
+    /// GitHub branch name.
+    pub github_branch: Option<String>,
+
+    /// GitHub pull-request URL or number.
+    pub github_pr: Option<String>,
 }
 
 /// Body for `PATCH /api/work-items/:id` — every field is optional.
@@ -315,10 +359,21 @@ pub struct UpdateWorkItemRequest {
 
     pub position: Option<i32>,
 
+    pub start_date: Option<DateTime<Utc>>,
+
     pub due_date: Option<DateTime<Utc>>,
 
     #[validate(length(max = 500, message = "recurrence_rule must be ≤ 500 characters"))]
     pub recurrence_rule: Option<String>,
+
+    /// When present, replaces the entire labels array.
+    pub labels: Option<Vec<String>>,
+
+    pub github_repo: Option<String>,
+
+    pub github_branch: Option<String>,
+
+    pub github_pr: Option<String>,
 }
 
 /// Body for `PATCH /api/work-items/:id/status`.
@@ -472,6 +527,30 @@ pub struct CreateWebLinkRequest {
     /// Optional human-readable label.
     #[validate(length(max = 500, message = "title must be ≤ 500 characters"))]
     pub title: Option<String>,
+}
+
+// ── Comments ───────────────────────────────────────────────────────────────────
+
+/// A `work_item_comments` row joined with the author's `display_name`.
+///
+/// Returned by the comments collection endpoints.
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct WorkItemComment {
+    pub id: Uuid,
+    pub work_item_id: Uuid,
+    pub user_id: Uuid,
+    /// `display_name` of the comment author (joined from `users`).
+    pub author_name: String,
+    pub body: String,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Body for `POST /api/work-items/:id/comments`.
+#[derive(Debug, Deserialize, Validate)]
+pub struct CreateCommentRequest {
+    /// Comment body; 1–10 000 characters.
+    #[validate(length(min = 1, max = 10_000, message = "body must be 1–10 000 characters"))]
+    pub body: String,
 }
 
 // ── Query parameters ───────────────────────────────────────────────────────────

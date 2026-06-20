@@ -23,6 +23,9 @@ export {
   useCreateWorkItemSubtask,
   useUpdateWorkItemSubtask,
   useDeleteWorkItemSubtask,
+  useWorkItemComments,
+  useCreateWorkItemComment,
+  useDeleteWorkItemComment,
   workItemKeys,
 } from "./hooks/useWorkItems";
 

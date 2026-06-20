@@ -26,6 +26,9 @@
 //! GET    /api/work-items/:id/attachments              list_attachments
 //! POST   /api/work-items/:id/attachments              create_attachment
 //! DELETE /api/work-items/:id/attachments/:att_id      delete_attachment
+//! GET    /api/work-items/:id/comments                 list_comments
+//! POST   /api/work-items/:id/comments                 create_comment
+//! DELETE /api/work-items/:id/comments/:comment_id     delete_comment
 //! ```
 
 use axum::{
@@ -100,5 +103,14 @@ pub fn router() -> Router<AppState> {
         .route(
             "/:id/attachments/:att_id",
             delete(handlers::delete_attachment),
+        )
+        // Sub-resource: comments
+        .route(
+            "/:id/comments",
+            get(handlers::list_comments).post(handlers::create_comment),
+        )
+        .route(
+            "/:id/comments/:comment_id",
+            delete(handlers::delete_comment),
         )
 }

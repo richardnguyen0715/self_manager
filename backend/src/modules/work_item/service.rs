@@ -20,11 +20,11 @@ use crate::shared::{
 };
 
 use super::models::{
-    Attachment, AttachmentRow, CreateLinkRequest, CreateSubtaskRequest, CreateWebLinkRequest,
-    CreateWorkItemRequest, ListWorkItemsQuery, MoveToBacklogRequest, MoveToSprintRequest,
-    SetColumnRequest, SetPointsRequest, SetStatusRequest, UpdateSubtaskRequest,
-    UpdateWorkItemRequest, WebLink, WorkItem, WorkItemLink, WorkItemListItem, WorkItemListResponse,
-    WorkItemResponse, WorkItemSubtask,
+    Attachment, AttachmentRow, CreateCommentRequest, CreateLinkRequest, CreateSubtaskRequest,
+    CreateWebLinkRequest, CreateWorkItemRequest, ListWorkItemsQuery, MoveToBacklogRequest,
+    MoveToSprintRequest, SetColumnRequest, SetPointsRequest, SetStatusRequest,
+    UpdateSubtaskRequest, UpdateWorkItemRequest, WebLink, WorkItem, WorkItemComment,
+    WorkItemLink, WorkItemListItem, WorkItemListResponse, WorkItemResponse, WorkItemSubtask,
 };
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -66,8 +66,10 @@ async fn fetch_work_item_with_subtasks(
             status::text   AS "status!",
             priority::text AS "priority!",
             story_points, position,
-            due_date, recurrence_rule, completed_at,
+            start_date, due_date, recurrence_rule, completed_at,
             column_id,
+            labels AS "labels!: Vec<String>",
+            github_repo, github_branch, github_pr,
             created_at, updated_at
         FROM work_items
         WHERE id = $1 AND user_id = $2
@@ -110,10 +112,15 @@ fn work_item_into_response(item: WorkItem, subtasks: Vec<WorkItemSubtask>) -> Wo
         priority: item.priority,
         story_points: item.story_points,
         position: item.position,
+        start_date: item.start_date,
         due_date: item.due_date,
         recurrence_rule: item.recurrence_rule,
         completed_at: item.completed_at,
         column_id: item.column_id,
+        labels: item.labels,
+        github_repo: item.github_repo,
+        github_branch: item.github_branch,
+        github_pr: item.github_pr,
         created_at: item.created_at,
         updated_at: item.updated_at,
         subtasks,
@@ -167,9 +174,14 @@ pub async fn list_work_items(
             wi.status::text    AS "status!",
             wi.priority::text  AS "priority!",
             wi.story_points,
+            wi.start_date,
             wi.due_date,
             wi.position,
             wi.column_id,
+            wi.labels          AS "labels!: Vec<String>",
+            wi.github_repo,
+            wi.github_branch,
+            wi.github_pr,
             COUNT(s.id)                          AS "subtask_count!: i64",
             COUNT(s.id) FILTER (WHERE s.is_done) AS "done_subtask_count!: i64",
             wi.created_at,
@@ -265,7 +277,9 @@ pub async fn create_work_item(
         r#"
         INSERT INTO work_items (
             user_id, project_id, epic_id, sprint_id, type, title, description,
-            status, priority, story_points, position, due_date, recurrence_rule
+            status, priority, story_points, position,
+            start_date, due_date, recurrence_rule,
+            labels, github_repo, github_branch, github_pr
         )
         VALUES (
             $1, $2, $3, $4,
@@ -273,7 +287,7 @@ pub async fn create_work_item(
             $6, $7,
             ($8::text)::work_item_status,
             ($9::text)::task_priority,
-            $10, $11, $12, $13
+            $10, $11, $12, $13, $14, $15, $16, $17, $18
         )
         RETURNING
             id, user_id, project_id, epic_id, sprint_id,
@@ -282,8 +296,10 @@ pub async fn create_work_item(
             status::text   AS "status!",
             priority::text AS "priority!",
             story_points, position,
-            due_date, recurrence_rule, completed_at,
+            start_date, due_date, recurrence_rule, completed_at,
             column_id,
+            labels AS "labels!: Vec<String>",
+            github_repo, github_branch, github_pr,
             created_at, updated_at
         "#,
         user_id,
@@ -297,8 +313,13 @@ pub async fn create_work_item(
         priority,
         req.story_points,
         position,
+        req.start_date,
         req.due_date,
         req.recurrence_rule,
+        &req.labels as &[String],
+        req.github_repo,
+        req.github_branch,
+        req.github_pr,
     )
     .fetch_one(&state.db)
     .await?;
@@ -348,8 +369,10 @@ pub async fn update_work_item(
             status::text   AS "status!",
             priority::text AS "priority!",
             story_points, position,
-            due_date, recurrence_rule, completed_at,
+            start_date, due_date, recurrence_rule, completed_at,
             column_id,
+            labels AS "labels!: Vec<String>",
+            github_repo, github_branch, github_pr,
             created_at, updated_at
         FROM work_items
         WHERE id = $1 AND user_id = $2
@@ -428,6 +451,28 @@ pub async fn update_work_item(
         current.sprint_id
     };
 
+    let new_start_date = if req.start_date.is_some() {
+        req.start_date
+    } else {
+        current.start_date
+    };
+    let new_labels = req.labels.as_deref().unwrap_or(&current.labels).to_vec();
+    let new_github_repo = if req.github_repo.is_some() {
+        req.github_repo.clone()
+    } else {
+        current.github_repo.clone()
+    };
+    let new_github_branch = if req.github_branch.is_some() {
+        req.github_branch.clone()
+    } else {
+        current.github_branch.clone()
+    };
+    let new_github_pr = if req.github_pr.is_some() {
+        req.github_pr.clone()
+    } else {
+        current.github_pr.clone()
+    };
+
     // Set `completed_at` when transitioning TO done; clear when transitioning away.
     let new_completed_at = if new_status == "done" && current.status != "done" {
         Some(Utc::now())
@@ -452,9 +497,14 @@ pub async fn update_work_item(
             priority        = ($10::text)::task_priority,
             story_points    = $11,
             position        = $12,
-            due_date        = $13,
-            recurrence_rule = $14,
-            completed_at    = $15,
+            start_date      = $13,
+            due_date        = $14,
+            recurrence_rule = $15,
+            completed_at    = $16,
+            labels          = $17,
+            github_repo     = $18,
+            github_branch   = $19,
+            github_pr       = $20,
             updated_at      = now()
         WHERE id = $1 AND user_id = $2
         RETURNING
@@ -464,8 +514,10 @@ pub async fn update_work_item(
             status::text   AS "status!",
             priority::text AS "priority!",
             story_points, position,
-            due_date, recurrence_rule, completed_at,
+            start_date, due_date, recurrence_rule, completed_at,
             column_id,
+            labels AS "labels!: Vec<String>",
+            github_repo, github_branch, github_pr,
             created_at, updated_at
         "#,
         item_id,
@@ -480,9 +532,14 @@ pub async fn update_work_item(
         new_priority,
         new_story_points,
         new_position,
+        new_start_date,
         new_due_date,
         new_recurrence,
         new_completed_at,
+        &new_labels as &[String],
+        new_github_repo,
+        new_github_branch,
+        new_github_pr,
     )
     .fetch_optional(&state.db)
     .await?
@@ -601,8 +658,10 @@ pub async fn set_status(
             status::text   AS "status!",
             priority::text AS "priority!",
             story_points, position,
-            due_date, recurrence_rule, completed_at,
+            start_date, due_date, recurrence_rule, completed_at,
             column_id,
+            labels AS "labels!: Vec<String>",
+            github_repo, github_branch, github_pr,
             created_at, updated_at
         "#,
         item_id,
@@ -668,8 +727,10 @@ pub async fn set_points(
             status::text   AS "status!",
             priority::text AS "priority!",
             story_points, position,
-            due_date, recurrence_rule, completed_at,
+            start_date, due_date, recurrence_rule, completed_at,
             column_id,
+            labels AS "labels!: Vec<String>",
+            github_repo, github_branch, github_pr,
             created_at, updated_at
         "#,
         item_id,
@@ -784,8 +845,10 @@ pub async fn move_to_sprint(
             status::text   AS "status!",
             priority::text AS "priority!",
             story_points, position,
-            due_date, recurrence_rule, completed_at,
+            start_date, due_date, recurrence_rule, completed_at,
             column_id,
+            labels AS "labels!: Vec<String>",
+            github_repo, github_branch, github_pr,
             created_at, updated_at
         "#,
         item_id,
@@ -840,8 +903,10 @@ pub async fn move_to_backlog(
             status::text   AS "status!",
             priority::text AS "priority!",
             story_points, position,
-            due_date, recurrence_rule, completed_at,
+            start_date, due_date, recurrence_rule, completed_at,
             column_id,
+            labels AS "labels!: Vec<String>",
+            github_repo, github_branch, github_pr,
             created_at, updated_at
         "#,
         item_id,
@@ -1152,8 +1217,10 @@ pub async fn set_column(
                 status::text   AS "status!",
                 priority::text AS "priority!",
                 story_points, position,
-                due_date, recurrence_rule, completed_at,
+                start_date, due_date, recurrence_rule, completed_at,
                 column_id,
+                labels AS "labels!: Vec<String>",
+                github_repo, github_branch, github_pr,
                 created_at, updated_at
             "#,
             item_id,
@@ -1179,8 +1246,10 @@ pub async fn set_column(
                 status::text   AS "status!",
                 priority::text AS "priority!",
                 story_points, position,
-                due_date, recurrence_rule, completed_at,
+                start_date, due_date, recurrence_rule, completed_at,
                 column_id,
+                labels AS "labels!: Vec<String>",
+                github_repo, github_branch, github_pr,
                 created_at, updated_at
             "#,
             item_id,
@@ -1252,9 +1321,14 @@ pub async fn list_items_for_sprint(
             wi.status::text    AS "status!",
             wi.priority::text  AS "priority!",
             wi.story_points,
+            wi.start_date,
             wi.due_date,
             wi.position,
             wi.column_id,
+            wi.labels          AS "labels!: Vec<String>",
+            wi.github_repo,
+            wi.github_branch,
+            wi.github_pr,
             COUNT(s.id)                          AS "subtask_count!: i64",
             COUNT(s.id) FILTER (WHERE s.is_done) AS "done_subtask_count!: i64",
             wi.created_at,
@@ -1330,9 +1404,14 @@ pub async fn list_items_for_epic(
             wi.status::text    AS "status!",
             wi.priority::text  AS "priority!",
             wi.story_points,
+            wi.start_date,
             wi.due_date,
             wi.position,
             wi.column_id,
+            wi.labels          AS "labels!: Vec<String>",
+            wi.github_repo,
+            wi.github_branch,
+            wi.github_pr,
             COUNT(s.id)                          AS "subtask_count!: i64",
             COUNT(s.id) FILTER (WHERE s.is_done) AS "done_subtask_count!: i64",
             wi.created_at,
@@ -1864,6 +1943,158 @@ pub async fn delete_attachment(
     // Best-effort file removal — ignore errors so the DB row is still gone.
     let full_path = uploads_dir.join(&row.stored_path);
     let _ = tokio::fs::remove_file(&full_path).await;
+
+    Ok(())
+}
+
+// ── Comments ───────────────────────────────────────────────────────────────────
+
+/// List all comments for a work item, verifying ownership of the parent item.
+///
+/// Returns comments ordered by `created_at ASC`, each joined with the author's
+/// `display_name` from the `users` table.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — work item not found or not owned by the user.
+/// - [`AppError::Db`] — database failure.
+pub async fn list_comments(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+) -> AppResult<Vec<WorkItemComment>> {
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    let rows = sqlx::query_as!(
+        WorkItemComment,
+        r#"
+        SELECT
+            c.id,
+            c.work_item_id,
+            c.user_id,
+            u.display_name AS "author_name!",
+            c.body,
+            c.created_at
+        FROM work_item_comments c
+        JOIN users u ON u.id = c.user_id
+        WHERE c.work_item_id = $1
+        ORDER BY c.created_at ASC
+        "#,
+        item_id,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(rows)
+}
+
+/// Add a comment to a work item.
+///
+/// The comment is attributed to `user_id` (the authenticated caller).
+/// Returns the newly created comment, including the author's `display_name`.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — work item not found or not owned by the user.
+/// - [`AppError::Db`] — database failure.
+pub async fn create_comment(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    req: CreateCommentRequest,
+) -> AppResult<WorkItemComment> {
+    let exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !exists {
+        return Err(AppError::NotFound);
+    }
+
+    let comment = sqlx::query_as!(
+        WorkItemComment,
+        r#"
+        WITH ins AS (
+            INSERT INTO work_item_comments (work_item_id, user_id, body)
+            VALUES ($1, $2, $3)
+            RETURNING id, work_item_id, user_id, body, created_at
+        )
+        SELECT
+            ins.id,
+            ins.work_item_id,
+            ins.user_id,
+            u.display_name AS "author_name!",
+            ins.body,
+            ins.created_at
+        FROM ins
+        JOIN users u ON u.id = ins.user_id
+        "#,
+        item_id,
+        user_id,
+        req.body,
+    )
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(comment)
+}
+
+/// Delete a comment, verifying that the comment belongs to the authenticated user
+/// and that the parent work item is also owned by that user.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — comment or parent work item not found / not owned.
+/// - [`AppError::Db`] — database failure.
+pub async fn delete_comment(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+    comment_id: Uuid,
+) -> AppResult<()> {
+    // Verify work item ownership.
+    let item_exists: bool = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        item_id,
+        user_id,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(false);
+
+    if !item_exists {
+        return Err(AppError::NotFound);
+    }
+
+    // Delete only the comment row that belongs to this user.
+    let result = sqlx::query!(
+        "DELETE FROM work_item_comments WHERE id = $1 AND work_item_id = $2 AND user_id = $3",
+        comment_id,
+        item_id,
+        user_id,
+    )
+    .execute(&state.db)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
 
     Ok(())
 }

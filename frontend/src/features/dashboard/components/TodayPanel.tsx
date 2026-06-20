@@ -31,13 +31,18 @@ interface TodayPanelProps {
 export function TodayPanel({ summary }: TodayPanelProps) {
   const { activePanel, setActivePanel } = useDashboardUIStore();
 
+  const tasks = summary.tasks ?? [];
+  const habits = summary.habits ?? [];
+  const events = summary.events ?? [];
+  const timeBlocks = summary.time_blocks ?? [];
+
   const tabs: TabConfig[] = useMemo(
     () => [
       {
         id: "tasks",
         label: "Tasks",
         icon: CheckSquare,
-        count: summary.tasks.filter(
+        count: tasks.filter(
           (t) => t.status !== "completed" && t.status !== "archived",
         ).length,
       },
@@ -45,22 +50,22 @@ export function TodayPanel({ summary }: TodayPanelProps) {
         id: "habits",
         label: "Habits",
         icon: Repeat2,
-        count: summary.habits.length,
+        count: habits.length,
       },
       {
         id: "events",
         label: "Events",
         icon: CalendarDays,
-        count: summary.events.length,
+        count: events.length,
       },
       {
         id: "time-blocks",
         label: "Time Blocks",
         icon: Clock,
-        count: summary.time_blocks.length,
+        count: timeBlocks.length,
       },
     ],
-    [summary],
+    [tasks, habits, events, timeBlocks],
   );
 
   return (
@@ -120,7 +125,7 @@ export function TodayPanel({ summary }: TodayPanelProps) {
           hidden={activePanel !== "tasks"}
         >
           {activePanel === "tasks" && (
-            <TodayTasksPanel tasks={summary.tasks} />
+            <TodayTasksPanel tasks={tasks} />
           )}
         </div>
 
@@ -131,7 +136,7 @@ export function TodayPanel({ summary }: TodayPanelProps) {
           hidden={activePanel !== "habits"}
         >
           {activePanel === "habits" && (
-            <TodayHabitsPanel habits={summary.habits} />
+            <TodayHabitsPanel habits={habits} />
           )}
         </div>
 
@@ -142,7 +147,7 @@ export function TodayPanel({ summary }: TodayPanelProps) {
           hidden={activePanel !== "events"}
         >
           {activePanel === "events" && (
-            <TodayEventsPanel events={summary.events} />
+            <TodayEventsPanel events={events} />
           )}
         </div>
 
@@ -153,7 +158,7 @@ export function TodayPanel({ summary }: TodayPanelProps) {
           hidden={activePanel !== "time-blocks"}
         >
           {activePanel === "time-blocks" && (
-            <TodayTimeBlocksPanel blocks={summary.time_blocks} />
+            <TodayTimeBlocksPanel blocks={timeBlocks} />
           )}
         </div>
       </CardContent>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import {
   ChevronRight,
   Plus,
@@ -19,6 +19,15 @@ import {
   Pencil,
   Check,
   X,
+  Send,
+  Trash2,
+  MessageSquare,
+  History,
+  Clock,
+  SquareKanban,
+  GitBranch,
+  Github,
+  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -37,10 +46,17 @@ import {
   useEpic,
   useSprint,
 } from "@/features/agile";
+import { useEpics } from "@/features/agile/hooks/useEpics";
+import { useSprintsList } from "@/features/sprints/hooks/useSprints";
+import {
+  useWorkItemComments,
+  useCreateWorkItemComment,
+  useDeleteWorkItemComment,
+} from "@/features/workitems/hooks/useWorkItems";
 import { WorkItemTypeBadge } from "@/features/agile/components/WorkItemTypeBadge";
 import { useBoardStore } from "../store";
 import { boardKeys } from "../hooks/useSprintBoard";
-import type { WorkItemStatus, WorkItemSubtask, Priority } from "@/types";
+import type { WorkItemStatus, WorkItemSubtask, WorkItemComment, Priority } from "@/types";
 import { useAuthStore } from "@/stores";
 import { useQueryClient } from "@tanstack/react-query";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -109,6 +125,223 @@ const PRIORITY_LABELS: Record<Priority, string> = {
 // ─── Story point options ──────────────────────────────────────────────────────
 
 const STORY_POINTS = [null, 1, 3, 5, 8] as const;
+
+// ─── Activity tabs ────────────────────────────────────────────────────────────
+
+type ActivityTab = "all" | "comments" | "history" | "worklog";
+
+const ACTIVITY_TABS: { value: ActivityTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { value: "all", label: "All", icon: SquareKanban },
+  { value: "comments", label: "Comments", icon: MessageSquare },
+  { value: "history", label: "History", icon: History },
+  { value: "worklog", label: "Work log", icon: Clock },
+];
+
+// ─── Inline text editor ───────────────────────────────────────────────────────
+
+interface InlineTextEditorProps {
+  value: string;
+  placeholder?: string;
+  icon?: React.ReactNode;
+  onSave: (value: string) => void;
+}
+
+function InlineTextEditor({ value, placeholder, icon, onSave }: InlineTextEditorProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  useEffect(() => {
+    if (!editing) setDraft(value);
+  }, [value, editing]);
+
+  function handleSave() {
+    if (draft !== value) onSave(draft.trim());
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        {icon}
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") { setDraft(value); setEditing(false); }
+          }}
+          placeholder={placeholder}
+          className="flex-1 bg-transparent border-b border-primary outline-none text-sm placeholder:text-muted-foreground/60"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="flex items-center gap-1.5 hover:text-primary transition-colors text-left w-full"
+      onClick={() => { setDraft(value); setEditing(true); }}
+    >
+      {icon}
+      {value ? (
+        <span className="text-sm truncate">{value}</span>
+      ) : (
+        <span className="text-sm text-muted-foreground">{placeholder ?? "None"}</span>
+      )}
+      <Pencil className="h-3 w-3 ml-auto opacity-0 text-muted-foreground shrink-0" />
+    </button>
+  );
+}
+
+// ─── GitHub PR editor (link when URL) ────────────────────────────────────────
+
+interface GithubPrEditorProps {
+  value: string;
+  onSave: (value: string) => void;
+  onMutateSuccess?: () => void;
+}
+
+function GithubPrEditor({ value, onSave }: GithubPrEditorProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  useEffect(() => {
+    if (!editing) setDraft(value);
+  }, [value, editing]);
+
+  function handleSave() {
+    if (draft !== value) onSave(draft.trim());
+    setEditing(false);
+  }
+
+  const isUrl = value.startsWith("http://") || value.startsWith("https://");
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <Github className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") { setDraft(value); setEditing(false); }
+          }}
+          placeholder="PR URL or number"
+          className="flex-1 bg-transparent border-b border-primary outline-none text-sm placeholder:text-muted-foreground/60"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Github className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      {value ? (
+        isUrl ? (
+          <a
+            href={value}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-primary hover:underline truncate flex-1"
+          >
+            {value}
+          </a>
+        ) : (
+          <span className="text-sm truncate flex-1">{value}</span>
+        )
+      ) : (
+        <span className="text-sm text-muted-foreground">None</span>
+      )}
+      <button
+        type="button"
+        onClick={() => { setDraft(value); setEditing(true); }}
+        className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
+        aria-label="Edit GitHub PR"
+      >
+        <Pencil className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
+// ─── Labels chip editor ───────────────────────────────────────────────────────
+
+interface LabelsEditorProps {
+  labels: string[];
+  onSave: (labels: string[]) => void;
+}
+
+function LabelsEditor({ labels, onSave }: LabelsEditorProps) {
+  const [inputValue, setInputValue] = useState("");
+
+  function addLabel() {
+    const trimmed = inputValue.trim();
+    if (!trimmed || labels.includes(trimmed)) {
+      setInputValue("");
+      return;
+    }
+    onSave([...labels, trimmed]);
+    setInputValue("");
+  }
+
+  function removeLabel(label: string) {
+    onSave(labels.filter((l) => l !== label));
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1 items-center">
+      {labels.map((label) => (
+        <span
+          key={label}
+          className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary border border-primary/20"
+        >
+          <Tag className="h-2.5 w-2.5 shrink-0" />
+          {label}
+          <button
+            type="button"
+            onClick={() => removeLabel(label)}
+            className="ml-0.5 hover:text-destructive transition-colors"
+            aria-label={`Remove ${label}`}
+          >
+            <X className="h-2.5 w-2.5" />
+          </button>
+        </span>
+      ))}
+      <input
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            addLabel();
+          }
+          if (e.key === "Backspace" && !inputValue && labels.length > 0) {
+            removeLabel(labels[labels.length - 1]);
+          }
+        }}
+        onBlur={addLabel}
+        placeholder={labels.length === 0 ? "Add label..." : "+"}
+        className="flex-1 min-w-[4rem] bg-transparent outline-none text-sm placeholder:text-muted-foreground/60"
+      />
+    </div>
+  );
+}
 
 // ─── Subtask row ──────────────────────────────────────────────────────────────
 
@@ -217,7 +450,159 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
   return (
     <div className="flex items-start gap-3 py-2.5">
       <span className="w-28 shrink-0 text-xs text-muted-foreground pt-0.5">{label}</span>
-      <div className="flex-1 text-sm">{children}</div>
+      <div className="flex-1 min-w-0 text-sm">{children}</div>
+    </div>
+  );
+}
+
+// ─── Comment item ─────────────────────────────────────────────────────────────
+
+function CommentItem({
+  comment,
+  currentUserId,
+  workItemId,
+}: {
+  comment: WorkItemComment;
+  currentUserId: string | undefined;
+  workItemId: string;
+}) {
+  const deleteComment = useDeleteWorkItemComment(workItemId);
+  const [deleting, setDeleting] = useState(false);
+  const isOwn = currentUserId === comment.user_id;
+
+  function handleDelete() {
+    setDeleting(true);
+    deleteComment.mutate(comment.id, { onSettled: () => setDeleting(false) });
+  }
+
+  return (
+    <div className="group relative flex gap-2.5 py-3 border-b border-border/50 last:border-0">
+      <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0 text-[10px] font-bold text-primary">
+        {isOwn ? (
+          <User className="h-3.5 w-3.5 text-primary" />
+        ) : (
+          <User className="h-3.5 w-3.5 text-muted-foreground" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold">{isOwn ? "You" : "Team member"}</span>
+          <span
+            className="text-xs text-muted-foreground"
+            title={format(new Date(comment.created_at), "MMM d, yyyy 'at' h:mm a")}
+          >
+            {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+          </span>
+        </div>
+        <p className="text-sm whitespace-pre-wrap break-words">{comment.body}</p>
+      </div>
+      {isOwn && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="absolute right-0 top-2.5 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+          onClick={handleDelete}
+          disabled={deleting}
+          aria-label="Delete comment"
+        >
+          {deleting ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+          )}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// ─── Comment compose box ──────────────────────────────────────────────────────
+
+function CommentCompose({
+  workItemId,
+  userInitial,
+}: {
+  workItemId: string;
+  userInitial: string;
+}) {
+  const createComment = useCreateWorkItemComment(workItemId);
+  const [body, setBody] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
+  }, [body]);
+
+  function handleSubmit() {
+    const trimmed = body.trim();
+    if (!trimmed || createComment.isPending) return;
+    createComment.mutate({ body: trimmed }, { onSuccess: () => setBody("") });
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  }
+
+  return (
+    <div className="flex items-start gap-2.5">
+      <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center shrink-0 text-[9px] font-bold text-primary-foreground">
+        {userInitial}
+      </div>
+      <div className="flex-1 space-y-2">
+        <div className="rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring overflow-hidden">
+          <textarea
+            ref={textareaRef}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Add a comment… (Cmd+Enter to post)"
+            rows={body ? 3 : 1}
+            className="w-full resize-none bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none min-h-[2.5rem] max-h-40"
+            disabled={createComment.isPending}
+          />
+          {body.trim() && (
+            <div className="flex items-center justify-between px-3 py-2 border-t border-border/50 bg-muted/30">
+              <span className="text-xs text-muted-foreground">Cmd+Enter to post</span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setBody("")}
+                  className="h-7"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSubmit}
+                  disabled={createComment.isPending || !body.trim()}
+                  className="h-7 gap-1.5"
+                >
+                  {createComment.isPending ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Send className="h-3 w-3" />
+                  )}
+                  Post
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+        {createComment.isError && (
+          <p className="text-xs text-destructive flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" />
+            Failed to post comment. Please try again.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -229,7 +614,7 @@ interface WorkItemDetailSheetProps {
   sprintId: string;
 }
 
-export function WorkItemDetailSheet({ sprintId }: WorkItemDetailSheetProps) {
+export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheetProps) {
   const { openItemId, closeItemDetail } = useBoardStore();
   const workItemId = openItemId ?? "";
   const qc = useQueryClient();
@@ -243,10 +628,14 @@ export function WorkItemDetailSheet({ sprintId }: WorkItemDetailSheetProps) {
 
   const { data: epic } = useEpic(workItem?.epic_id ?? "");
   const { data: sprint } = useSprint(workItem?.sprint_id ?? "");
+  const epicOptions = useEpics().data?.data ?? [];
+  const sprintOptions = useSprintsList().data?.data ?? [];
 
-  const [activityTab, setActivityTab] = useState<"all" | "comments" | "history" | "worklog">(
-    "all",
-  );
+  // Comments
+  const { data: commentsData, isLoading: commentsLoading } = useWorkItemComments(workItemId);
+  const comments = commentsData ?? [];
+
+  const [activityTab, setActivityTab] = useState<ActivityTab>("all");
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -290,6 +679,7 @@ export function WorkItemDetailSheet({ sprintId }: WorkItemDetailSheetProps) {
   const totalCount = subtasks.length;
   const progressPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
   const currentStatus = getStatusConf(workItem.status);
+  const userInitial = user?.display_name?.[0]?.toUpperCase() ?? "U";
 
   function handleTitleSave() {
     const trimmed = titleDraft.trim();
@@ -321,6 +711,8 @@ export function WorkItemDetailSheet({ sprintId }: WorkItemDetailSheetProps) {
       },
     );
   }
+
+  const showComments = activityTab === "all" || activityTab === "comments";
 
   return (
     <SheetWrapper onClose={closeItemDetail}>
@@ -609,47 +1001,80 @@ export function WorkItemDetailSheet({ sprintId }: WorkItemDetailSheetProps) {
 
               <Separator />
 
-              {/* Activity */}
+              {/* ── Activity ──────────────────────────────────────────────── */}
               <div className="space-y-3">
                 <h2 className="text-sm font-semibold">Activity</h2>
 
-                {/* Tabs */}
-                <div className="flex items-center gap-0 border-b border-border">
-                  {(
-                    [
-                      ["all", "All"],
-                      ["comments", "Comments"],
-                      ["history", "History"],
-                      ["worklog", "Work log"],
-                    ] as const
-                  ).map(([value, label]) => (
+                {/* Tab bar */}
+                <div className="flex items-center gap-0 border-b border-border" role="tablist">
+                  {ACTIVITY_TABS.map((tab) => (
                     <button
-                      key={value}
+                      key={tab.value}
                       type="button"
-                      onClick={() => setActivityTab(value)}
+                      role="tab"
+                      aria-selected={activityTab === tab.value}
+                      onClick={() => setActivityTab(tab.value)}
                       className={cn(
                         "px-3 py-1.5 text-sm font-medium transition-colors border-b-2 -mb-px",
-                        activityTab === value
+                        activityTab === tab.value
                           ? "border-primary text-foreground"
                           : "border-transparent text-muted-foreground hover:text-foreground",
                       )}
                     >
-                      {label}
+                      {tab.label}
                     </button>
                   ))}
                 </div>
 
-                {/* Comment box */}
-                <div className="flex items-start gap-2.5">
-                  <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center shrink-0">
-                    <span className="text-[9px] font-bold text-primary-foreground">
-                      {user?.display_name?.[0]?.toUpperCase() ?? "U"}
-                    </span>
+                {/* Comments: shown for "all" and "comments" tabs */}
+                {showComments && (
+                  <div className="space-y-3">
+                    {/* Compose box */}
+                    <CommentCompose workItemId={workItemId} userInitial={userInitial} />
+
+                    {/* Comment list */}
+                    {commentsLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : comments.length === 0 ? (
+                      <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground">
+                        <MessageSquare className="h-6 w-6 opacity-40" />
+                        <p className="font-medium">No comments yet</p>
+                        <p className="text-xs">Be the first to leave a comment.</p>
+                      </div>
+                    ) : (
+                      <div>
+                        {comments.map((comment) => (
+                          <CommentItem
+                            key={comment.id}
+                            comment={comment}
+                            currentUserId={user?.id}
+                            workItemId={workItemId}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex-1 rounded-md border border-input px-3 py-2 text-sm text-muted-foreground min-h-[2.5rem] cursor-text hover:border-ring transition-colors">
-                    Add a comment...
+                )}
+
+                {/* History tab — empty state */}
+                {activityTab === "history" && (
+                  <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground">
+                    <History className="h-6 w-6 opacity-40" />
+                    <p className="font-medium">No history recorded yet</p>
+                    <p className="text-xs">Field changes will appear here once history tracking is enabled.</p>
                   </div>
-                </div>
+                )}
+
+                {/* Work log tab — empty state */}
+                {activityTab === "worklog" && (
+                  <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground">
+                    <Clock className="h-6 w-6 opacity-40" />
+                    <p className="font-medium">No work log entries yet</p>
+                    <p className="text-xs">Logged time entries will appear here.</p>
+                  </div>
+                )}
               </div>
             </div>
           </ScrollArea>
@@ -778,16 +1203,57 @@ export function WorkItemDetailSheet({ sprintId }: WorkItemDetailSheetProps) {
                 </DropdownMenuPrimitive.Root>
               </DetailRow>
 
-              {/* Parent (epic) */}
+              {/* Parent (epic) — editable dropdown */}
               <DetailRow label="Parent">
-                {epic ? (
-                  <span className="flex items-center gap-1.5 text-sm text-primary">
-                    <Layers className="h-3.5 w-3.5" />
-                    {epic.title}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground text-sm">None</span>
-                )}
+                <DropdownMenuPrimitive.Root>
+                  <DropdownMenuPrimitive.Trigger asChild>
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 text-sm hover:text-primary transition-colors max-w-full"
+                    >
+                      <Layers className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{epic ? epic.title : "None"}</span>
+                      <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />
+                    </button>
+                  </DropdownMenuPrimitive.Trigger>
+                  <DropdownMenuPrimitive.Portal>
+                    <DropdownMenuPrimitive.Content
+                      align="start"
+                      sideOffset={4}
+                      className="z-50 max-h-64 min-w-[10rem] overflow-y-auto rounded-md border bg-popover p-1 shadow-md"
+                    >
+                      <DropdownMenuPrimitive.Item
+                        onSelect={() =>
+                          updateItem.mutate(
+                            { epic_id: null },
+                            { onSuccess: () => qc.invalidateQueries({ queryKey: boardKeys.all }) },
+                          )
+                        }
+                        className="flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent"
+                      >
+                        None
+                        {!workItem.epic_id && <Check className="h-3 w-3 ml-auto" />}
+                      </DropdownMenuPrimitive.Item>
+                      {epicOptions.map((e) => (
+                        <DropdownMenuPrimitive.Item
+                          key={e.id}
+                          onSelect={() =>
+                            updateItem.mutate(
+                              { epic_id: e.id },
+                              { onSuccess: () => qc.invalidateQueries({ queryKey: boardKeys.all }) },
+                            )
+                          }
+                          className="flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent"
+                        >
+                          <span className="truncate">{e.title}</span>
+                          {workItem.epic_id === e.id && (
+                            <Check className="h-3 w-3 ml-auto shrink-0" />
+                          )}
+                        </DropdownMenuPrimitive.Item>
+                      ))}
+                    </DropdownMenuPrimitive.Content>
+                  </DropdownMenuPrimitive.Portal>
+                </DropdownMenuPrimitive.Root>
               </DetailRow>
 
               {/* Due date — editable */}
@@ -820,26 +1286,100 @@ export function WorkItemDetailSheet({ sprintId }: WorkItemDetailSheetProps) {
                 </label>
               </DetailRow>
 
-              {/* Labels */}
+              {/* Labels — chip input */}
               <DetailRow label="Labels">
-                <span className="text-muted-foreground text-sm">None</span>
+                <LabelsEditor
+                  labels={workItem.labels ?? []}
+                  onSave={(labels) =>
+                    updateItem.mutate(
+                      { labels },
+                      { onSuccess: () => qc.invalidateQueries({ queryKey: boardKeys.all }) },
+                    )
+                  }
+                />
               </DetailRow>
 
-              {/* Start date */}
+              {/* Start date — editable */}
               <DetailRow label="Start date">
-                <span className="text-muted-foreground text-sm">None</span>
+                <label className="flex items-center gap-1.5 text-sm cursor-pointer hover:text-primary transition-colors">
+                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                  {workItem.start_date ? (
+                    format(new Date(workItem.start_date), "MMM d, yyyy")
+                  ) : (
+                    <span className="text-muted-foreground">None</span>
+                  )}
+                  <input
+                    type="date"
+                    value={workItem.start_date?.slice(0, 10) ?? ""}
+                    onChange={(e) =>
+                      updateItem.mutate(
+                        {
+                          start_date: e.target.value
+                            ? `${e.target.value}T00:00:00Z`
+                            : null,
+                        },
+                        {
+                          onSuccess: () =>
+                            qc.invalidateQueries({ queryKey: boardKeys.all }),
+                        },
+                      )
+                    }
+                    className="sr-only"
+                  />
+                </label>
               </DetailRow>
 
-              {/* Sprint */}
+              {/* Sprint — editable dropdown */}
               <DetailRow label="Sprint">
-                {sprint ? (
-                  <span className="text-sm text-primary flex items-center gap-1.5">
-                    <Zap className="h-3.5 w-3.5" />
-                    {sprint.name}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground text-sm">Backlog</span>
-                )}
+                <DropdownMenuPrimitive.Root>
+                  <DropdownMenuPrimitive.Trigger asChild>
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 text-sm hover:text-primary transition-colors max-w-full"
+                    >
+                      <Zap className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{sprint ? sprint.name : "Backlog"}</span>
+                      <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />
+                    </button>
+                  </DropdownMenuPrimitive.Trigger>
+                  <DropdownMenuPrimitive.Portal>
+                    <DropdownMenuPrimitive.Content
+                      align="start"
+                      sideOffset={4}
+                      className="z-50 max-h-64 min-w-[10rem] overflow-y-auto rounded-md border bg-popover p-1 shadow-md"
+                    >
+                      <DropdownMenuPrimitive.Item
+                        onSelect={() =>
+                          updateItem.mutate(
+                            { sprint_id: null },
+                            { onSuccess: () => qc.invalidateQueries({ queryKey: boardKeys.all }) },
+                          )
+                        }
+                        className="flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent"
+                      >
+                        Backlog
+                        {!workItem.sprint_id && <Check className="h-3 w-3 ml-auto" />}
+                      </DropdownMenuPrimitive.Item>
+                      {sprintOptions.map((sp) => (
+                        <DropdownMenuPrimitive.Item
+                          key={sp.id}
+                          onSelect={() =>
+                            updateItem.mutate(
+                              { sprint_id: sp.id },
+                              { onSuccess: () => qc.invalidateQueries({ queryKey: boardKeys.all }) },
+                            )
+                          }
+                          className="flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent"
+                        >
+                          <span className="truncate">{sp.name}</span>
+                          {workItem.sprint_id === sp.id && (
+                            <Check className="h-3 w-3 ml-auto shrink-0" />
+                          )}
+                        </DropdownMenuPrimitive.Item>
+                      ))}
+                    </DropdownMenuPrimitive.Content>
+                  </DropdownMenuPrimitive.Portal>
+                </DropdownMenuPrimitive.Root>
               </DetailRow>
 
               {/* Story point estimate */}
@@ -894,12 +1434,55 @@ export function WorkItemDetailSheet({ sprintId }: WorkItemDetailSheetProps) {
                 </DropdownMenuPrimitive.Root>
               </DetailRow>
 
+              {/* GitHub repo — inline text input */}
+              <DetailRow label="GitHub repo">
+                <InlineTextEditor
+                  value={workItem.github_repo ?? ""}
+                  placeholder="owner/repo"
+                  icon={<Github className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                  onSave={(val) =>
+                    updateItem.mutate(
+                      { github_repo: val || null },
+                      { onSuccess: () => qc.invalidateQueries({ queryKey: boardKeys.all }) },
+                    )
+                  }
+                />
+              </DetailRow>
+
+              {/* GitHub branch — inline text input */}
+              <DetailRow label="GitHub branch">
+                <InlineTextEditor
+                  value={workItem.github_branch ?? ""}
+                  placeholder="branch-name"
+                  icon={<GitBranch className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                  onSave={(val) =>
+                    updateItem.mutate(
+                      { github_branch: val || null },
+                      { onSuccess: () => qc.invalidateQueries({ queryKey: boardKeys.all }) },
+                    )
+                  }
+                />
+              </DetailRow>
+
+              {/* GitHub PR — inline text/link */}
+              <DetailRow label="GitHub PR">
+                <GithubPrEditor
+                  value={workItem.github_pr ?? ""}
+                  onSave={(val) =>
+                    updateItem.mutate(
+                      { github_pr: val || null },
+                      { onSuccess: () => qc.invalidateQueries({ queryKey: boardKeys.all }) },
+                    )
+                  }
+                />
+              </DetailRow>
+
               {/* Reporter */}
               <DetailRow label="Reporter">
                 <div className="flex items-center gap-1.5">
                   <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center">
                     <span className="text-[9px] font-bold text-primary-foreground">
-                      {user?.display_name?.[0]?.toUpperCase() ?? "U"}
+                      {userInitial}
                     </span>
                   </div>
                   <span className="text-sm">{user?.display_name ?? "You"}</span>
@@ -932,32 +1515,33 @@ function SheetWrapper({
   children: React.ReactNode;
   onClose: () => void;
 }) {
-  // Resizable width, persisted across opens (desktop only — mobile is always full-width).
+  // Resizable width — persisted across opens (desktop only; mobile is always full-width).
   const [width, setWidth] = useState<number>(() => {
     if (typeof window === "undefined") return 768;
     const saved = Number(localStorage.getItem("mml_sheet_width"));
     return saved >= 480 ? saved : 768;
   });
   const dragging = useRef(false);
-
-  // On mobile (<640px) always use full viewport width; ignore saved width.
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
-  const panelMaxWidth = isMobile ? "100vw" : `${width}px`;
+  // Track the most recent width in a ref so the mouseup handler can save it
+  // without needing `width` in the dependency array (which would re-add/remove
+  // the listener on every resize step).
+  const widthRef = useRef(width);
+  widthRef.current = width;
 
   useEffect(() => {
     function onMove(e: MouseEvent) {
       if (!dragging.current) return;
-      const w = Math.min(
+      const newWidth = Math.min(
         Math.max(window.innerWidth - e.clientX, 480),
         Math.min(1200, window.innerWidth - 80),
       );
-      setWidth(w);
+      setWidth(newWidth);
     }
     function onUp() {
       if (dragging.current) {
         dragging.current = false;
         document.body.style.userSelect = "";
-        localStorage.setItem("mml_sheet_width", String(width));
+        localStorage.setItem("mml_sheet_width", String(widthRef.current));
       }
     }
     window.addEventListener("mousemove", onMove);
@@ -966,7 +1550,7 @@ function SheetWrapper({
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [width]);
+  }, []); // empty dep array — handlers read state via refs
 
   return (
     <div className="fixed inset-0 z-40 flex">
@@ -977,20 +1561,42 @@ function SheetWrapper({
         aria-hidden="true"
       />
 
-      {/* Panel — full-width on mobile, constrained + resizable on sm+ */}
+      {/* Panel
+           - Mobile (< sm): full viewport width.
+           - Desktop (sm+): explicit pixel width driven by the resize state,
+             capped at 100vw so it never overflows.  Using an explicit `width`
+             (not just maxWidth) is what makes the panel visibly grow/shrink
+             as the user drags the left edge.
+      */}
       <div
-        className="relative ml-auto flex flex-col w-full sm:w-auto bg-background border-l shadow-2xl h-full overflow-hidden"
-        style={{ maxWidth: panelMaxWidth }}
+        className="relative ml-auto flex flex-col bg-background border-l shadow-2xl h-full overflow-hidden
+                   w-full sm:w-auto"
+        style={{
+          // On sm+ this explicit width overrides the `w-auto` baseline and
+          // allows drag-resizing.  On mobile the `w-full` class wins because
+          // the inline style is overridden by the responsive class in Tailwind
+          // (sm breakpoint media query has higher specificity than inline style
+          // in most browsers, but we guard it via the isMobile check below).
+          ...(typeof window !== "undefined" && window.innerWidth >= 640
+            ? { width: `${width}px`, maxWidth: "100vw" }
+            : {}),
+        }}
       >
-        {/* Resize handle (left edge) — hidden on mobile where it's always full-width */}
+        {/* Resize handle — left edge, desktop only.
+            w-2 (8 px) makes it noticeably easier to grab than the original w-1.5. */}
         <div
-          onMouseDown={() => {
+          onMouseDown={(e) => {
+            e.preventDefault();
             dragging.current = true;
             document.body.style.userSelect = "none";
           }}
-          className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize z-20 hover:bg-primary/40 transition-colors hidden sm:block"
+          className="absolute left-0 top-0 h-full w-2 cursor-ew-resize z-20
+                     hover:bg-primary/30 active:bg-primary/50 transition-colors hidden sm:block"
           aria-label="Resize panel"
+          role="separator"
+          aria-orientation="vertical"
         />
+
         {/* Close button */}
         <div className="absolute top-3 right-3 z-10">
           <Button

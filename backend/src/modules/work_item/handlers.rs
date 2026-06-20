@@ -21,11 +21,11 @@ use crate::shared::{
 
 use super::{
     models::{
-        Attachment, CreateLinkRequest, CreateSubtaskRequest, CreateWebLinkRequest,
-        CreateWorkItemRequest, ListWorkItemsQuery, MoveToBacklogRequest, MoveToSprintRequest,
-        SetColumnRequest, SetPointsRequest, SetStatusRequest, UpdateSubtaskRequest,
-        UpdateWorkItemRequest, WebLink, WorkItemLink, WorkItemListResponse, WorkItemResponse,
-        WorkItemSubtask,
+        Attachment, CreateCommentRequest, CreateLinkRequest, CreateSubtaskRequest,
+        CreateWebLinkRequest, CreateWorkItemRequest, ListWorkItemsQuery, MoveToBacklogRequest,
+        MoveToSprintRequest, SetColumnRequest, SetPointsRequest, SetStatusRequest,
+        UpdateSubtaskRequest, UpdateWorkItemRequest, WebLink, WorkItemComment, WorkItemLink,
+        WorkItemListResponse, WorkItemResponse, WorkItemSubtask,
     },
     service,
 };
@@ -427,5 +427,53 @@ pub async fn delete_attachment(
 ) -> AppResult<StatusCode> {
     let uploads_dir = std::path::Path::new(UPLOADS_DIR);
     service::delete_attachment(&state, auth.user_id, item_id, att_id, uploads_dir).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ── GET /api/work-items/:id/comments ─────────────────────────────────────────
+
+/// List all comments for a work item.
+///
+/// Returns `404 Not Found` when the parent work item does not exist or belongs
+/// to a different user.
+pub async fn list_comments(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(item_id): Path<Uuid>,
+) -> AppResult<Json<Vec<WorkItemComment>>> {
+    let comments = service::list_comments(&state, auth.user_id, item_id).await?;
+    Ok(Json(comments))
+}
+
+// ── POST /api/work-items/:id/comments ────────────────────────────────────────
+
+/// Add a comment to a work item.
+///
+/// Returns `201 Created` with the new comment including the author's name.
+pub async fn create_comment(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(item_id): Path<Uuid>,
+    Json(body): Json<CreateCommentRequest>,
+) -> AppResult<(StatusCode, Json<WorkItemComment>)> {
+    body.validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let comment = service::create_comment(&state, auth.user_id, item_id, body).await?;
+    Ok((StatusCode::CREATED, Json(comment)))
+}
+
+// ── DELETE /api/work-items/:id/comments/:comment_id ──────────────────────────
+
+/// Delete a comment authored by the authenticated user.
+///
+/// Returns `204 No Content` on success.
+/// Returns `404 Not Found` when the comment does not exist, does not belong to
+/// the parent work item, or was not written by this user.
+pub async fn delete_comment(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path((item_id, comment_id)): Path<(Uuid, Uuid)>,
+) -> AppResult<StatusCode> {
+    service::delete_comment(&state, auth.user_id, item_id, comment_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

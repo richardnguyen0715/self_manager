@@ -29,6 +29,9 @@ import {
   Clock,
   History,
   FileIcon,
+  GitBranch,
+  Github,
+  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -267,6 +270,214 @@ function AttachmentRow({ attachment, workItemId }: AttachmentRowProps) {
       >
         <X className="h-3 w-3" />
       </Button>
+    </div>
+  );
+}
+
+// ─── Inline text editor ───────────────────────────────────────────────────────
+
+interface InlineTextEditorProps {
+  value: string;
+  placeholder?: string;
+  icon?: React.ReactNode;
+  onSave: (value: string) => void;
+}
+
+function InlineTextEditor({ value, placeholder, icon, onSave }: InlineTextEditorProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  // Keep draft in sync when value changes from outside
+  useEffect(() => {
+    if (!editing) setDraft(value);
+  }, [value, editing]);
+
+  function handleSave() {
+    if (draft !== value) onSave(draft.trim());
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        {icon}
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") { setDraft(value); setEditing(false); }
+          }}
+          placeholder={placeholder}
+          className="flex-1 bg-transparent border-b border-primary outline-none text-sm placeholder:text-muted-foreground/60"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="flex items-center gap-1.5 hover:text-primary transition-colors text-left w-full"
+      onClick={() => { setDraft(value); setEditing(true); }}
+    >
+      {icon}
+      {value ? (
+        <span className="text-sm truncate">{value}</span>
+      ) : (
+        <span className="text-sm text-muted-foreground">{placeholder ?? "None"}</span>
+      )}
+      <Pencil className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-100 text-muted-foreground shrink-0" />
+    </button>
+  );
+}
+
+// ─── GitHub PR editor (link when URL) ────────────────────────────────────────
+
+interface GithubPrEditorProps {
+  value: string;
+  onSave: (value: string) => void;
+}
+
+function GithubPrEditor({ value, onSave }: GithubPrEditorProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  useEffect(() => {
+    if (!editing) setDraft(value);
+  }, [value, editing]);
+
+  function handleSave() {
+    if (draft !== value) onSave(draft.trim());
+    setEditing(false);
+  }
+
+  const isUrl = value.startsWith("http://") || value.startsWith("https://");
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <Github className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") { setDraft(value); setEditing(false); }
+          }}
+          placeholder="PR URL or number"
+          className="flex-1 bg-transparent border-b border-primary outline-none text-sm placeholder:text-muted-foreground/60"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Github className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      {value ? (
+        isUrl ? (
+          <a
+            href={value}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-primary hover:underline truncate flex-1"
+          >
+            {value}
+          </a>
+        ) : (
+          <span className="text-sm truncate flex-1">{value}</span>
+        )
+      ) : (
+        <span className="text-sm text-muted-foreground">None</span>
+      )}
+      <button
+        type="button"
+        onClick={() => { setDraft(value); setEditing(true); }}
+        className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
+        aria-label="Edit GitHub PR"
+      >
+        <Pencil className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
+// ─── Labels chip editor ───────────────────────────────────────────────────────
+
+interface LabelsEditorProps {
+  labels: string[];
+  onSave: (labels: string[]) => void;
+}
+
+function LabelsEditor({ labels, onSave }: LabelsEditorProps) {
+  const [inputValue, setInputValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function addLabel() {
+    const trimmed = inputValue.trim();
+    if (!trimmed || labels.includes(trimmed)) {
+      setInputValue("");
+      return;
+    }
+    onSave([...labels, trimmed]);
+    setInputValue("");
+  }
+
+  function removeLabel(label: string) {
+    onSave(labels.filter((l) => l !== label));
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1 items-center">
+      {labels.map((label) => (
+        <span
+          key={label}
+          className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary border border-primary/20"
+        >
+          <Tag className="h-2.5 w-2.5 shrink-0" />
+          {label}
+          <button
+            type="button"
+            onClick={() => removeLabel(label)}
+            className="ml-0.5 hover:text-destructive transition-colors"
+            aria-label={`Remove ${label}`}
+          >
+            <X className="h-2.5 w-2.5" />
+          </button>
+        </span>
+      ))}
+      <input
+        ref={inputRef}
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            addLabel();
+          }
+          if (e.key === "Backspace" && !inputValue && labels.length > 0) {
+            removeLabel(labels[labels.length - 1]);
+          }
+        }}
+        onBlur={addLabel}
+        placeholder={labels.length === 0 ? "Add label..." : "+"}
+        className="flex-1 min-w-[4rem] bg-transparent outline-none text-sm placeholder:text-muted-foreground/60"
+      />
     </div>
   );
 }
@@ -1395,14 +1606,36 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
                 </label>
               </DetailRow>
 
-              {/* Labels — placeholder */}
+              {/* Labels — chip input */}
               <DetailRow label="Labels">
-                <span className="text-muted-foreground">None</span>
+                <LabelsEditor
+                  labels={workItem.labels ?? []}
+                  onSave={(labels) => updateItem.mutate({ labels })}
+                />
               </DetailRow>
 
-              {/* Start date — not in work_item contract field, shown as placeholder */}
+              {/* Start date — inline editable */}
               <DetailRow label="Start date">
-                <span className="text-muted-foreground">None</span>
+                <label className="flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors">
+                  <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  {workItem.start_date ? (
+                    format(new Date(workItem.start_date), "MMM d, yyyy")
+                  ) : (
+                    <span className="text-muted-foreground">None</span>
+                  )}
+                  <input
+                    type="date"
+                    value={workItem.start_date?.slice(0, 10) ?? ""}
+                    onChange={(e) =>
+                      updateItem.mutate({
+                        start_date: e.target.value
+                          ? `${e.target.value}T00:00:00Z`
+                          : null,
+                      })
+                    }
+                    className="sr-only"
+                  />
+                </label>
               </DetailRow>
 
               {/* Sprint — inline editable dropdown */}
@@ -1487,6 +1720,34 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
                     </DropdownMenuPrimitive.Content>
                   </DropdownMenuPrimitive.Portal>
                 </DropdownMenuPrimitive.Root>
+              </DetailRow>
+
+              {/* GitHub repo — inline text input */}
+              <DetailRow label="GitHub repo">
+                <InlineTextEditor
+                  value={workItem.github_repo ?? ""}
+                  placeholder="owner/repo"
+                  icon={<Github className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                  onSave={(val) => updateItem.mutate({ github_repo: val || null })}
+                />
+              </DetailRow>
+
+              {/* GitHub branch — inline text input */}
+              <DetailRow label="GitHub branch">
+                <InlineTextEditor
+                  value={workItem.github_branch ?? ""}
+                  placeholder="branch-name"
+                  icon={<GitBranch className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                  onSave={(val) => updateItem.mutate({ github_branch: val || null })}
+                />
+              </DetailRow>
+
+              {/* GitHub PR — inline text input, renders as link if URL */}
+              <DetailRow label="GitHub PR">
+                <GithubPrEditor
+                  value={workItem.github_pr ?? ""}
+                  onSave={(val) => updateItem.mutate({ github_pr: val || null })}
+                />
               </DetailRow>
 
               {/* Reporter */}
