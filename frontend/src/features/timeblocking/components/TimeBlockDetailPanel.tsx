@@ -8,6 +8,7 @@ import type { TimeBlock } from "@/types";
 import { useDeleteTimeBlock } from "../hooks/useTimeBlocks";
 import { useTimeBlockingStore } from "../timeblocking.store";
 import { FocusLaunchButton } from "./FocusSessionPanel";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -20,18 +21,26 @@ interface TimeBlockDetailPanelProps {
 export function TimeBlockDetailPanel({ block }: TimeBlockDetailPanelProps) {
   const { openEditor, setSelectedBlockId } = useTimeBlockingStore();
   const deleteBlock = useDeleteTimeBlock();
+  const confirm = useConfirm();
 
   const durationMin = Math.round(
     (new Date(block.end_time).getTime() - new Date(block.start_time).getTime()) /
       60000,
   );
 
-  function handleDelete() {
-    if (confirm(`Delete "${block.title}"?`)) {
-      deleteBlock.mutate(block.id, {
-        onSuccess: () => setSelectedBlockId(null),
-      });
-    }
+  async function handleDelete() {
+    if (
+      !(await confirm({
+        title: `Delete "${block.title}"?`,
+        description: "This cannot be undone.",
+        confirmText: "Delete",
+        destructive: true,
+      }))
+    )
+      return;
+    deleteBlock.mutate(block.id, {
+      onSuccess: () => setSelectedBlockId(null),
+    });
   }
 
   return (

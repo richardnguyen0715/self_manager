@@ -65,6 +65,7 @@ import type { WorkItemLink, WorkItemWebLink, WorkItemAttachment } from "../types
 import { useAuthStore } from "@/stores";
 import { useEpics } from "@/features/agile/hooks/useEpics";
 import { useSprintsList } from "@/features/sprints/hooks/useSprints";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const NEXT_PUBLIC_API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -280,6 +281,7 @@ interface SubtaskRowProps {
 function SubtaskRow({ subtask, workItemId }: SubtaskRowProps) {
   const update = useUpdateWorkItemSubtask(workItemId, subtask.id);
   const remove = useDeleteWorkItemSubtask(workItemId);
+  const confirm = useConfirm();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(subtask.title);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -367,8 +369,16 @@ function SubtaskRow({ subtask, workItemId }: SubtaskRowProps) {
           variant="ghost"
           size="icon"
           className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={() => {
-            if (confirm("Delete this subtask?")) remove.mutate(subtask.id);
+          onClick={async () => {
+            if (
+              await confirm({
+                title: "Delete this subtask?",
+                description: "This cannot be undone.",
+                confirmText: "Delete",
+                destructive: true,
+              })
+            )
+              remove.mutate(subtask.id);
           }}
           aria-label="Delete subtask"
         >
@@ -419,6 +429,7 @@ interface WorkItemDetailProps {
 export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
   const router = useRouter();
   const { user } = useAuthStore();
+  const confirm = useConfirm();
 
   // ── Data ──
   const { data: workItem, isLoading, isError } = useWorkItem(workItemId);
@@ -530,12 +541,19 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
     );
   }
 
-  function handleDelete() {
-    if (confirm(`Delete "${workItem!.title}"? This cannot be undone.`)) {
-      deleteItem.mutate(workItem!.id, {
-        onSuccess: () => router.push("/work-items"),
-      });
-    }
+  async function handleDelete() {
+    if (
+      !(await confirm({
+        title: `Delete "${workItem!.title}"?`,
+        description: "This cannot be undone.",
+        confirmText: "Delete",
+        destructive: true,
+      }))
+    )
+      return;
+    deleteItem.mutate(workItem!.id, {
+      onSuccess: () => router.push("/work-items"),
+    });
   }
 
   function handleAddWebLink() {

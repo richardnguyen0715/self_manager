@@ -24,6 +24,7 @@ import {
   useUpdatePage,
   useSearchPages,
 } from "@/features/docs";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { PageTreeNode, PageKind, PageStatus } from "@/features/docs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -136,6 +137,7 @@ function PageRow({ page, spaceId }: RowProps) {
 
   const deletePage = useDeletePage();
   const updatePage = useUpdatePage(page.id);
+  const confirm = useConfirm();
 
   function commitRename() {
     setRenaming(false);
@@ -145,11 +147,18 @@ function PageRow({ page, spaceId }: RowProps) {
     }
   }
 
-  function handleDelete(e: React.MouseEvent) {
+  async function handleDelete(e: React.MouseEvent) {
     e.stopPropagation();
-    if (confirm(`Delete "${page.title || "Untitled"}" and all its children?`)) {
-      deletePage.mutate({ id: page.id, spaceId });
-    }
+    if (
+      !(await confirm({
+        title: `Delete "${page.title || "Untitled"}" and all its children?`,
+        description: "This cannot be undone.",
+        confirmText: "Delete",
+        destructive: true,
+      }))
+    )
+      return;
+    deletePage.mutate({ id: page.id, spaceId });
   }
 
   React.useEffect(() => {

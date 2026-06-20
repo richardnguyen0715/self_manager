@@ -28,6 +28,7 @@ import {
   useMoveWorkItemToBacklog,
   useDeleteWorkItem,
 } from "@/features/agile";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // ─── Priority dot ─────────────────────────────────────────────────────────────
 
@@ -89,6 +90,7 @@ export function WorkItemRow({
   const moveToSprint = useMoveWorkItemToSprint(item.id);
   const moveToBacklog = useMoveWorkItemToBacklog(item.id);
   const deleteItem = useDeleteWorkItem();
+  const confirm = useConfirm();
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: item.id,
@@ -102,10 +104,17 @@ export function WorkItemRow({
     (s) => s.id !== currentSprintId && s.status !== "completed",
   );
 
-  function handleDelete() {
-    if (confirm(`Delete "${item.title}"? This cannot be undone.`)) {
-      deleteItem.mutate(item.id);
-    }
+  async function handleDelete() {
+    if (
+      !(await confirm({
+        title: `Delete "${item.title}"?`,
+        description: "This cannot be undone.",
+        confirmText: "Delete",
+        destructive: true,
+      }))
+    )
+      return;
+    deleteItem.mutate(item.id);
   }
 
   const hasSubtasks = (item.subtask_count ?? 0) > 0;

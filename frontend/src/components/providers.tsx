@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "@/lib/query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthGuard } from "@/components/auth-guard";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface ProvidersProps {
   children: React.ReactNode;
@@ -16,6 +17,7 @@ export function Providers({ children }: ProvidersProps) {
       <TooltipProvider delayDuration={300}>
         <AuthGuard>{children}</AuthGuard>
       </TooltipProvider>
+      <ConfirmDialog />
       {process.env.NODE_ENV === "development" && (
         <ReactQueryDevtools initialIsOpen={false} />
       )}

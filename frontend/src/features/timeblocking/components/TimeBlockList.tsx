@@ -12,6 +12,7 @@ import { formatTime } from "@/lib/utils";
 import type { TimeBlockSummary } from "@/types";
 import { useDeleteTimeBlock } from "../hooks/useTimeBlocks";
 import { useTimeBlockingStore } from "../timeblocking.store";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface TimeBlockListProps {
   blocks: TimeBlockSummary[];
@@ -24,6 +25,7 @@ interface TimeBlockListProps {
 export function TimeBlockList({ blocks }: TimeBlockListProps) {
   const { setSelectedBlockId } = useTimeBlockingStore();
   const deleteBlock = useDeleteTimeBlock();
+  const confirm = useConfirm();
 
   if (blocks.length === 0) {
     return (
@@ -114,9 +116,16 @@ export function TimeBlockList({ blocks }: TimeBlockListProps) {
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6 text-destructive"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
-                      if (confirm(`Delete "${block.title}"?`)) {
+                      if (
+                        await confirm({
+                          title: `Delete "${block.title}"?`,
+                          description: "This cannot be undone.",
+                          confirmText: "Delete",
+                          destructive: true,
+                        })
+                      ) {
                         deleteBlock.mutate(block.id);
                       }
                     }}

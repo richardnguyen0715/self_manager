@@ -27,7 +27,9 @@ import { VersionHistoryPanel } from "@/features/docs/collab/VersionHistoryPanel"
 import { CommentsPanel } from "@/features/docs/collab/CommentsPanel";
 import { PageMetaHeader } from "@/features/docs/pages/PageMetaHeader";
 import { PageTemplatesPicker } from "@/features/docs/pages/PageTemplatesPicker";
+import { PagePeekPanel } from "@/features/docs/PagePeekPanel";
 import type { TipTapDoc } from "@/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // ─── Right panel tabs ─────────────────────────────────────────────────────────
 
@@ -65,6 +67,7 @@ export function DocsPageEditorPage({
   pageId,
 }: DocsPageEditorPageProps) {
   const router = useRouter();
+  const confirm = useConfirm();
 
   // ── Server data ────────────────────────────────────────────────────────────
   const { data: page, isLoading, isError } = usePage(pageId);
@@ -158,9 +161,17 @@ export function DocsPageEditorPage({
   }
 
   // ── Delete ─────────────────────────────────────────────────────────────────
-  function handleDelete() {
+  async function handleDelete() {
     if (!page) return;
-    if (!confirm(`Delete "${page.title}"? This cannot be undone.`)) return;
+    if (
+      !(await confirm({
+        title: `Delete "${page.title}"?`,
+        description: "This cannot be undone.",
+        confirmText: "Delete",
+        destructive: true,
+      }))
+    )
+      return;
     deletePage.mutate(
       { id: pageId, spaceId },
       { onSuccess: () => router.push(`/docs/${spaceId}`) },
@@ -328,6 +339,7 @@ export function DocsPageEditorPage({
                 <div className="px-8 py-4">
                   <DocEditor
                     pageId={pageId}
+                    spaceId={spaceId}
                     value={docContent}
                     onChange={handleContentChange}
                     showTemplatePicker={isBlankPage}
@@ -388,6 +400,9 @@ export function DocsPageEditorPage({
         onSelectContent={handleTemplateSelectContent}
         onSelectFromServer={handleTemplateSelectFromServer}
       />
+
+      {/* Page peek panel — slides in from the right when a @mention chip is clicked */}
+      <PagePeekPanel />
     </div>
   );
 }

@@ -65,6 +65,7 @@ import { NodeDelete } from "./extensions/NodeDelete";
 import { BlockSelection } from "./extensions/BlockSelection";
 
 // ── Node views ──────────────────────────────────────────────────────────────
+import { CodeBlockView } from "./node-views/CodeBlockView";
 import { InfoPanelView } from "./node-views/InfoPanelView";
 import { MermaidView } from "./node-views/MermaidView";
 import { TableOfContentsView } from "./node-views/TableOfContentsView";
@@ -90,8 +91,9 @@ import { TemplatesPicker } from "./TemplatesPicker";
 import { UrlDialog } from "./UrlDialog";
 
 // ── Hooks + types ───────────────────────────────────────────────────────────
-import { useUploadPageImage, useSearchPages } from "@/features/docs";
-import type { TipTapDoc, PageSearchResult } from "@/types";
+import { useUploadPageImage, useSearchPages, usePageTree } from "@/features/docs";
+import { usePeekStore } from "@/features/docs/store/usePeekStore";
+import type { TipTapDoc, PageSearchResult, PageTreeNode } from "@/types";
 import { cn } from "@/lib/utils";
 
 // ── Lowlight (all languages bundled) ────────────────────────────────────────
@@ -337,6 +339,12 @@ function hasContent(doc: TipTapDoc): boolean {
 export interface DocEditorProps {
   /** Page id — used for the image upload endpoint */
   pageId: string;
+  /**
+   * Space id — scopes the @mention page search.  When present the mention
+   * dropdown lists pages from this space even before the user types anything
+   * (mirroring Notion's behaviour).
+   */
+  spaceId?: string;
   /** Controlled JSON document */
   value: TipTapDoc;
   /** Called on each doc update; caller should debounce before persisting */
@@ -353,6 +361,7 @@ export interface DocEditorProps {
 
 export function DocEditor({
   pageId,
+  spaceId,
   value,
   onChange,
   readOnly = false,
@@ -360,6 +369,7 @@ export function DocEditor({
   showTemplatePicker = false,
 }: DocEditorProps) {
   const uploadMutation = useUploadPageImage(pageId);
+  const openPeek = usePeekStore((s) => s.openPeek);
 
   const editorWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -374,16 +384,40 @@ export function DocEditor({
 
   // ── @page mention query ────────────────────────────────────────────────────
   const [mentionQuery, setMentionQuery] = useState("");
-  const { data: mentionResults, isFetching: mentionLoading } = useSearchPages(
+
+  // When query is non-empty: call the search endpoint scoped to the space.
+  // Guard: only enable when q has content (the endpoint requires a non-empty q).
+  const isQueryEmpty = mentionQuery.trim().length === 0;
+  const { data: searchResults, isFetching: searchLoading } = useSearchPages(
     mentionQuery,
-    undefined,
+    spaceId,
   );
+
+  // When query is empty: show all pages in the current space from the page tree.
+  const { data: pageTree, isFetching: treeLoading } = usePageTree(spaceId ?? "");
+
+  // Flatten a PageTreeNode tree into a flat list of PageSearchResult-shaped items.
+  function flattenTree(nodes: PageTreeNode[]): PageSearchResult[] {
+    const result: PageSearchResult[] = [];
+    const visit = (n: PageTreeNode) => {
+      result.push({ id: n.id, space_id: n.space_id, title: n.title, kind: n.kind, icon: n.icon, snippet: null });
+      n.children.forEach(visit);
+    };
+    nodes.forEach(visit);
+    return result;
+  }
+
+  // Combine: empty query → page tree; non-empty query → search results.
+  const mentionResults: PageSearchResult[] = isQueryEmpty
+    ? flattenTree(pageTree ?? [])
+    : (searchResults ?? []);
+  const mentionLoading = isQueryEmpty ? treeLoading : searchLoading;
 
   // Stable refs so suggestion config closures always get fresh values
   const mentionResultsRef = useRef<PageSearchResult[]>([]);
   const mentionLoadingRef = useRef(false);
   useEffect(() => {
-    mentionResultsRef.current = mentionResults ?? [];
+    mentionResultsRef.current = mentionResults;
     mentionLoadingRef.current = mentionLoading;
   }, [mentionResults, mentionLoading]);
 
@@ -453,7 +487,11 @@ export function DocEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ codeBlock: false }),
-      CodeBlockLowlight.configure({ lowlight }),
+      CodeBlockLowlight.configure({ lowlight }).extend({
+        addNodeView() {
+          return ReactNodeViewRenderer(CodeBlockView);
+        },
+      }),
       Underline,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       TaskList,
@@ -600,6 +638,20 @@ export function DocEditor({
         class: "focus:outline-none",
         spellcheck: "true",
       },
+      // Intercept clicks on page-mention chips so they open the peek panel
+      // instead of following the href navigation.
+      handleClick(_view, _pos, event) {
+        const target = event.target as HTMLElement | null;
+        if (!target) return false;
+        const anchor = target.closest<HTMLAnchorElement>("a.page-mention");
+        if (!anchor) return false;
+        event.preventDefault();
+        const targetPageId = anchor.dataset.pageId;
+        if (targetPageId) {
+          openPeek(targetPageId);
+        }
+        return true;
+      },
     },
   });
 
@@ -692,6 +744,31 @@ export function DocEditor({
     parent.addEventListener("mousedown", onParentMouseDown);
     return () => parent.removeEventListener("mousedown", onParentMouseDown);
   }, [editor, readOnly]);
+
+  // ── Read-only page-mention click → peek panel ───────────────────────────
+  // When the editor is read-only (DocView), ProseMirror's handleClick in
+  // editorProps is still active but we also add a delegated DOM listener on
+  // the wrapper for belt-and-suspenders coverage (e.g. if editor is null).
+  useEffect(() => {
+    if (!readOnly) return;
+    const container = editorWrapperRef.current;
+    if (!container) return;
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const anchor = target.closest<HTMLAnchorElement>("a.page-mention");
+      if (!anchor) return;
+      e.preventDefault();
+      const targetPageId = anchor.dataset.pageId;
+      if (targetPageId) {
+        openPeek(targetPageId);
+      }
+    };
+
+    container.addEventListener("click", handleClick);
+    return () => container.removeEventListener("click", handleClick);
+  }, [readOnly, openPeek]);
 
   const handleTemplateSelect = (content: TipTapDoc) => {
     editor?.commands.setContent(normalizeDoc(content), false);

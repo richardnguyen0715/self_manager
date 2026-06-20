@@ -28,6 +28,7 @@ import type {
 } from "@/types";
 import { useWorkItems, useDeleteWorkItem } from "../hooks/useWorkItems";
 import { useWorkItemUIStore } from "../store";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useProjectStore } from "@/stores";
 import { WorkItemStatusBadge } from "./WorkItemStatusBadge";
 import { WorkItemTypeBadge } from "./WorkItemTypeBadge";
@@ -152,6 +153,7 @@ function SkeletonRow() {
 
 function WorkItemRow({ item }: { item: WorkItemListItem }) {
   const deleteItem = useDeleteWorkItem();
+  const confirm = useConfirm();
 
   const hasSubtasks = (item.subtask_count ?? 0) > 0;
 
@@ -168,10 +170,17 @@ function WorkItemRow({ item }: { item: WorkItemListItem }) {
       })()
     : null;
 
-  function handleDelete() {
-    if (confirm(`Delete "${item.title}"? This cannot be undone.`)) {
-      deleteItem.mutate(item.id);
-    }
+  async function handleDelete() {
+    if (
+      !(await confirm({
+        title: `Delete "${item.title}"?`,
+        description: "This cannot be undone.",
+        confirmText: "Delete",
+        destructive: true,
+      }))
+    )
+      return;
+    deleteItem.mutate(item.id);
   }
 
   return (

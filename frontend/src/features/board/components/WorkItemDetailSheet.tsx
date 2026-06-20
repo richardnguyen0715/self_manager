@@ -43,6 +43,7 @@ import { boardKeys } from "../hooks/useSprintBoard";
 import type { WorkItemStatus, WorkItemSubtask, Priority } from "@/types";
 import { useAuthStore } from "@/stores";
 import { useQueryClient } from "@tanstack/react-query";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -120,6 +121,7 @@ function SubtaskRow({
 }) {
   const update = useUpdateWorkItemSubtask(workItemId, subtask.id);
   const remove = useDeleteWorkItemSubtask(workItemId);
+  const confirm = useConfirm();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(subtask.title);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -190,8 +192,16 @@ function SubtaskRow({
           variant="ghost"
           size="icon"
           className="h-6 w-6 opacity-0 group-hover:opacity-100"
-          onClick={() => {
-            if (confirm("Delete this subtask?")) remove.mutate(subtask.id);
+          onClick={async () => {
+            if (
+              await confirm({
+                title: "Delete this subtask?",
+                description: "This cannot be undone.",
+                confirmText: "Delete",
+                destructive: true,
+              })
+            )
+              remove.mutate(subtask.id);
           }}
         >
           <X className="h-3 w-3" />

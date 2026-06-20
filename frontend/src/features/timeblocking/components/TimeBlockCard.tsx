@@ -19,6 +19,7 @@ import {
 import type { TimeBlockSummary } from "@/types";
 import { useDeleteTimeBlock } from "../hooks/useTimeBlocks";
 import { useTimeBlockingStore } from "../timeblocking.store";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,7 @@ export function TimeBlockCard({ block, top, height }: TimeBlockCardProps) {
 
   const { setSelectedBlockId } = useTimeBlockingStore();
   const deleteBlock = useDeleteTimeBlock();
+  const confirm = useConfirm();
 
   const compact = height < 48; // not enough room to show detail rows
 
@@ -53,11 +55,18 @@ export function TimeBlockCard({ block, top, height }: TimeBlockCardProps) {
     setSelectedBlockId(block.id);
   }
 
-  function handleDelete(e: React.MouseEvent) {
+  async function handleDelete(e: React.MouseEvent) {
     e.stopPropagation();
-    if (confirm(`Delete "${block.title}"?`)) {
-      deleteBlock.mutate(block.id);
-    }
+    if (
+      !(await confirm({
+        title: `Delete "${block.title}"?`,
+        description: "This cannot be undone.",
+        confirmText: "Delete",
+        destructive: true,
+      }))
+    )
+      return;
+    deleteBlock.mutate(block.id);
   }
 
   function handleStartFocus(e: React.MouseEvent) {

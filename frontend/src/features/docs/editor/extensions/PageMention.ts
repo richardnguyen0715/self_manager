@@ -61,16 +61,24 @@ export const PageMention = Node.create({
     return [{ tag: 'a[data-type="page-mention"]' }];
   },
 
-  renderHTML({ HTMLAttributes }: { HTMLAttributes: Record<string, unknown> }) {
-    const attrs = HTMLAttributes as PageMentionAttrs & Record<string, unknown>;
+  renderHTML({
+    node,
+    HTMLAttributes,
+  }: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    node: any;
+    HTMLAttributes: Record<string, unknown>;
+  }) {
+    // The text label lives on the node attrs (HTMLAttributes has it serialized
+    // as data-label, so read node.attrs.label for the visible chip text).
+    const label = (node?.attrs?.label as string) || "Untitled";
     return [
       "a",
-      mergeAttributes(attrs, {
+      mergeAttributes(HTMLAttributes, {
         "data-type": "page-mention",
-        href: `/docs/page/${attrs.pageId ?? ""}`,
         class: "page-mention",
       }),
-      attrs.label ?? "",
+      `@${label}`,
     ];
   },
 

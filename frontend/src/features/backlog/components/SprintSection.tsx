@@ -40,6 +40,7 @@ import { WorkItemRow } from "./WorkItemRow";
 import { QuickAddRow } from "./QuickAddRow";
 import type { BacklogFiltersState } from "../store/useBacklogStore";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -119,6 +120,7 @@ export function SprintSection({ sprint, allSprints }: SprintSectionProps) {
   const { collapsedSprints, toggleSprintCollapse, filters, openCreateItem } =
     useBacklogStore();
   const isCollapsed = Boolean(collapsedSprints[sprint.id]);
+  const confirm = useConfirm();
 
   const { setNodeRef: dropRef, isOver } = useDroppable({
     id: `sprint-${sprint.id}`,
@@ -149,16 +151,19 @@ export function SprintSection({ sprint, allSprints }: SprintSectionProps) {
 
   async function handleComplete() {
     if (
-      confirm(
-        `Complete sprint "${sprint.name}"? This will create a sprint review.`,
-      )
-    ) {
-      setCompleting(true);
-      try {
-        await completeSprint.mutateAsync({ id: sprint.id });
-      } finally {
-        setCompleting(false);
-      }
+      !(await confirm({
+        title: `Complete sprint "${sprint.name}"?`,
+        description: "This will create a sprint review.",
+        confirmText: "Complete",
+        destructive: false,
+      }))
+    )
+      return;
+    setCompleting(true);
+    try {
+      await completeSprint.mutateAsync({ id: sprint.id });
+    } finally {
+      setCompleting(false);
     }
   }
 

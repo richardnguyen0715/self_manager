@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import type { Sprint, SprintStatus } from "@/types";
 import { useSprintsList, useActivateSprint, useDeleteSprint } from "../hooks/useSprints";
 import { useSprintUIStore } from "../store";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useProjectStore } from "@/stores";
 import { SprintStatusBadge } from "./SprintStatusBadge";
 import { CapacityBar } from "./CapacityBar";
@@ -74,16 +75,24 @@ function SprintRow({ sprint }: SprintRowProps) {
   const activate = useActivateSprint();
   const deleteSprint = useDeleteSprint();
   const { openEditDialog, openCompleteDialog } = useSprintUIStore();
+  const confirm = useConfirm();
 
   const daysLeft =
     sprint.status === "active"
       ? differenceInDays(new Date(sprint.end_date), new Date())
       : null;
 
-  function handleDelete() {
-    if (confirm(`Delete "${sprint.name}"? This cannot be undone.`)) {
-      deleteSprint.mutate(sprint.id);
-    }
+  async function handleDelete() {
+    if (
+      !(await confirm({
+        title: `Delete "${sprint.name}"?`,
+        description: "This cannot be undone.",
+        confirmText: "Delete",
+        destructive: true,
+      }))
+    )
+      return;
+    deleteSprint.mutate(sprint.id);
   }
 
   return (

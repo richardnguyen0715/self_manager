@@ -30,6 +30,7 @@ import {
   useUpdateColumn,
   useDeleteColumn,
 } from "../hooks/useSprintBoard";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // ─── Quick-create inline form ─────────────────────────────────────────────────
 
@@ -196,13 +197,17 @@ interface ColumnMenuProps {
 function ColumnMenu({ column, onRename }: ColumnMenuProps) {
   const updateColumn = useUpdateColumn();
   const deleteColumn = useDeleteColumn();
+  const confirm = useConfirm();
   const [colorSubOpen, setColorSubOpen] = useState(false);
 
-  function handleDelete() {
+  async function handleDelete() {
     if (
-      !confirm(
-        `Delete column "${column.name}"? Items in it will be moved to the first remaining column.`,
-      )
+      !(await confirm({
+        title: `Delete column "${column.name}"?`,
+        description: "Items in it will be moved to the first remaining column.",
+        confirmText: "Delete",
+        destructive: true,
+      }))
     )
       return;
     deleteColumn.mutate(column.id);

@@ -19,6 +19,7 @@ import { useToggleTaskComplete, useDeleteTask } from "../hooks/useTasks";
 import { useTaskUIStore } from "../store";
 import { PriorityBadge } from "./PriorityBadge";
 import { StatusBadge } from "./StatusBadge";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface TaskRowProps {
   task: TaskListItem;
@@ -36,6 +37,7 @@ export function TaskRow({ task }: TaskRowProps) {
   const toggleComplete = useToggleTaskComplete();
   const deleteTask = useDeleteTask();
   const { openEditDialog } = useTaskUIStore();
+  const confirm = useConfirm();
 
   const isCompleted = task.status === "completed";
   const hasSubtasks = task.subtask_count > 0;
@@ -48,10 +50,17 @@ export function TaskRow({ task }: TaskRowProps) {
     });
   }
 
-  function handleDelete() {
-    if (confirm(`Delete "${task.title}"? This cannot be undone.`)) {
-      deleteTask.mutate(task.id);
-    }
+  async function handleDelete() {
+    if (
+      !(await confirm({
+        title: `Delete "${task.title}"?`,
+        description: "This cannot be undone.",
+        confirmText: "Delete",
+        destructive: true,
+      }))
+    )
+      return;
+    deleteTask.mutate(task.id);
   }
 
   return (

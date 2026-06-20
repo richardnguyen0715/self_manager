@@ -22,6 +22,7 @@ import {
   useMoveItemToSprint,
   useMoveItemToBacklog,
 } from "../hooks/useSprints";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { CapacityBar } from "./CapacityBar";
 import { BacklogItemRow, SprintItemRow } from "./WorkItemPlanRow";
 
@@ -56,6 +57,7 @@ export function SprintPlanningPanel({ sprintId }: SprintPlanningPanelProps) {
 
   const moveToSprint = useMoveItemToSprint();
   const moveToBacklog = useMoveItemToBacklog();
+  const confirm = useConfirm();
 
   const currentSprintItems = sprintItemsData?.data ?? [];
 
@@ -79,9 +81,12 @@ export function SprintPlanningPanel({ sprintId }: SprintPlanningPanelProps) {
       sprintCapacityPts > 0 &&
       sprintPlannedPts + itemPts > sprintCapacityPts
     ) {
-      const confirmed = confirm(
-        `Adding this item (${itemPts} pts) would exceed sprint capacity (${sprintPlannedPts}/${sprintCapacityPts} pts). Continue?`,
-      );
+      const confirmed = await confirm({
+        title: "Exceed sprint capacity?",
+        description: `Adding this item (${itemPts} pts) would exceed sprint capacity (${sprintPlannedPts}/${sprintCapacityPts} pts). Continue?`,
+        confirmText: "Continue",
+        destructive: false,
+      });
       if (!confirmed) return;
     }
     setMovingItemId(itemId);
