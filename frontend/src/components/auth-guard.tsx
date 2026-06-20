@@ -37,15 +37,21 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   // making any redirect decision. Without this, a hard reload momentarily sees
   // isAuthenticated=false and bounces the user /board -> /auth -> /dashboard,
   // losing the page they were on.
-  const [hydrated, setHydrated] = useState(() =>
-    useAuthStore.persist.hasHydrated(),
+  // NOTE: `.persist` is undefined during the server prerender pass, so guard
+  // every access with optional chaining — touching it unguarded crashes
+  // `next build` while statically exporting pages like /_not-found and /search.
+  const [hydrated, setHydrated] = useState(
+    () => useAuthStore.persist?.hasHydrated?.() ?? false,
   );
 
   useEffect(() => {
-    setHydrated(useAuthStore.persist.hasHydrated());
-    const unsub = useAuthStore.persist.onFinishHydration(() =>
-      setHydrated(true),
-    );
+    const persist = useAuthStore.persist;
+    if (!persist) {
+      setHydrated(true);
+      return;
+    }
+    if (persist.hasHydrated()) setHydrated(true);
+    const unsub = persist.onFinishHydration(() => setHydrated(true));
     return unsub;
   }, []);
 
