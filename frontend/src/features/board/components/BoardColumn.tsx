@@ -398,6 +398,15 @@ export function BoardColumn({ column, items, sprintId }: BoardColumnProps) {
             ))}
           </SortableContext>
 
+          {isCreating && (
+            <QuickCreateForm
+              columnId={column.id}
+              mappedStatus={column.mapped_status}
+              sprintId={sprintId}
+              onClose={closeCreateInColumn}
+            />
+          )}
+
           {(items ?? []).length === 0 && !isCreating && (
             <div
               className={cn(
@@ -412,16 +421,9 @@ export function BoardColumn({ column, items, sprintId }: BoardColumnProps) {
         </div>
       </ScrollArea>
 
-      {/* Quick-create form / add button */}
-      <div className="px-3 pb-3 pt-1 space-y-2">
-        {isCreating ? (
-          <QuickCreateForm
-            columnId={column.id}
-            mappedStatus={column.mapped_status}
-            sprintId={sprintId}
-            onClose={closeCreateInColumn}
-          />
-        ) : (
+      {/* Add button */}
+      <div className="px-3 pb-3 pt-1">
+        {!isCreating && (
           <Button
             variant="ghost"
             size="sm"
