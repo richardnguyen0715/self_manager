@@ -2,6 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   CalendarDays,
   CalendarClock,
@@ -14,6 +15,8 @@ import {
   GitBranch,
   Github,
   GitPullRequest,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { format, isPast, isToday, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -22,7 +25,10 @@ import type { WorkItemListItem, Priority } from "@/types";
 import { WorkItemTypeBadge } from "@/features/agile/components/WorkItemTypeBadge";
 import { useSprintsList } from "@/features/sprints/hooks/useSprints";
 import { useEpics } from "@/features/agile/hooks/useEpics";
+import { useDeleteWorkItem } from "@/features/hierarchy";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useBoardStore } from "../store";
+import { boardKeys } from "../hooks/useSprintBoard";
 
 // ─── Priority colour helpers ──────────────────────────────────────────────────
 
@@ -59,6 +65,35 @@ export function BoardCard({
   isOverlay = false,
 }: BoardCardProps) {
   const openItemDetail = useBoardStore((s) => s.openItemDetail);
+  const removeItem = useBoardStore((s) => s.removeItem);
+  const deleteWorkItem = useDeleteWorkItem();
+  const confirm = useConfirm();
+  const qc = useQueryClient();
+
+  async function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (
+      !(await confirm({
+        title: `Delete "${item.title}"?`,
+        description:
+          "It will be moved to the Trash. You can restore it later.",
+        confirmText: "Delete",
+        destructive: true,
+      }))
+    )
+      return;
+    // Optimistically remove from the board, then soft-delete on the server.
+    removeItem(item.id);
+    try {
+      await deleteWorkItem.mutateAsync(item.id);
+    } finally {
+      // useDeleteWorkItem only invalidates the hierarchy query keys, so the
+      // board's own queries (boardKeys + ["work-items"]) must be refetched
+      // here to re-hydrate the board store. On failure this restores the card.
+      qc.invalidateQueries({ queryKey: boardKeys.all });
+      qc.invalidateQueries({ queryKey: ["work-items"] });
+    }
+  }
 
   const {
     attributes,
@@ -155,7 +190,30 @@ export function BoardCard({
         <GripVertical className="h-3.5 w-3.5" />
       </button>
 
-      <div className="px-3 py-2.5 pl-7 space-y-1.5">
+      {/* Delete (soft-delete to Trash) */}
+      {!isOverlay && (
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={deleteWorkItem.isPending}
+          className={cn(
+            "absolute right-1.5 top-1.5 z-10 p-1 rounded",
+            "text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10",
+            "opacity-0 group-hover:opacity-100 transition-opacity",
+            "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          )}
+          aria-label="Delete work item"
+          title="Delete (move to Trash)"
+        >
+          {deleteWorkItem.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Trash2 className="h-3.5 w-3.5" />
+          )}
+        </button>
+      )}
+
+      <div className="px-3 py-2.5 pl-7 pr-7 space-y-1.5">
         {/* Type tag row */}
         <div className="flex items-center gap-1.5">
           <WorkItemTypeBadge type={item.type} showLabel className="shrink-0" />

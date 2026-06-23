@@ -72,6 +72,8 @@ async fn main() -> anyhow::Result<()> {
         .nest("/auth",          modules::auth::router())
         .nest("/tasks",         modules::task::router())
         .nest("/projects",      modules::project::router())
+        .nest("/organizations", modules::organization::router())
+        .nest("/trash",         modules::trash::router())
         .nest("/goals",         modules::goal::router())
         .nest("/habits",        modules::habit::router())
         .nest("/calendar",      modules::calendar::router())

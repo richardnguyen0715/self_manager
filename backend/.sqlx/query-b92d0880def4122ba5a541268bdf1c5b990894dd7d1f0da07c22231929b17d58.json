@@ -1,0 +1,148 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            wi.id,\n            wi.project_id,\n            wi.epic_id,\n            wi.sprint_id,\n            wi.type::text      AS \"item_type!\",\n            wi.title,\n            wi.status::text    AS \"status!\",\n            wi.priority::text  AS \"priority!\",\n            wi.story_points,\n            wi.start_date,\n            wi.due_date,\n            wi.position,\n            wi.column_id,\n            wi.labels          AS \"labels!: Vec<String>\",\n            wi.pinned_fields   AS \"pinned_fields!: Vec<String>\",\n            wi.github_repo,\n            wi.github_branch,\n            wi.github_pr,\n            COUNT(s.id)                          AS \"subtask_count!: i64\",\n            COUNT(s.id) FILTER (WHERE s.is_done) AS \"done_subtask_count!: i64\",\n            wi.created_at,\n            wi.updated_at\n        FROM work_items wi\n        LEFT JOIN work_item_subtasks s ON s.work_item_id = wi.id\n        WHERE wi.user_id = $1\n          AND wi.deleted_at IS NOT NULL\n        GROUP BY wi.id\n        ORDER BY wi.deleted_at DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "project_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "epic_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "sprint_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "item_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "priority!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "story_points",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "start_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "due_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "position",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "column_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 13,
+        "name": "labels!: Vec<String>",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 14,
+        "name": "pinned_fields!: Vec<String>",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 15,
+        "name": "github_repo",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 16,
+        "name": "github_branch",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 17,
+        "name": "github_pr",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 18,
+        "name": "subtask_count!: i64",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 19,
+        "name": "done_subtask_count!: i64",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 20,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 21,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      null,
+      false,
+      null,
+      null,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      null,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "b92d0880def4122ba5a541268bdf1c5b990894dd7d1f0da07c22231929b17d58"
+}

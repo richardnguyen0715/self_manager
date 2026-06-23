@@ -25,6 +25,7 @@ export interface ProjectPayload {
   description?: string | null;
   color?: string | null;
   deadline?: string | null;
+  organization_id?: string | null;
 }
 
 /** POST /api/projects */

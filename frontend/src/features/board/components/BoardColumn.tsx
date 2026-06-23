@@ -31,6 +31,7 @@ import {
   useDeleteColumn,
 } from "../hooks/useSprintBoard";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useProjectStore } from "@/stores";
 
 // ─── Quick-create inline form ─────────────────────────────────────────────────
 
@@ -50,6 +51,10 @@ function QuickCreateForm({
   const [title, setTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const create = useCreateBoardItem(sprintId);
+  // Scope the new item to the currently-selected project so it does not become
+  // an orphan (project_id NULL) that vanishes under project filters. When the
+  // board is in "All Projects" mode (currentProjectId === null) we leave it null.
+  const currentProjectId = useProjectStore((s) => s.currentProjectId);
 
   function handleSubmit() {
     const trimmed = title.trim();
@@ -62,6 +67,7 @@ function QuickCreateForm({
         title: trimmed,
         status: (mappedStatus as "backlog" | "todo" | "in_progress" | "review" | "done") ?? "todo",
         sprint_id: sprintId,
+        project_id: currentProjectId,
       },
       { onSuccess: () => { setTitle(""); onClose(); } },
     );

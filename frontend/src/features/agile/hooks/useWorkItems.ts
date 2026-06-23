@@ -40,6 +40,39 @@ export const workItemKeys = {
     ["backlog", filters] as const,
 };
 
+/**
+ * Dedupe a work-item list by `id`, preserving first-seen order.
+ *
+ * Guards against a single created work item rendering as TWO rows in the
+ * backlog. The backend list queries already collapse the subtask LEFT JOIN
+ * with `GROUP BY wi.id`, so the server returns distinct rows; the transient
+ * duplicate is a client-side artifact — an optimistic insert overlapping the
+ * post-create refetch, or the same item held under two query keys (unfiltered
+ * + project-filtered) momentarily concatenating. Normalising by id through
+ * React Query's `select` makes the rendered list canonical regardless of
+ * source, and the deduped array is memoised (no new reference per render).
+ */
+function dedupeById<T extends { id: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
+  }
+  return out;
+}
+
+function dedupeListResponse<T extends { id: string }>(
+  res: AgileListResponse<T>,
+): AgileListResponse<T> {
+  const data = dedupeById(res.data);
+  // Preserve the server's reported total when it already matches the deduped
+  // length; otherwise fall back to the real distinct count so the header badge
+  // and the rendered rows never disagree.
+  return { data, total: res.data.length === data.length ? res.total : data.length };
+}
+
 function filtersToParams(
   filters: WorkItemFiltersState,
 ): Record<string, string | number | boolean | undefined | null> {
@@ -67,6 +100,7 @@ export function useWorkItems(filters: WorkItemFiltersState = {}) {
         filtersToParams(filters),
       ),
     placeholderData: keepPreviousData,
+    select: dedupeListResponse,
   });
 }
 
@@ -96,6 +130,7 @@ export function useBacklog(filters?: { epic_id?: string; project_id?: string | n
         filters as Record<string, string | number | boolean | undefined | null>,
       ),
     placeholderData: keepPreviousData,
+    select: dedupeListResponse,
   });
 }
 
@@ -121,6 +156,9 @@ export function useUpdateWorkItem(id: string) {
     onSuccess: (data) => {
       qc.setQueryData(workItemKeys.detail(id), data);
       qc.invalidateQueries({ queryKey: workItemKeys.lists() });
+      // A project (re)assignment moves the row in/out of project-filtered
+      // backlog views, so refresh the backlog query family too.
+      qc.invalidateQueries({ queryKey: ["backlog"] });
     },
   });
 }

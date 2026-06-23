@@ -1,0 +1,172 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n               t.id,\n               t.user_id,\n               t.project_id,\n               t.title,\n               t.description,\n               t.priority    AS \"priority: TaskPriority\",\n               t.status      AS \"status: TaskStatus\",\n               t.due_date,\n               t.start_date,\n               t.estimated_time,\n               t.actual_time,\n               t.recurrence_rule,\n               t.completed_at,\n               t.position,\n               t.created_at,\n               t.updated_at\n           FROM tasks t\n           WHERE t.user_id = $1\n             AND t.deleted_at IS NULL\n             AND ($2::uuid    IS NULL OR t.project_id = $2)\n             AND ($3::task_status IS NULL OR t.status  = $3)\n             AND ($4::task_priority IS NULL OR t.priority = $4)\n             AND ($5::timestamptz IS NULL OR t.due_date <= $5)\n             AND ($6::timestamptz IS NULL OR t.due_date >= $6)\n             AND ($7::uuid IS NULL OR EXISTS (\n                     SELECT 1 FROM task_tags tt\n                     WHERE tt.task_id = t.id AND tt.tag_id = $7\n                 ))\n           ORDER BY t.position ASC, t.created_at DESC\n           LIMIT $8 OFFSET $9",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "project_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "priority: TaskPriority",
+        "type_info": {
+          "Custom": {
+            "name": "task_priority",
+            "kind": {
+              "Enum": [
+                "critical",
+                "high",
+                "medium",
+                "low"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "status: TaskStatus",
+        "type_info": {
+          "Custom": {
+            "name": "task_status",
+            "kind": {
+              "Enum": [
+                "inbox",
+                "planned",
+                "in_progress",
+                "waiting",
+                "completed",
+                "archived"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "due_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "start_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "estimated_time",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "actual_time",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "recurrence_rule",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "completed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "position",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 14,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 15,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        {
+          "Custom": {
+            "name": "task_status",
+            "kind": {
+              "Enum": [
+                "inbox",
+                "planned",
+                "in_progress",
+                "waiting",
+                "completed",
+                "archived"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "task_priority",
+            "kind": {
+              "Enum": [
+                "critical",
+                "high",
+                "medium",
+                "low"
+              ]
+            }
+          }
+        },
+        "Timestamptz",
+        "Timestamptz",
+        "Uuid",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d9e3c14bc8e46647a3d46ab80d5c0e27ff877f46eb3f400068ad5c4def3e1023"
+}

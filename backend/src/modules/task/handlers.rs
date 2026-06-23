@@ -67,13 +67,33 @@ pub async fn update_task(
     Ok(Json(resp))
 }
 
-/// `DELETE /api/tasks/:id`
+/// `DELETE /api/tasks/:id` — soft-delete (moves the task to the recycle bin).
 pub async fn delete_task(
     auth: AuthUser,
     State(state): State<AppState>,
     Path(task_id): Path<Uuid>,
 ) -> AppResult<StatusCode> {
     service::delete_task(&state, auth.user_id, task_id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// `POST /api/tasks/:id/restore` — restore a soft-deleted task.
+pub async fn restore_task(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(task_id): Path<Uuid>,
+) -> AppResult<StatusCode> {
+    service::restore_task(&state, auth.user_id, task_id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// `DELETE /api/tasks/:id/purge` — permanently delete a task (hard delete).
+pub async fn purge_task(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(task_id): Path<Uuid>,
+) -> AppResult<StatusCode> {
+    service::purge_task(&state, auth.user_id, task_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

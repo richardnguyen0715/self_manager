@@ -36,6 +36,10 @@ pub struct Project {
     pub deadline: Option<NaiveDate>,
     pub status: ProjectStatus,
     pub position: i32,
+    /// Owning organization, or `None` when the project is unassigned.
+    pub organization_id: Option<Uuid>,
+    /// Soft-delete timestamp; `None` for active rows.
+    pub deleted_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -67,6 +71,10 @@ pub struct ProjectResponse {
     pub deadline: Option<NaiveDate>,
     pub status: ProjectStatus,
     pub position: i32,
+    /// Owning organization, or `None` when the project is unassigned.
+    pub organization_id: Option<Uuid>,
+    /// Soft-delete timestamp; `None` for active rows (set for Trash views).
+    pub deleted_at: Option<DateTime<Utc>>,
     pub progress: ProjectProgress,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -85,6 +93,8 @@ impl ProjectResponse {
             deadline: project.deadline,
             status: project.status,
             position: project.position,
+            organization_id: project.organization_id,
+            deleted_at: project.deleted_at,
             progress,
             created_at: project.created_at,
             updated_at: project.updated_at,
@@ -138,6 +148,28 @@ pub struct UpdateProjectRequest {
     pub status: Option<ProjectStatus>,
 
     pub position: Option<i32>,
+
+    /// Assign or unassign the owning organization.
+    ///
+    /// Three-state semantics via `Option<Option<Uuid>>`:
+    /// - field omitted   → `None`        → leave `organization_id` unchanged
+    /// - `null`          → `Some(None)`  → unassign (set to NULL)
+    /// - `"<uuid>"`      → `Some(Some)`  → assign to that organization
+    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub organization_id: Option<Option<Uuid>>,
+}
+
+/// Deserialize a present-but-nullable field into `Option<Option<T>>`.
+///
+/// An absent field is handled by `#[serde(default)]` (yields `None`); this
+/// function is only invoked when the key is present, so it returns
+/// `Some(inner)` where `inner` is `None` for an explicit JSON `null`.
+fn deserialize_double_option<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
 }
 
 // ── Query parameters ──────────────────────────────────────────────────────────

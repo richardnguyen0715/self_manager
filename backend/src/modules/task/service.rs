@@ -92,6 +92,7 @@ pub async fn list_tasks(
                t.updated_at
            FROM tasks t
            WHERE t.user_id = $1
+             AND t.deleted_at IS NULL
              AND ($2::uuid    IS NULL OR t.project_id = $2)
              AND ($3::task_status IS NULL OR t.status  = $3)
              AND ($4::task_priority IS NULL OR t.priority = $4)
@@ -141,7 +142,7 @@ pub async fn get_task(state: &AppState, user_id: Uuid, task_id: Uuid) -> AppResu
                created_at,
                updated_at
            FROM tasks
-           WHERE id = $1 AND user_id = $2"#,
+           WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL"#,
         task_id,
         user_id,
     )
@@ -241,7 +242,7 @@ pub async fn update_task(
                due_date, start_date, estimated_time, actual_time,
                recurrence_rule, completed_at, position, created_at, updated_at
            FROM tasks
-           WHERE id = $1 AND user_id = $2"#,
+           WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL"#,
         task_id,
         user_id,
     )
@@ -275,7 +276,7 @@ pub async fn update_task(
                recurrence_rule  = COALESCE($12, recurrence_rule),
                position         = COALESCE($13, position),
                completed_at     = $14
-           WHERE id = $1 AND user_id = $2
+           WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
            RETURNING
                id, user_id, project_id, title, description,
                priority    AS "priority: TaskPriority",
@@ -311,9 +312,47 @@ pub async fn update_task(
     enrich(&state.db, updated).await
 }
 
-/// Delete a task; returns [`AppError::NotFound`] if it doesn't exist or belongs
-/// to a different user.
+/// Soft-delete a task by stamping `deleted_at = now()`. Soft-deleted rows are
+/// hidden from every normal view but can be restored or permanently purged via
+/// the recycle bin. Returns [`AppError::NotFound`] if the task doesn't exist,
+/// belongs to a different user, or is already in the trash.
 pub async fn delete_task(state: &AppState, user_id: Uuid, task_id: Uuid) -> AppResult<()> {
+    let result = sqlx::query!(
+        "UPDATE tasks SET deleted_at = now() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL",
+        task_id,
+        user_id,
+    )
+    .execute(&state.db)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
+/// Restore a soft-deleted task by clearing `deleted_at`. Returns
+/// [`AppError::NotFound`] if the task doesn't exist, belongs to a different
+/// user, or is not currently in the trash.
+pub async fn restore_task(state: &AppState, user_id: Uuid, task_id: Uuid) -> AppResult<()> {
+    let result = sqlx::query!(
+        "UPDATE tasks SET deleted_at = NULL WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL",
+        task_id,
+        user_id,
+    )
+    .execute(&state.db)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
+/// Permanently delete a task (hard delete). Subtasks and tag associations are
+/// removed via foreign-key cascade. Returns [`AppError::NotFound`] if it doesn't
+/// exist or belongs to a different user.
+pub async fn purge_task(state: &AppState, user_id: Uuid, task_id: Uuid) -> AppResult<()> {
     let result = sqlx::query!(
         "DELETE FROM tasks WHERE id = $1 AND user_id = $2",
         task_id,
@@ -333,7 +372,7 @@ pub async fn delete_task(state: &AppState, user_id: Uuid, task_id: Uuid) -> AppR
 /// Assert the task belongs to `user_id`; errors otherwise.
 async fn assert_task_owner(db: &PgPool, user_id: Uuid, task_id: Uuid) -> AppResult<()> {
     let exists = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM tasks WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM tasks WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         task_id,
         user_id,
     )

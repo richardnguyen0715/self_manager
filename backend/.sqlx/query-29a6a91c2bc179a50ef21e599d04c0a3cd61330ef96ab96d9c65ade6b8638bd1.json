@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE projects SET deleted_at = now(), updated_at = now()\n         WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "29a6a91c2bc179a50ef21e599d04c0a3cd61330ef96ab96d9c65ade6b8638bd1"
+}

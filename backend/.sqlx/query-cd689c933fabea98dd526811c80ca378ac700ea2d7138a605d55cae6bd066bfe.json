@@ -1,0 +1,127 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE projects SET\n            name            = COALESCE($3, name),\n            description     = COALESCE($4, description),\n            color           = COALESCE($5, color),\n            deadline        = COALESCE($6, deadline),\n            goal_id         = CASE WHEN $7 THEN $8 ELSE goal_id END,\n            status          = COALESCE($9, status),\n            position        = COALESCE($10, position),\n            organization_id = CASE WHEN $11 THEN $12 ELSE organization_id END,\n            updated_at      = now()\n        WHERE id = $1 AND user_id = $2\n          AND deleted_at IS NULL\n        RETURNING\n            id,\n            user_id,\n            goal_id,\n            name,\n            description,\n            color,\n            deadline,\n            status  AS \"status: ProjectStatus\",\n            position,\n            organization_id,\n            deleted_at,\n            created_at,\n            updated_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "goal_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "deadline",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 7,
+        "name": "status: ProjectStatus",
+        "type_info": {
+          "Custom": {
+            "name": "project_status",
+            "kind": {
+              "Enum": [
+                "active",
+                "completed",
+                "archived"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "position",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "organization_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 10,
+        "name": "deleted_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Date",
+        "Bool",
+        "Uuid",
+        {
+          "Custom": {
+            "name": "project_status",
+            "kind": {
+              "Enum": [
+                "active",
+                "completed",
+                "archived"
+              ]
+            }
+          }
+        },
+        "Int4",
+        "Bool",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "cd689c933fabea98dd526811c80ca378ac700ea2d7138a605d55cae6bd066bfe"
+}

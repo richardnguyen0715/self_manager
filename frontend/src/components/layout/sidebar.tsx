@@ -21,6 +21,8 @@ import {
   Network,
   FolderOpen,
   FileText,
+  Building2,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -52,6 +54,9 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Docs", href: "/docs", icon: FileText },
   { label: "Goals", href: "/goals", icon: Target },
   { label: "Analytics", href: "/analytics", icon: BarChart3 },
+  // ── Management ───────────────────────────────────────────────────────────
+  { label: "Organizations", href: "/organizations", icon: Building2 },
+  { label: "Trash", href: "/trash", icon: Trash2 },
 ];
 
 const BOTTOM_ITEMS: NavItem[] = [

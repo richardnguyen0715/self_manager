@@ -81,13 +81,37 @@ pub async fn update_project(
 
 // ── DELETE /api/projects/:id ──────────────────────────────────────────────────
 
-/// Permanently delete a project.
+/// Soft-delete a project (moves it to the Trash; recoverable).
 pub async fn delete_project(
     auth: AuthUser,
     State(state): State<AppState>,
     Path(project_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, AppError> {
     service::delete_project(&state, auth.user_id, project_id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ── POST /api/projects/:id/restore ────────────────────────────────────────────
+
+/// Restore a soft-deleted project from the Trash.
+pub async fn restore_project(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(project_id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    service::restore_project(&state, auth.user_id, project_id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ── DELETE /api/projects/:id/purge ────────────────────────────────────────────
+
+/// Permanently delete a project (hard delete, irreversible).
+pub async fn purge_project(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(project_id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    service::purge_project(&state, auth.user_id, project_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

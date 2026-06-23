@@ -1,0 +1,161 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            id, user_id, project_id, epic_id, sprint_id,\n            type::text  AS \"item_type!\",\n            title, description,\n            status::text   AS \"status!\",\n            priority::text AS \"priority!\",\n            story_points, position,\n            start_date, due_date, recurrence_rule, completed_at,\n            column_id,\n            labels AS \"labels!: Vec<String>\",\n            pinned_fields AS \"pinned_fields!: Vec<String>\",\n            github_repo, github_branch, github_pr,\n            created_at, updated_at\n        FROM work_items\n        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "project_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "epic_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "sprint_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "item_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "priority!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "story_points",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "position",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "start_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "due_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "recurrence_rule",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "completed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 16,
+        "name": "column_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 17,
+        "name": "labels!: Vec<String>",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 18,
+        "name": "pinned_fields!: Vec<String>",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 19,
+        "name": "github_repo",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 20,
+        "name": "github_branch",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 21,
+        "name": "github_pr",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 22,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 23,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      null,
+      false,
+      true,
+      null,
+      null,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "19d7efa9d1bf72df22fa8ce48f755ebf17c23ef36c088a9c8b5c1e1efdacd34e"
+}

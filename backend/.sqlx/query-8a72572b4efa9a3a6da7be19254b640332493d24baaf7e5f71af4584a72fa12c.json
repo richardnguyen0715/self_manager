@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*)\n        FROM work_items wi\n        WHERE wi.user_id = $1\n          AND wi.deleted_at IS NULL\n          AND ($2::uuid IS NULL OR wi.project_id = $2)\n          AND ($3::uuid IS NULL OR wi.sprint_id  = $3)\n          AND ($4::uuid IS NULL OR wi.epic_id    = $4)\n          AND ($5::text IS NULL OR wi.status::text   = $5)\n          AND ($6::text IS NULL OR wi.type::text     = $6)\n          AND ($7::text IS NULL OR wi.priority::text = $7)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "8a72572b4efa9a3a6da7be19254b640332493d24baaf7e5f71af4584a72fa12c"
+}

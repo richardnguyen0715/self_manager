@@ -13,6 +13,8 @@ import {
   ArrowLeft,
   Calendar,
   GripVertical,
+  FolderInput,
+  Check,
 } from "lucide-react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { useDraggable } from "@dnd-kit/core";
@@ -27,7 +29,9 @@ import {
   useMoveWorkItemToSprint,
   useMoveWorkItemToBacklog,
   useDeleteWorkItem,
+  useUpdateWorkItem,
 } from "@/features/agile";
+import { useProjects } from "@/features/tasks/hooks/useProjects";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // ─── Priority dot ─────────────────────────────────────────────────────────────
@@ -90,6 +94,8 @@ export function WorkItemRow({
   const moveToSprint = useMoveWorkItemToSprint(item.id);
   const moveToBacklog = useMoveWorkItemToBacklog(item.id);
   const deleteItem = useDeleteWorkItem();
+  const updateItem = useUpdateWorkItem(item.id);
+  const { data: projects = [] } = useProjects();
   const confirm = useConfirm();
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -115,6 +121,11 @@ export function WorkItemRow({
     )
       return;
     deleteItem.mutate(item.id);
+  }
+
+  function handleAssignProject(projectId: string | null) {
+    if ((item.project_id ?? null) === projectId) return; // no-op
+    updateItem.mutate({ project_id: projectId });
   }
 
   const hasSubtasks = (item.subtask_count ?? 0) > 0;
@@ -315,6 +326,76 @@ export function WorkItemRow({
                 </DropdownMenuPrimitive.Portal>
               </DropdownMenuPrimitive.Sub>
             )}
+
+            {/* Assign to project */}
+            <DropdownMenuPrimitive.Sub>
+              <DropdownMenuPrimitive.SubTrigger
+                className={cn(
+                  "flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none",
+                  "focus:bg-accent focus:text-accent-foreground",
+                )}
+              >
+                <FolderInput className="h-3.5 w-3.5" />
+                Assign to project
+              </DropdownMenuPrimitive.SubTrigger>
+              <DropdownMenuPrimitive.Portal>
+                <DropdownMenuPrimitive.SubContent
+                  sideOffset={4}
+                  className={cn(
+                    "z-50 max-h-[18rem] min-w-[12rem] overflow-y-auto rounded-md border bg-popover p-1 shadow-md",
+                    "data-[state=open]:animate-in data-[state=closed]:animate-out",
+                    "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                    "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+                  )}
+                >
+                  {/* No project (clear assignment) */}
+                  <DropdownMenuPrimitive.Item
+                    onSelect={() => handleAssignProject(null)}
+                    className={cn(
+                      "flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none",
+                      "focus:bg-accent focus:text-accent-foreground",
+                    )}
+                  >
+                    <span className="flex h-3.5 w-3.5 items-center justify-center shrink-0">
+                      {item.project_id == null && <Check className="h-3.5 w-3.5" />}
+                    </span>
+                    <span className="text-muted-foreground">No project</span>
+                  </DropdownMenuPrimitive.Item>
+
+                  {projects.length > 0 && (
+                    <DropdownMenuPrimitive.Separator className="my-1 h-px bg-border" />
+                  )}
+
+                  {projects.map((p) => (
+                    <DropdownMenuPrimitive.Item
+                      key={p.id}
+                      onSelect={() => handleAssignProject(p.id)}
+                      className={cn(
+                        "flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none",
+                        "focus:bg-accent focus:text-accent-foreground",
+                      )}
+                    >
+                      <span className="flex h-3.5 w-3.5 items-center justify-center shrink-0">
+                        {item.project_id === p.id && <Check className="h-3.5 w-3.5" />}
+                      </span>
+                      {p.color && (
+                        <span
+                          className="h-2 w-2 rounded-full shrink-0"
+                          style={{ backgroundColor: p.color }}
+                        />
+                      )}
+                      <span className="truncate">{p.name}</span>
+                    </DropdownMenuPrimitive.Item>
+                  ))}
+
+                  {projects.length === 0 && (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                      No projects yet.
+                    </div>
+                  )}
+                </DropdownMenuPrimitive.SubContent>
+              </DropdownMenuPrimitive.Portal>
+            </DropdownMenuPrimitive.Sub>
 
             <DropdownMenuPrimitive.Separator className="my-1 h-px bg-border" />
 

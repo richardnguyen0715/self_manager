@@ -61,6 +61,10 @@ import {
   useWorkItems,
 } from "../hooks/useWorkItems";
 import { WorkItemTypeBadge } from "./WorkItemTypeBadge";
+import {
+  TiptapDescriptionEditor,
+  DescriptionPreview,
+} from "./TiptapDescriptionEditor";
 import { WORK_ITEM_STATUS_CONFIG } from "./WorkItemStatusBadge";
 import { PRIORITY_CONFIG } from "./WorkItemPriorityBadge";
 import type { WorkItemStatus, WorkItemSubtask } from "@/types";
@@ -730,10 +734,10 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
     setEditingTitle(false);
   }
 
-  function handleDescriptionSave() {
-    const trimmed = descriptionDraft.trim() || null;
-    if (trimmed !== workItem!.description) {
-      updateItem.mutate({ description: trimmed });
+  function handleDescriptionSave(html: string) {
+    const next = html.trim() || null;
+    if (next !== workItem!.description) {
+      updateItem.mutate({ description: next });
     }
     setEditingDescription(false);
   }
@@ -955,36 +959,16 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
             <div className="space-y-2">
               <h2 className="text-sm font-semibold">Description</h2>
               {editingDescription ? (
-                <div className="space-y-2">
-                  <textarea
-                    autoFocus
-                    value={descriptionDraft}
-                    onChange={(e) => setDescriptionDraft(e.target.value)}
-                    rows={5}
-                    placeholder="Add a description..."
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
-                  />
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={handleDescriptionSave}>
-                      Save
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setEditingDescription(false)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
+                <TiptapDescriptionEditor
+                  value={descriptionDraft}
+                  onSave={handleDescriptionSave}
+                  onCancel={() => setEditingDescription(false)}
+                />
               ) : (
                 <div
                   role="button"
                   tabIndex={0}
-                  className={cn(
-                    "min-h-[3rem] cursor-text rounded-md px-1 py-1 text-sm transition-colors hover:bg-accent/40 whitespace-pre-wrap",
-                    !workItem.description && "text-muted-foreground italic",
-                  )}
+                  className="min-h-[3rem] cursor-text rounded-md px-1 py-1 transition-colors hover:bg-accent/40"
                   onClick={() => {
                     setDescriptionDraft(workItem.description ?? "");
                     setEditingDescription(true);
@@ -997,7 +981,7 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
                     }
                   }}
                 >
-                  {workItem.description || "Add a description..."}
+                  <DescriptionPreview value={workItem.description} />
                 </div>
               )}
             </div>

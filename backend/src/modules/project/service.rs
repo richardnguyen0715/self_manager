@@ -33,6 +33,7 @@ async fn fetch_progress(state: &AppState, project_id: Uuid) -> AppResult<Project
             COUNT(*) FILTER (WHERE status = 'completed')   AS "completed_tasks!: i64"
         FROM tasks
         WHERE project_id = $1
+          AND deleted_at IS NULL
         "#,
         project_id
     )
@@ -78,10 +79,13 @@ pub async fn list_projects(
             deadline,
             status  AS "status: ProjectStatus",
             position,
+            organization_id,
+            deleted_at,
             created_at,
             updated_at
         FROM projects
         WHERE user_id = $1
+          AND deleted_at IS NULL
           AND ($2::project_status IS NULL OR status = $2)
           AND ($3::uuid IS NULL OR goal_id = $3)
         ORDER BY position ASC, created_at ASC
@@ -120,10 +124,13 @@ pub async fn get_project(
             deadline,
             status  AS "status: ProjectStatus",
             position,
+            organization_id,
+            deleted_at,
             created_at,
             updated_at
         FROM projects
         WHERE id = $1 AND user_id = $2
+          AND deleted_at IS NULL
         "#,
         project_id,
         user_id
@@ -175,6 +182,8 @@ pub async fn create_project(
             deadline,
             status  AS "status: ProjectStatus",
             position,
+            organization_id,
+            deleted_at,
             created_at,
             updated_at
         "#,
@@ -218,10 +227,13 @@ pub async fn update_project(
             deadline,
             status  AS "status: ProjectStatus",
             position,
+            organization_id,
+            deleted_at,
             created_at,
             updated_at
         FROM projects
         WHERE id = $1 AND user_id = $2
+          AND deleted_at IS NULL
         "#,
         project_id,
         user_id
@@ -253,19 +265,43 @@ pub async fn update_project(
         None => None,
     };
 
+    // Validate new organization_id ownership when it's being assigned.
+    // `req.organization_id` is `Option<Option<Uuid>>`:
+    //   None             → leave organization_id unchanged
+    //   Some(None)       → unassign (set to NULL)
+    //   Some(Some(oid))  → assign to `oid` (must belong to this user)
+    if let Some(Some(oid)) = req.organization_id {
+        let exists = sqlx::query_scalar!(
+            "SELECT EXISTS(SELECT 1 FROM organizations WHERE id = $1 AND user_id = $2)",
+            oid,
+            user_id
+        )
+        .fetch_one(&state.db)
+        .await?
+        .unwrap_or(false);
+
+        if !exists {
+            return Err(AppError::NotFoundMsg(
+                "organization not found or does not belong to you".to_owned(),
+            ));
+        }
+    }
+
     let project = sqlx::query_as!(
         Project,
         r#"
         UPDATE projects SET
-            name        = COALESCE($3, name),
-            description = COALESCE($4, description),
-            color       = COALESCE($5, color),
-            deadline    = COALESCE($6, deadline),
-            goal_id     = CASE WHEN $7 THEN $8 ELSE goal_id END,
-            status      = COALESCE($9, status),
-            position    = COALESCE($10, position),
-            updated_at  = now()
+            name            = COALESCE($3, name),
+            description     = COALESCE($4, description),
+            color           = COALESCE($5, color),
+            deadline        = COALESCE($6, deadline),
+            goal_id         = CASE WHEN $7 THEN $8 ELSE goal_id END,
+            status          = COALESCE($9, status),
+            position        = COALESCE($10, position),
+            organization_id = CASE WHEN $11 THEN $12 ELSE organization_id END,
+            updated_at      = now()
         WHERE id = $1 AND user_id = $2
+          AND deleted_at IS NULL
         RETURNING
             id,
             user_id,
@@ -276,6 +312,8 @@ pub async fn update_project(
             deadline,
             status  AS "status: ProjectStatus",
             position,
+            organization_id,
+            deleted_at,
             created_at,
             updated_at
         "#,
@@ -289,6 +327,8 @@ pub async fn update_project(
         new_goal_id.flatten(),               // $8  new goal_id value (may be NULL)
         req.status.clone() as Option<ProjectStatus>, // $9
         req.position,                        // $10
+        req.organization_id.is_some(),       // $11 bool: should we update organization_id?
+        req.organization_id.flatten(),       // $12 new organization_id value (may be NULL)
     )
     .fetch_one(&state.db)
     .await?;
@@ -305,12 +345,53 @@ pub async fn update_project(
     Ok(ProjectResponse::from_parts(project, progress))
 }
 
-/// Permanently delete a project owned by `user_id`.
+/// Soft-delete a project owned by `user_id` (moves it to the Trash).
+///
+/// Sets `deleted_at = now()` so the row vanishes from all normal views while
+/// remaining recoverable via [`restore_project`] or removable via
+/// [`purge_project`]. Already soft-deleted rows are treated as not found.
+pub async fn delete_project(state: &AppState, user_id: Uuid, project_id: Uuid) -> AppResult<()> {
+    let result = sqlx::query!(
+        "UPDATE projects SET deleted_at = now(), updated_at = now()
+         WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL",
+        project_id,
+        user_id
+    )
+    .execute(&state.db)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
+/// Restore a soft-deleted project (clears `deleted_at`).
+///
+/// Only matches rows that are currently in the Trash (`deleted_at IS NOT NULL`).
+pub async fn restore_project(state: &AppState, user_id: Uuid, project_id: Uuid) -> AppResult<()> {
+    let result = sqlx::query!(
+        "UPDATE projects SET deleted_at = NULL, updated_at = now()
+         WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL",
+        project_id,
+        user_id
+    )
+    .execute(&state.db)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
+/// Permanently delete a project owned by `user_id` (hard DELETE, irreversible).
 ///
 /// Cascaded by the DB: tasks whose `project_id` points here will have their
 /// `project_id` set to NULL (ON DELETE SET NULL), kanban_columns will be
-/// deleted (ON DELETE CASCADE).
-pub async fn delete_project(state: &AppState, user_id: Uuid, project_id: Uuid) -> AppResult<()> {
+/// deleted (ON DELETE CASCADE). Purge is allowed regardless of soft-delete
+/// state so a project can be removed directly or emptied from the Trash.
+pub async fn purge_project(state: &AppState, user_id: Uuid, project_id: Uuid) -> AppResult<()> {
     let result = sqlx::query!(
         "DELETE FROM projects WHERE id = $1 AND user_id = $2",
         project_id,

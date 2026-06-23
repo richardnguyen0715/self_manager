@@ -134,6 +134,7 @@ export interface Project {
   id: string;
   user_id: string;
   goal_id: string | null;
+  organization_id?: string | null;
   name: string;
   description: string | null;
   color: string | null;
@@ -141,6 +142,23 @@ export interface Project {
   status: ProjectStatus;
   position: number;
   progress: ProjectProgress;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Organization — personal grouping layer above projects (single-user, owned
+ * by user_id). A project optionally belongs to one organization via
+ * Project.organization_id.
+ * Backend: Organization { id, user_id, name, description?, color?, position,
+ *   created_at, updated_at } — table added by migration 0011.
+ */
+export interface Organization {
+  id: string;
+  name: string;
+  description?: string | null;
+  color?: string | null;
+  position: number;
   created_at: string;
   updated_at: string;
 }
@@ -909,6 +927,20 @@ export interface AgileListResponse<T> {
   total: number;
 }
 
+// ─── Trash (soft-delete recycle bin) ────────────────────────────────────────────
+
+/**
+ * TrashResponse from GET /api/trash.
+ * Backend: { work_items, tasks, projects } where each array contains
+ * soft-deleted rows (deleted_at IS NOT NULL) for the user, newest deleted first.
+ * Reuses the existing list-item response shapes.
+ */
+export interface TrashResponse {
+  work_items: WorkItemListItem[];
+  tasks: Task[];
+  projects: Project[];
+}
+
 // ─── Docs ──────────────────────────────────────────────────────────────────────
 
 export type PageKind = "page" | "whiteboard";
@@ -1211,6 +1243,10 @@ export const API_ENDPOINTS = {
   TASKS: "/api/tasks",
   // GET / PATCH / DELETE /api/tasks/:id
   TASK_BY_ID: (id: string) => `/api/tasks/${id}`,
+  // POST /api/tasks/:id/restore — un-soft-delete
+  TASK_RESTORE: (id: string) => `/api/tasks/${id}/restore`,
+  // DELETE /api/tasks/:id/purge — permanent hard delete
+  TASK_PURGE: (id: string) => `/api/tasks/${id}/purge`,
   // GET / POST /api/tasks/:id/subtasks
   TASK_SUBTASKS: (id: string) => `/api/tasks/${id}/subtasks`,
   // PATCH / DELETE /api/tasks/:id/subtasks/:subtask_id
@@ -1232,6 +1268,18 @@ export const API_ENDPOINTS = {
   PROJECTS: "/api/projects",
   PROJECT_BY_ID: (id: string) => `/api/projects/${id}`,
   PROJECTS_REORDER: "/api/projects/reorder",
+  // POST /api/projects/:id/restore — un-soft-delete
+  PROJECT_RESTORE: (id: string) => `/api/projects/${id}/restore`,
+  // DELETE /api/projects/:id/purge — permanent hard delete
+  PROJECT_PURGE: (id: string) => `/api/projects/${id}/purge`,
+
+  // ── Organizations (/api/organizations) ────────────────────────────────────
+  ORGANIZATIONS: "/api/organizations",
+  ORGANIZATION_BY_ID: (id: string) => `/api/organizations/${id}`,
+
+  // ── Trash (/api/trash) — soft-delete recycle bin ──────────────────────────
+  // GET /api/trash → { work_items, tasks, projects }
+  TRASH: "/api/trash",
 
   // ── Goals (/api/goals) ────────────────────────────────────────────────────
   GOALS: "/api/goals",
@@ -1365,6 +1413,10 @@ export const API_ENDPOINTS = {
   // ── Work Items (/api/work-items) ──────────────────────────────────────────
   WORK_ITEMS: "/api/work-items",
   WORK_ITEM_BY_ID: (id: string) => `/api/work-items/${id}`,
+  // POST /api/work-items/:id/restore — un-soft-delete
+  WORK_ITEM_RESTORE: (id: string) => `/api/work-items/${id}/restore`,
+  // DELETE /api/work-items/:id/purge — permanent hard delete
+  WORK_ITEM_PURGE: (id: string) => `/api/work-items/${id}/purge`,
   WORK_ITEM_STATUS: (id: string) => `/api/work-items/${id}/status`,
   WORK_ITEM_COLUMN: (id: string) => `/api/work-items/${id}/column`,
   WORK_ITEM_POINTS: (id: string) => `/api/work-items/${id}/points`,

@@ -7,7 +7,9 @@
 //! POST   /api/work-items                              create_work_item
 //! GET    /api/work-items/:id                          get_work_item
 //! PATCH  /api/work-items/:id                          update_work_item
-//! DELETE /api/work-items/:id                          delete_work_item
+//! DELETE /api/work-items/:id                          delete_work_item (soft)
+//! POST   /api/work-items/:id/restore                  restore_work_item
+//! DELETE /api/work-items/:id/purge                    purge_work_item (hard)
 //! PATCH  /api/work-items/:id/status                   set_status
 //! PATCH  /api/work-items/:id/points                   set_points
 //! PATCH  /api/work-items/:id/column                   set_column
@@ -32,7 +34,7 @@
 //! ```
 
 use axum::{
-    routing::{delete, get, patch},
+    routing::{delete, get, patch, post},
     Router,
 };
 
@@ -58,6 +60,9 @@ pub fn router() -> Router<AppState> {
                 .patch(handlers::update_work_item)
                 .delete(handlers::delete_work_item),
         )
+        // Trash: restore (un-delete) and purge (permanent delete)
+        .route("/:id/restore", post(handlers::restore_work_item))
+        .route("/:id/purge", delete(handlers::purge_work_item))
         // Sub-resource: status transition
         .route("/:id/status", patch(handlers::set_status))
         // Sub-resource: story points

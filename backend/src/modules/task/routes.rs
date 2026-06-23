@@ -32,6 +32,9 @@ pub fn router() -> Router<AppState> {
                 .patch(handlers::update_task)
                 .delete(handlers::delete_task),
         )
+        // ── Soft-delete recycle bin ────────────────────────────────────────────
+        .route("/:id/restore", routing::post(handlers::restore_task))
+        .route("/:id/purge", routing::delete(handlers::purge_task))
         // ── Subtasks (nested under task) ───────────────────────────────────────
         .route(
             "/:id/subtasks",

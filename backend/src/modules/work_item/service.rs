@@ -73,7 +73,7 @@ async fn fetch_work_item_with_subtasks(
             github_repo, github_branch, github_pr,
             created_at, updated_at
         FROM work_items
-        WHERE id = $1 AND user_id = $2
+        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
         "#,
         item_id,
         user_id,
@@ -192,6 +192,7 @@ pub async fn list_work_items(
         FROM work_items wi
         LEFT JOIN work_item_subtasks s ON s.work_item_id = wi.id
         WHERE wi.user_id = $1
+          AND wi.deleted_at IS NULL
           AND ($2::uuid IS NULL OR wi.project_id = $2)
           AND ($3::uuid IS NULL OR wi.sprint_id  = $3)
           AND ($4::uuid IS NULL OR wi.epic_id    = $4)
@@ -220,6 +221,7 @@ pub async fn list_work_items(
         SELECT COUNT(*)
         FROM work_items wi
         WHERE wi.user_id = $1
+          AND wi.deleted_at IS NULL
           AND ($2::uuid IS NULL OR wi.project_id = $2)
           AND ($3::uuid IS NULL OR wi.sprint_id  = $3)
           AND ($4::uuid IS NULL OR wi.epic_id    = $4)
@@ -396,7 +398,7 @@ pub async fn update_work_item(
             github_repo, github_branch, github_pr,
             created_at, updated_at
         FROM work_items
-        WHERE id = $1 AND user_id = $2
+        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
         "#,
         item_id,
         user_id,
@@ -533,7 +535,7 @@ pub async fn update_work_item(
             github_branch   = $19,
             github_pr       = $20,
             updated_at      = now()
-        WHERE id = $1 AND user_id = $2
+        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
         RETURNING
             id, user_id, project_id, epic_id, sprint_id,
             type::text     AS "item_type!",
@@ -599,15 +601,76 @@ pub async fn update_work_item(
     Ok(work_item_into_response(updated, subtasks))
 }
 
-/// Delete a work item, enforcing ownership.
+/// Soft-delete a work item, enforcing ownership.
 ///
-/// Cascade deletes subtasks via the database FK constraint.
+/// Sets `deleted_at = now()` so the item disappears from normal views but can
+/// be restored from the trash. Subtasks remain attached to the (hidden) item.
 ///
 /// # Errors
 ///
 /// - [`AppError::NotFound`] — item not found or owned by a different user.
 /// - [`AppError::Db`] — database failure.
 pub async fn delete_work_item(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+) -> AppResult<()> {
+    let result = sqlx::query!(
+        "UPDATE work_items SET deleted_at = now(), updated_at = now() \
+         WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL",
+        item_id,
+        user_id,
+    )
+    .execute(&state.db)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+
+    Ok(())
+}
+
+/// Restore a soft-deleted work item, enforcing ownership.
+///
+/// Clears `deleted_at` so the item reappears in normal views.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — item not found, owned by a different user, or
+///   not currently soft-deleted.
+/// - [`AppError::Db`] — database failure.
+pub async fn restore_work_item(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+) -> AppResult<()> {
+    let result = sqlx::query!(
+        "UPDATE work_items SET deleted_at = NULL, updated_at = now() \
+         WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL",
+        item_id,
+        user_id,
+    )
+    .execute(&state.db)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+
+    Ok(())
+}
+
+/// Permanently delete a work item, enforcing ownership.
+///
+/// This is a real `DELETE` that cascade-deletes subtasks via the database FK
+/// constraint. Unlike [`delete_work_item`], the row is gone for good.
+///
+/// # Errors
+///
+/// - [`AppError::NotFound`] — item not found or owned by a different user.
+/// - [`AppError::Db`] — database failure.
+pub async fn purge_work_item(
     state: &AppState,
     user_id: Uuid,
     item_id: Uuid,
@@ -649,7 +712,7 @@ pub async fn set_status(
 
     // Fetch current status for transition detection.
     let current_status: String = sqlx::query_scalar!(
-        r#"SELECT status::text AS "status!" FROM work_items WHERE id = $1 AND user_id = $2"#,
+        r#"SELECT status::text AS "status!" FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL"#,
         item_id,
         user_id,
     )
@@ -679,7 +742,7 @@ pub async fn set_status(
             status       = ($3::text)::work_item_status,
             completed_at = $4,
             updated_at   = now()
-        WHERE id = $1 AND user_id = $2
+        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
         RETURNING
             id, user_id, project_id, epic_id, sprint_id,
             type::text     AS "item_type!",
@@ -749,7 +812,7 @@ pub async fn set_points(
         r#"
         UPDATE work_items
         SET story_points = $3, updated_at = now()
-        WHERE id = $1 AND user_id = $2
+        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
         RETURNING
             id, user_id, project_id, epic_id, sprint_id,
             type::text     AS "item_type!",
@@ -826,7 +889,7 @@ pub async fn move_to_sprint(
         r#"
         SELECT sprint_id, story_points
         FROM work_items
-        WHERE id = $1 AND user_id = $2
+        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
         "#,
         item_id,
         user_id,
@@ -844,7 +907,7 @@ pub async fn move_to_sprint(
             r#"
             SELECT COALESCE(SUM(COALESCE(story_points, 0)), 0)
             FROM work_items
-            WHERE sprint_id = $1
+            WHERE sprint_id = $1 AND deleted_at IS NULL
             "#,
             sprint_id,
         )
@@ -868,7 +931,7 @@ pub async fn move_to_sprint(
         r#"
         UPDATE work_items
         SET sprint_id = $3, position = $4, updated_at = now()
-        WHERE id = $1 AND user_id = $2
+        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
         RETURNING
             id, user_id, project_id, epic_id, sprint_id,
             type::text     AS "item_type!",
@@ -927,7 +990,7 @@ pub async fn move_to_backlog(
         r#"
         UPDATE work_items
         SET sprint_id = NULL, position = $3, updated_at = now()
-        WHERE id = $1 AND user_id = $2
+        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
         RETURNING
             id, user_id, project_id, epic_id, sprint_id,
             type::text     AS "item_type!",
@@ -981,7 +1044,7 @@ pub async fn list_subtasks(
 ) -> AppResult<Vec<WorkItemSubtask>> {
     // Ownership check.
     let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -1025,7 +1088,7 @@ pub async fn add_subtask(
 ) -> AppResult<WorkItemSubtask> {
     // Ownership check.
     let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -1078,7 +1141,7 @@ pub async fn update_subtask(
 ) -> AppResult<WorkItemSubtask> {
     // Verify item ownership.
     let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -1148,7 +1211,7 @@ pub async fn delete_subtask(
 ) -> AppResult<()> {
     // Verify item ownership.
     let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -1200,7 +1263,7 @@ pub async fn set_column(
 ) -> AppResult<WorkItemResponse> {
     // Verify ownership of the work item.
     let item_exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -1242,7 +1305,7 @@ pub async fn set_column(
             SET column_id  = $3,
                 status     = ($4::text)::work_item_status,
                 updated_at = now()
-            WHERE id = $1 AND user_id = $2
+            WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
             RETURNING
                 id, user_id, project_id, epic_id, sprint_id,
                 type::text     AS "item_type!",
@@ -1272,7 +1335,7 @@ pub async fn set_column(
             UPDATE work_items
             SET column_id  = $3,
                 updated_at = now()
-            WHERE id = $1 AND user_id = $2
+            WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
             RETURNING
                 id, user_id, project_id, epic_id, sprint_id,
                 type::text     AS "item_type!",
@@ -1372,6 +1435,7 @@ pub async fn list_items_for_sprint(
         FROM work_items wi
         LEFT JOIN work_item_subtasks s ON s.work_item_id = wi.id
         WHERE wi.sprint_id = $1
+          AND wi.deleted_at IS NULL
           AND ($2::text IS NULL OR wi.status::text = $2)
         GROUP BY wi.id
         ORDER BY wi.position ASC, wi.created_at ASC
@@ -1387,6 +1451,7 @@ pub async fn list_items_for_sprint(
         SELECT COUNT(*)
         FROM work_items wi
         WHERE wi.sprint_id = $1
+          AND wi.deleted_at IS NULL
           AND ($2::text IS NULL OR wi.status::text = $2)
         "#,
         sprint_id,
@@ -1456,6 +1521,7 @@ pub async fn list_items_for_epic(
         FROM work_items wi
         LEFT JOIN work_item_subtasks s ON s.work_item_id = wi.id
         WHERE wi.epic_id = $1
+          AND wi.deleted_at IS NULL
           AND ($2::text IS NULL OR wi.status::text = $2)
         GROUP BY wi.id
         ORDER BY wi.position ASC, wi.created_at ASC
@@ -1471,6 +1537,7 @@ pub async fn list_items_for_epic(
         SELECT COUNT(*)
         FROM work_items wi
         WHERE wi.epic_id = $1
+          AND wi.deleted_at IS NULL
           AND ($2::text IS NULL OR wi.status::text = $2)
         "#,
         epic_id,
@@ -1501,7 +1568,7 @@ pub async fn list_links(
 ) -> AppResult<Vec<WorkItemLink>> {
     // Ownership check.
     let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -1565,7 +1632,7 @@ pub async fn create_link(
 
     // Source ownership check.
     let source_exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -1579,7 +1646,7 @@ pub async fn create_link(
 
     // Target ownership check.
     let target_exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         req.target_work_item_id,
         user_id,
     )
@@ -1651,7 +1718,7 @@ pub async fn delete_link(
 ) -> AppResult<()> {
     // Ownership check on the source work item.
     let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -1692,7 +1759,7 @@ pub async fn list_web_links(
     item_id: Uuid,
 ) -> AppResult<Vec<WebLink>> {
     let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -1733,7 +1800,7 @@ pub async fn create_web_link(
     req: CreateWebLinkRequest,
 ) -> AppResult<WebLink> {
     let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -1776,7 +1843,7 @@ pub async fn delete_web_link(
     link_id: Uuid,
 ) -> AppResult<()> {
     let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -1817,7 +1884,7 @@ pub async fn list_attachments(
     item_id: Uuid,
 ) -> AppResult<Vec<Attachment>> {
     let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -1865,7 +1932,7 @@ pub async fn create_attachment(
     bytes: bytes::Bytes,
 ) -> AppResult<Attachment> {
     let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -1947,7 +2014,7 @@ pub async fn delete_attachment(
     uploads_dir: &std::path::Path,
 ) -> AppResult<()> {
     let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -2001,7 +2068,7 @@ pub async fn list_comments(
     item_id: Uuid,
 ) -> AppResult<Vec<WorkItemComment>> {
     let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -2052,7 +2119,7 @@ pub async fn create_comment(
     req: CreateCommentRequest,
 ) -> AppResult<WorkItemComment> {
     let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )
@@ -2107,7 +2174,7 @@ pub async fn delete_comment(
 ) -> AppResult<()> {
     // Verify work item ownership.
     let item_exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2)",
+        "SELECT EXISTS(SELECT 1 FROM work_items WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL)",
         item_id,
         user_id,
     )

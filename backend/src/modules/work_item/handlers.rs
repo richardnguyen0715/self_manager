@@ -106,15 +106,47 @@ pub async fn update_work_item(
 
 // ── DELETE /api/work-items/:id ─────────────────────────────────────────────────
 
-/// Delete a work item by its UUID.
+/// Soft-delete a work item by its UUID.
 ///
-/// Returns `204 No Content` on success. Subtasks are cascade-deleted.
+/// Returns `204 No Content` on success. The item is moved to the trash
+/// (`deleted_at = now()`) and can be restored or permanently purged.
 pub async fn delete_work_item(
     auth: AuthUser,
     State(state): State<AppState>,
     Path(item_id): Path<Uuid>,
 ) -> AppResult<StatusCode> {
     service::delete_work_item(&state, auth.user_id, item_id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ── POST /api/work-items/:id/restore ──────────────────────────────────────────
+
+/// Restore a soft-deleted work item by its UUID.
+///
+/// Returns `204 No Content` on success. Clears `deleted_at` so the item
+/// reappears in normal views. Returns `404 Not Found` when the item does not
+/// exist, belongs to a different user, or is not currently trashed.
+pub async fn restore_work_item(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(item_id): Path<Uuid>,
+) -> AppResult<StatusCode> {
+    service::restore_work_item(&state, auth.user_id, item_id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ── DELETE /api/work-items/:id/purge ──────────────────────────────────────────
+
+/// Permanently delete a work item by its UUID.
+///
+/// Returns `204 No Content` on success. This is a real, irreversible delete;
+/// subtasks are cascade-deleted via the database FK constraint.
+pub async fn purge_work_item(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(item_id): Path<Uuid>,
+) -> AppResult<StatusCode> {
+    service::purge_work_item(&state, auth.user_id, item_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

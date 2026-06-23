@@ -9,7 +9,9 @@
 //! | PUT    | /reorder                  | reorder_projects           |
 //! | GET    | /:id                      | get_project                |
 //! | PATCH  | /:id                      | update_project             |
-//! | DELETE | /:id                      | delete_project             |
+//! | DELETE | /:id                      | delete_project (soft)      |
+//! | POST   | /:id/restore              | restore_project            |
+//! | DELETE | /:id/purge                | purge_project (hard)       |
 
 use axum::{
     routing::{delete, get, patch, post, put},
@@ -36,4 +38,7 @@ pub fn router() -> Router<AppState> {
         .route("/:id", get(handlers::get_project))
         .route("/:id", patch(handlers::update_project))
         .route("/:id", delete(handlers::delete_project))
+        // Soft-delete lifecycle: restore from / purge out of the Trash
+        .route("/:id/restore", post(handlers::restore_project))
+        .route("/:id/purge", delete(handlers::purge_project))
 }
