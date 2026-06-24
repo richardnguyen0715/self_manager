@@ -343,6 +343,53 @@ function InlineTextEditor({ value, placeholder, icon, onSave }: InlineTextEditor
   );
 }
 
+// ─── Date field (opens the native picker reliably via showPicker) ────────────
+
+function DateField({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (iso: string | null) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  function openPicker() {
+    const el = inputRef.current;
+    if (!el) return;
+    try {
+      el.showPicker();
+    } catch {
+      el.focus();
+      el.click();
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={openPicker}
+      className="relative flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors text-left"
+    >
+      <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      {value ? (
+        format(new Date(value), "MMM d, yyyy")
+      ) : (
+        <span className="text-muted-foreground">None</span>
+      )}
+      <input
+        ref={inputRef}
+        type="date"
+        value={value?.slice(0, 10) ?? ""}
+        onChange={(e) =>
+          onChange(e.target.value ? `${e.target.value}T00:00:00Z` : null)
+        }
+        className="absolute bottom-0 left-0 h-0 w-0 opacity-0 pointer-events-none"
+        tabIndex={-1}
+        aria-hidden="true"
+      />
+    </button>
+  );
+}
+
 // ─── GitHub PR editor (link when URL) ────────────────────────────────────────
 
 interface GithubPrEditorProps {
@@ -1568,26 +1615,10 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
 
               {/* Due date — inline editable */}
               <DetailRow label="Due date">
-                <label className="flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors">
-                  <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  {workItem.due_date ? (
-                    format(new Date(workItem.due_date), "MMM d, yyyy")
-                  ) : (
-                    <span className="text-muted-foreground">None</span>
-                  )}
-                  <input
-                    type="date"
-                    value={workItem.due_date?.slice(0, 10) ?? ""}
-                    onChange={(e) =>
-                      updateItem.mutate({
-                        due_date: e.target.value
-                          ? `${e.target.value}T00:00:00Z`
-                          : null,
-                      })
-                    }
-                    className="sr-only"
-                  />
-                </label>
+                <DateField
+                  value={workItem.due_date ?? null}
+                  onChange={(due_date) => updateItem.mutate({ due_date })}
+                />
               </DetailRow>
 
               {/* Labels — chip input */}
@@ -1600,26 +1631,10 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
 
               {/* Start date — inline editable */}
               <DetailRow label="Start date">
-                <label className="flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors">
-                  <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  {workItem.start_date ? (
-                    format(new Date(workItem.start_date), "MMM d, yyyy")
-                  ) : (
-                    <span className="text-muted-foreground">None</span>
-                  )}
-                  <input
-                    type="date"
-                    value={workItem.start_date?.slice(0, 10) ?? ""}
-                    onChange={(e) =>
-                      updateItem.mutate({
-                        start_date: e.target.value
-                          ? `${e.target.value}T00:00:00Z`
-                          : null,
-                      })
-                    }
-                    className="sr-only"
-                  />
-                </label>
+                <DateField
+                  value={workItem.start_date ?? null}
+                  onChange={(start_date) => updateItem.mutate({ start_date })}
+                />
               </DetailRow>
 
               {/* Sprint — inline editable dropdown */}
