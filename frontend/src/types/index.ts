@@ -1039,6 +1039,15 @@ export interface WorkItemComment {
   created_at: string;
 }
 
+/** One recorded change to a work item (History tab). */
+export interface WorkItemActivity {
+  id: string;
+  field: string;
+  old_value: string | null;
+  new_value: string | null;
+  created_at: string;
+}
+
 export interface PageImageUploadResponse {
   url: string; // "/uploads/<file>"
 }
@@ -1440,6 +1449,8 @@ export const API_ENDPOINTS = {
   // DELETE /api/work-items/:id/attachments/:att_id
   WORK_ITEM_ATTACHMENT_BY_ID: (id: string, attId: string) =>
     `/api/work-items/${id}/attachments/${attId}`,
+  // GET /api/work-items/:id/activity
+  WORK_ITEM_ACTIVITY: (id: string) => `/api/work-items/${id}/activity`,
   // GET|POST /api/work-items/:id/comments
   WORK_ITEM_COMMENTS: (id: string) => `/api/work-items/${id}/comments`,
   // DELETE /api/work-items/:id/comments/:comment_id

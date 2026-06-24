@@ -20,6 +20,7 @@ use crate::shared::{
 };
 
 use super::models::{
+    ActivityEntry,
     Attachment, AttachmentRow, CreateCommentRequest, CreateLinkRequest, CreateSubtaskRequest,
     CreateWebLinkRequest, CreateWorkItemRequest, ListWorkItemsQuery, MoveToBacklogRequest,
     MoveToSprintRequest, SetColumnRequest, SetPointsRequest, SetStatusRequest,
@@ -346,6 +347,8 @@ pub async fn create_work_item(
     .fetch_one(&state.db)
     .await?;
 
+    record_activity(state, item.id, user_id, "created", None, None).await;
+
     Ok(work_item_into_response(item, vec![]))
 }
 
@@ -585,6 +588,18 @@ pub async fn update_work_item(
         });
     }
 
+    // Record field changes to the activity log (best-effort, never blocks).
+    let fmt_date =
+        |d: &Option<chrono::DateTime<Utc>>| d.map(|x| x.format("%Y-%m-%d").to_string());
+    record_change(state, item_id, user_id, "status", Some(current.status.clone()), Some(updated.status.clone())).await;
+    record_change(state, item_id, user_id, "priority", Some(current.priority.clone()), Some(updated.priority.clone())).await;
+    record_change(state, item_id, user_id, "title", Some(current.title.clone()), Some(updated.title.clone())).await;
+    record_change(state, item_id, user_id, "due_date", fmt_date(&current.due_date), fmt_date(&updated.due_date)).await;
+    record_change(state, item_id, user_id, "start_date", fmt_date(&current.start_date), fmt_date(&updated.start_date)).await;
+    record_change(state, item_id, user_id, "story_points", current.story_points.map(|p| p.to_string()), updated.story_points.map(|p| p.to_string())).await;
+    record_change(state, item_id, user_id, "sprint", current.sprint_id.map(|i| i.to_string()), updated.sprint_id.map(|i| i.to_string())).await;
+    record_change(state, item_id, user_id, "parent", current.epic_id.map(|i| i.to_string()), updated.epic_id.map(|i| i.to_string())).await;
+
     let subtasks = sqlx::query_as!(
         WorkItemSubtask,
         r#"
@@ -773,6 +788,16 @@ pub async fn set_status(
             sprint_id: updated.sprint_id,
         });
     }
+
+    record_change(
+        state,
+        item_id,
+        user_id,
+        "status",
+        Some(current_status),
+        Some(updated.status.clone()),
+    )
+    .await;
 
     let subtasks = sqlx::query_as!(
         WorkItemSubtask,
@@ -2201,4 +2226,73 @@ pub async fn delete_comment(
     }
 
     Ok(())
+}
+
+// ─── Activity / change history ──────────────────────────────────────────────
+
+/// Insert one activity row (best-effort; logs and swallows DB errors so a
+/// history write never fails the user's actual mutation).
+async fn record_activity(
+    state: &AppState,
+    work_item_id: Uuid,
+    user_id: Uuid,
+    field: &str,
+    old_value: Option<String>,
+    new_value: Option<String>,
+) {
+    let res = sqlx::query!(
+        r#"INSERT INTO work_item_activity
+               (id, work_item_id, user_id, field, old_value, new_value)
+           VALUES ($1, $2, $3, $4, $5, $6)"#,
+        Uuid::new_v4(),
+        work_item_id,
+        user_id,
+        field,
+        old_value,
+        new_value,
+    )
+    .execute(&state.db)
+    .await;
+    if let Err(e) = res {
+        tracing::warn!("failed to record work item activity: {e}");
+    }
+}
+
+/// Record a field change only when the value actually changed.
+async fn record_change(
+    state: &AppState,
+    work_item_id: Uuid,
+    user_id: Uuid,
+    field: &str,
+    old: Option<String>,
+    new: Option<String>,
+) {
+    if old != new {
+        record_activity(state, work_item_id, user_id, field, old, new).await;
+    }
+}
+
+/// List a work item's activity (most recent first).
+///
+/// # Errors
+/// - [`AppError::Db`] — database failure.
+pub async fn list_activity(
+    state: &AppState,
+    user_id: Uuid,
+    item_id: Uuid,
+) -> AppResult<Vec<ActivityEntry>> {
+    let rows = sqlx::query_as!(
+        ActivityEntry,
+        r#"SELECT a.id, a.field, a.old_value, a.new_value, a.created_at
+           FROM work_item_activity a
+           JOIN work_items wi ON wi.id = a.work_item_id
+           WHERE a.work_item_id = $1 AND wi.user_id = $2
+           ORDER BY a.created_at DESC
+           LIMIT 200"#,
+        item_id,
+        user_id,
+    )
+    .fetch_all(&state.db)
+    .await?;
+    Ok(rows)
 }

@@ -13,6 +13,7 @@ import type {
   WorkItemListItem,
   WorkItemSubtask,
   WorkItemComment,
+  WorkItemActivity,
   AgileListResponse,
   Epic,
   Sprint,
@@ -50,6 +51,7 @@ export const workItemKeys = {
   attachments: (id: string) =>
     [...workItemKeys.detail(id), "attachments"] as const,
   comments: (id: string) => [...workItemKeys.detail(id), "comments"] as const,
+  activity: (id: string) => [...workItemKeys.detail(id), "activity"] as const,
 };
 
 function filtersToParams(
@@ -146,6 +148,7 @@ export function useUpdateWorkItem(id: string) {
     onSuccess: (data) => {
       qc.setQueryData(workItemKeys.detail(id), data);
       qc.invalidateQueries({ queryKey: workItemKeys.lists() });
+      qc.invalidateQueries({ queryKey: workItemKeys.activity(id) });
     },
   });
 }
@@ -172,6 +175,7 @@ export function useSetWorkItemStatus(id: string) {
     onSuccess: (data) => {
       qc.setQueryData(workItemKeys.detail(id), data);
       qc.invalidateQueries({ queryKey: workItemKeys.lists() });
+      qc.invalidateQueries({ queryKey: workItemKeys.activity(id) });
       // also invalidate sprint queries in case sprint board is visible
       qc.invalidateQueries({ queryKey: ["sprints"] });
     },
@@ -187,6 +191,7 @@ export function useSetWorkItemPoints(id: string) {
     onSuccess: (data) => {
       qc.setQueryData(workItemKeys.detail(id), data);
       qc.invalidateQueries({ queryKey: workItemKeys.lists() });
+      qc.invalidateQueries({ queryKey: workItemKeys.activity(id) });
     },
   });
 }
@@ -418,6 +423,16 @@ export function useWorkItemComments(workItemId: string) {
     queryKey: workItemKeys.comments(workItemId),
     queryFn: () =>
       api.get<WorkItemComment[]>(API_ENDPOINTS.WORK_ITEM_COMMENTS(workItemId)),
+    enabled: Boolean(workItemId),
+  });
+}
+
+/** GET /api/work-items/:id/activity — change history (most recent first). */
+export function useWorkItemActivity(workItemId: string) {
+  return useQuery({
+    queryKey: workItemKeys.activity(workItemId),
+    queryFn: () =>
+      api.get<WorkItemActivity[]>(API_ENDPOINTS.WORK_ITEM_ACTIVITY(workItemId)),
     enabled: Boolean(workItemId),
   });
 }

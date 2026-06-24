@@ -21,6 +21,7 @@ use crate::shared::{
 
 use super::{
     models::{
+        ActivityEntry,
         Attachment, CreateCommentRequest, CreateLinkRequest, CreateSubtaskRequest,
         CreateWebLinkRequest, CreateWorkItemRequest, ListWorkItemsQuery, MoveToBacklogRequest,
         MoveToSprintRequest, SetColumnRequest, SetPointsRequest, SetStatusRequest,
@@ -508,4 +509,16 @@ pub async fn delete_comment(
 ) -> AppResult<StatusCode> {
     service::delete_comment(&state, auth.user_id, item_id, comment_id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ── GET /api/work-items/:id/activity ─────────────────────────────────────────
+
+/// List a work item's change history (most recent first).
+pub async fn list_activity(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(item_id): Path<Uuid>,
+) -> AppResult<Json<Vec<ActivityEntry>>> {
+    let entries = service::list_activity(&state, auth.user_id, item_id).await?;
+    Ok(Json(entries))
 }

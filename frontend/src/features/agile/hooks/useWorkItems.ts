@@ -156,6 +156,7 @@ export function useUpdateWorkItem(id: string) {
     onSuccess: (data) => {
       qc.setQueryData(workItemKeys.detail(id), data);
       qc.invalidateQueries({ queryKey: workItemKeys.lists() });
+      qc.invalidateQueries({ queryKey: [...workItemKeys.detail(id), "activity"] });
       // A project (re)assignment moves the row in/out of project-filtered
       // backlog views, so refresh the backlog query family too.
       qc.invalidateQueries({ queryKey: ["backlog"] });
@@ -184,6 +185,7 @@ export function useSetWorkItemStatus(id: string) {
     onSuccess: (data) => {
       qc.setQueryData(workItemKeys.detail(id), data);
       qc.invalidateQueries({ queryKey: workItemKeys.lists() });
+      qc.invalidateQueries({ queryKey: [...workItemKeys.detail(id), "activity"] });
       qc.invalidateQueries({ queryKey: ["sprints"] });
     },
   });
@@ -197,6 +199,7 @@ export function useSetWorkItemPoints(id: string) {
     onSuccess: (data) => {
       qc.setQueryData(workItemKeys.detail(id), data);
       qc.invalidateQueries({ queryKey: workItemKeys.lists() });
+      qc.invalidateQueries({ queryKey: [...workItemKeys.detail(id), "activity"] });
     },
   });
 }

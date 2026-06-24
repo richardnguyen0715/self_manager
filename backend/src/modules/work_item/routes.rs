@@ -109,6 +109,8 @@ pub fn router() -> Router<AppState> {
             "/:id/attachments/:att_id",
             delete(handlers::delete_attachment),
         )
+        // Sub-resource: activity / change history
+        .route("/:id/activity", get(handlers::list_activity))
         // Sub-resource: comments
         .route(
             "/:id/comments",

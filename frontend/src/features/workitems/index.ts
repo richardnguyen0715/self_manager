@@ -24,6 +24,7 @@ export {
   useUpdateWorkItemSubtask,
   useDeleteWorkItemSubtask,
   useWorkItemComments,
+  useWorkItemActivity,
   useCreateWorkItemComment,
   useDeleteWorkItemComment,
   workItemKeys,

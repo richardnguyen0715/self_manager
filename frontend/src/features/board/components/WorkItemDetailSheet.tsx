@@ -57,9 +57,11 @@ import { useEpics } from "@/features/agile/hooks/useEpics";
 import { useSprintsList } from "@/features/sprints/hooks/useSprints";
 import {
   useWorkItemComments,
+  useWorkItemActivity,
   useCreateWorkItemComment,
   useDeleteWorkItemComment,
 } from "@/features/workitems/hooks/useWorkItems";
+import type { WorkItemActivity } from "@/types";
 import { WorkItemTypeBadge } from "@/features/agile/components/WorkItemTypeBadge";
 import { useBoardStore } from "../store";
 import { boardKeys } from "../hooks/useSprintBoard";
@@ -702,6 +704,49 @@ function CommentCompose({
   );
 }
 
+// ─── Activity row ─────────────────────────────────────────────────────────────
+
+const ACTIVITY_FIELD_LABELS: Record<string, string> = {
+  created: "created this work item",
+  status: "Status",
+  priority: "Priority",
+  title: "Title",
+  due_date: "Due date",
+  start_date: "Start date",
+  story_points: "Story points",
+  sprint: "Sprint",
+  parent: "Parent",
+};
+
+function ActivityRow({ entry }: { entry: WorkItemActivity }) {
+  const label = ACTIVITY_FIELD_LABELS[entry.field] ?? entry.field;
+  const when = formatDistanceToNow(new Date(entry.created_at), { addSuffix: true });
+  return (
+    <div className="flex gap-2.5 py-2 border-b border-border/50 last:border-0 text-sm">
+      <History className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+      <div className="flex-1 min-w-0">
+        {entry.field === "created" ? (
+          <span>{label}</span>
+        ) : (
+          <span>
+            <span className="font-medium">{label}</span>{" "}
+            {entry.old_value ? (
+              <>
+                changed from{" "}
+                <span className="text-muted-foreground line-through">{entry.old_value}</span>{" "}
+                to <span className="font-medium">{entry.new_value ?? "None"}</span>
+              </>
+            ) : (
+              <>set to <span className="font-medium">{entry.new_value ?? "None"}</span></>
+            )}
+          </span>
+        )}
+        <div className="text-xs text-muted-foreground">{when}</div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main sheet ───────────────────────────────────────────────────────────────
 
 interface WorkItemDetailSheetProps {
@@ -730,6 +775,8 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
   // Comments
   const { data: commentsData, isLoading: commentsLoading } = useWorkItemComments(workItemId);
   const comments = commentsData ?? [];
+  const { data: activityData } = useWorkItemActivity(workItemId);
+  const activity = activityData ?? [];
 
   const [activityTab, setActivityTab] = useState<ActivityTab>("all");
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
@@ -1154,13 +1201,21 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
                   </div>
                 )}
 
-                {/* History tab — empty state */}
+                {/* History tab — recorded field changes */}
                 {activityTab === "history" && (
-                  <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground">
-                    <History className="h-6 w-6 opacity-40" />
-                    <p className="font-medium">No history recorded yet</p>
-                    <p className="text-xs">Field changes will appear here once history tracking is enabled.</p>
-                  </div>
+                  activity.length === 0 ? (
+                    <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground">
+                      <History className="h-6 w-6 opacity-40" />
+                      <p className="font-medium">No history yet</p>
+                      <p className="text-xs">Field changes will appear here.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {activity.map((a) => (
+                        <ActivityRow key={a.id} entry={a} />
+                      ))}
+                    </div>
+                  )
                 )}
 
                 {/* Work log tab — empty state */}

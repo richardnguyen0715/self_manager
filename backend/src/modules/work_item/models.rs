@@ -583,3 +583,15 @@ pub struct ListWorkItemsQuery {
     /// Zero-based offset; defaults to 0.
     pub offset: Option<i64>,
 }
+
+// ─── Activity / change history ──────────────────────────────────────────────
+
+/// One recorded change to a work item (shown in the History tab).
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct ActivityEntry {
+    pub id: Uuid,
+    pub field: String,
+    pub old_value: Option<String>,
+    pub new_value: Option<String>,
+    pub created_at: DateTime<Utc>,
+}

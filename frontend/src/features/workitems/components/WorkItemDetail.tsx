@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import {
   ChevronRight,
   Plus,
@@ -59,6 +59,7 @@ import {
   useUploadAttachment,
   useDeleteAttachment,
   useWorkItems,
+  useWorkItemActivity,
 } from "../hooks/useWorkItems";
 import { WorkItemTypeBadge } from "./WorkItemTypeBadge";
 import {
@@ -67,7 +68,7 @@ import {
 } from "./TiptapDescriptionEditor";
 import { WORK_ITEM_STATUS_CONFIG } from "./WorkItemStatusBadge";
 import { PRIORITY_CONFIG } from "./WorkItemPriorityBadge";
-import type { WorkItemStatus, WorkItemSubtask } from "@/types";
+import type { WorkItemStatus, WorkItemSubtask, WorkItemActivity } from "@/types";
 import type { WorkItemLink, WorkItemWebLink, WorkItemAttachment } from "../types";
 import { useAuthStore } from "@/stores";
 import { useEpics } from "@/features/agile/hooks/useEpics";
@@ -682,6 +683,55 @@ const ACTIVITY_TABS: { value: ActivityTab; label: string; icon: React.ComponentT
     { value: "worklog", label: "Work log", icon: Clock },
   ];
 
+// ─── Activity row ─────────────────────────────────────────────────────────────
+
+const ACTIVITY_FIELD_LABELS: Record<string, string> = {
+  created: "created this work item",
+  status: "Status",
+  priority: "Priority",
+  title: "Title",
+  due_date: "Due date",
+  start_date: "Start date",
+  story_points: "Story points",
+  sprint: "Sprint",
+  parent: "Parent",
+};
+
+function ActivityRow({ entry }: { entry: WorkItemActivity }) {
+  const label = ACTIVITY_FIELD_LABELS[entry.field] ?? entry.field;
+  const when = formatDistanceToNow(new Date(entry.created_at), {
+    addSuffix: true,
+  });
+  return (
+    <div className="flex gap-2.5 py-2 border-b border-border/50 last:border-0 text-sm">
+      <History className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+      <div className="flex-1 min-w-0">
+        {entry.field === "created" ? (
+          <span>{label}</span>
+        ) : (
+          <span>
+            <span className="font-medium">{label}</span>{" "}
+            {entry.old_value ? (
+              <>
+                changed from{" "}
+                <span className="text-muted-foreground line-through">
+                  {entry.old_value}
+                </span>{" "}
+                to <span className="font-medium">{entry.new_value ?? "None"}</span>
+              </>
+            ) : (
+              <>
+                set to <span className="font-medium">{entry.new_value ?? "None"}</span>
+              </>
+            )}
+          </span>
+        )}
+        <div className="text-xs text-muted-foreground">{when}</div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface WorkItemDetailProps {
@@ -699,6 +749,8 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
   const setPoints = useSetWorkItemPoints(workItemId);
   const updateItem = useUpdateWorkItem(workItemId);
   const deleteItem = useDeleteWorkItem();
+  const { data: activityData } = useWorkItemActivity(workItemId);
+  const activity = activityData ?? [];
   const createSubtask = useCreateWorkItemSubtask(workItemId);
 
   const { data: epic } = useEpicById(workItem?.epic_id ?? "");
@@ -1438,12 +1490,25 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
                 </div>
               </div>
 
-              {/* Activity tab content — history/worklog placeholders */}
-              {(activityTab === "history" || activityTab === "worklog") && (
+              {/* History tab — recorded field changes */}
+              {activityTab === "history" && (
+                activity.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-2">
+                    No history yet.
+                  </p>
+                ) : (
+                  <div className="space-y-2 py-1">
+                    {activity.map((a) => (
+                      <ActivityRow key={a.id} entry={a} />
+                    ))}
+                  </div>
+                )
+              )}
+
+              {/* Work log tab — placeholder */}
+              {activityTab === "worklog" && (
                 <p className="text-sm text-muted-foreground py-2">
-                  {activityTab === "history"
-                    ? "No history recorded yet."
-                    : "No work log entries yet."}
+                  No work log entries yet.
                 </p>
               )}
             </div>
