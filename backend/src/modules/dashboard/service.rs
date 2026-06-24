@@ -126,6 +126,44 @@ async fn fetch_tasks(
     .fetch_all(&state.db)
     .await?;
 
+    // Work items with a due date also belong on the dashboard's Today list.
+    // Map work_item_status -> task_status so they share the DashboardTask shape.
+    let wi_rows = sqlx::query_as!(
+        DashboardTask,
+        r#"SELECT
+               wi.id,
+               wi.title,
+               wi.priority AS "priority: DashTaskPriority",
+               (CASE wi.status::text
+                   WHEN 'done'        THEN 'completed'
+                   WHEN 'in_progress' THEN 'in_progress'
+                   ELSE 'planned' END)::task_status AS "status!: DashTaskStatus",
+               wi.due_date,
+               NULL::int4 AS "estimated_time?",
+               wi.project_id,
+               p.name AS project_name
+           FROM work_items wi
+           LEFT JOIN projects p ON p.id = wi.project_id
+           WHERE wi.user_id = $1
+             AND wi.deleted_at IS NULL
+             AND wi.status::text <> 'done'
+             AND (
+                 (wi.due_date >= $2 AND wi.due_date <= $3)
+                 OR wi.due_date < $4
+                 OR wi.status::text = 'in_progress'
+             )
+           ORDER BY wi.due_date ASC NULLS LAST, wi.created_at DESC
+           LIMIT 50"#,
+        user_id,
+        day_start,
+        day_end,
+        now,
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    let mut rows = rows;
+    rows.extend(wi_rows);
     Ok(rows)
 }
 
@@ -389,7 +427,7 @@ async fn fetch_quick_stats(
     let now = Utc::now();
 
     // Tasks completed today.
-    let tasks_done_today: i64 = sqlx::query_scalar!(
+    let mut tasks_done_today: i64 = sqlx::query_scalar!(
         r#"SELECT COUNT(*)
            FROM tasks
            WHERE user_id     = $1
@@ -405,7 +443,7 @@ async fn fetch_quick_stats(
     .unwrap_or(0);
 
     // Overdue tasks: past due date and not completed/archived.
-    let tasks_overdue: i64 = sqlx::query_scalar!(
+    let mut tasks_overdue: i64 = sqlx::query_scalar!(
         r#"SELECT COUNT(*)
            FROM tasks
            WHERE user_id  = $1
@@ -417,6 +455,39 @@ async fn fetch_quick_stats(
     .fetch_one(&state.db)
     .await?
     .unwrap_or(0);
+
+    // Work items also count toward these stats (kept in sync with the
+    // "Overdue Work Items" panel and the Today list).
+    let wi_overdue: i64 = sqlx::query_scalar!(
+        r#"SELECT COUNT(*)
+           FROM work_items
+           WHERE user_id = $1
+             AND deleted_at IS NULL
+             AND due_date < $2
+             AND status::text <> 'done'"#,
+        user_id,
+        now,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(0);
+    let wi_done_today: i64 = sqlx::query_scalar!(
+        r#"SELECT COUNT(*)
+           FROM work_items
+           WHERE user_id = $1
+             AND deleted_at IS NULL
+             AND status::text = 'done'
+             AND updated_at >= $2
+             AND updated_at <= $3"#,
+        user_id,
+        day_start,
+        day_end,
+    )
+    .fetch_one(&state.db)
+    .await?
+    .unwrap_or(0);
+    tasks_overdue += wi_overdue;
+    tasks_done_today += wi_done_today;
 
     // Focus minutes today from completed focus sessions.
     let focus_minutes_today: i64 = sqlx::query_scalar!(

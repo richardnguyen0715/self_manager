@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(*)\n           FROM work_items\n           WHERE user_id = $1\n             AND deleted_at IS NULL\n             AND due_date < $2\n             AND status::text <> 'done'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "1754ed711f6f6f8782fb015ebaff2efa6ed214647139e55dfd673fc0ae1762bf"
+}
