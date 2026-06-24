@@ -29,8 +29,14 @@ import {
   Github,
   Tag,
   Pin,
+  ExternalLink,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import {
+  DescriptionPreview,
+  TiptapDescriptionEditor,
+} from "@/features/workitems/components/TiptapDescriptionEditor";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -708,6 +714,7 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
   const workItemId = openItemId ?? "";
   const qc = useQueryClient();
   const { user } = useAuthStore();
+  const router = useRouter();
 
   const { data: workItem, isLoading, isError } = useWorkItem(workItemId);
   const setStatus = useSetWorkItemStatus(workItemId);
@@ -730,7 +737,6 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [editingDescription, setEditingDescription] = useState(false);
-  const [descriptionDraft, setDescriptionDraft] = useState("");
   const subtaskInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -788,14 +794,6 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
       updateItem.mutate({ title: trimmed });
     }
     setEditingTitle(false);
-  }
-
-  function handleDescriptionSave() {
-    const trimmed = descriptionDraft.trim() || null;
-    if (trimmed !== workItem!.description) {
-      updateItem.mutate({ description: trimmed });
-    }
-    setEditingDescription(false);
   }
 
   function handleAddSubtask() {
@@ -927,6 +925,20 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
                       </DropdownMenuPrimitive.Content>
                     </DropdownMenuPrimitive.Portal>
                   </DropdownMenuPrimitive.Root>
+
+                  {/* Open this work item on the full Work Items page */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5"
+                    onClick={() => {
+                      closeItemDetail();
+                      router.push(`/work-items/${workItemId}`);
+                    }}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open in Work Items
+                  </Button>
                 </div>
               </div>
 
@@ -936,40 +948,23 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
               <div className="space-y-1.5">
                 <h2 className="text-sm font-semibold">Description</h2>
                 {editingDescription ? (
-                  <div className="space-y-2">
-                    <textarea
-                      autoFocus
-                      value={descriptionDraft}
-                      onChange={(e) => setDescriptionDraft(e.target.value)}
-                      rows={4}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
-                      placeholder="Add a description..."
-                    />
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={handleDescriptionSave}>
-                        Save
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setEditingDescription(false)}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
+                  <TiptapDescriptionEditor
+                    value={workItem.description}
+                    onSave={(html) => {
+                      const next = html || null;
+                      if (next !== workItem!.description) {
+                        updateItem.mutate({ description: next });
+                      }
+                      setEditingDescription(false);
+                    }}
+                    onCancel={() => setEditingDescription(false)}
+                  />
                 ) : (
                   <div
-                    className={cn(
-                      "min-h-[2.5rem] cursor-text rounded-md px-0 py-1 text-sm transition-colors hover:bg-accent/40",
-                      !workItem.description && "text-muted-foreground",
-                    )}
-                    onClick={() => {
-                      setDescriptionDraft(workItem.description ?? "");
-                      setEditingDescription(true);
-                    }}
+                    className="min-h-[2.5rem] cursor-text rounded-md px-0 py-1 transition-colors hover:bg-accent/40"
+                    onClick={() => setEditingDescription(true)}
                   >
-                    {workItem.description || "Add a description..."}
+                    <DescriptionPreview value={workItem.description} />
                   </div>
                 )}
               </div>
@@ -1659,12 +1654,17 @@ function SheetWrapper({
             dragging.current = true;
             document.body.style.userSelect = "none";
           }}
-          className="absolute left-0 top-0 h-full w-2 cursor-ew-resize z-20
-                     hover:bg-primary/30 active:bg-primary/50 transition-colors hidden sm:block"
+          className="group/resize absolute left-0 top-0 h-full w-3 cursor-ew-resize z-30
+                     hidden sm:flex items-center justify-center"
           aria-label="Resize panel"
           role="separator"
           aria-orientation="vertical"
-        />
+          title="Drag to resize"
+        >
+          {/* Persistent thin rail + grip so it's discoverable */}
+          <span className="absolute inset-y-0 left-0 w-px bg-border group-hover/resize:bg-primary/50 transition-colors" />
+          <span className="h-8 w-1 rounded-full bg-border group-hover/resize:bg-primary/60 transition-colors" />
+        </div>
 
         {/* Close button */}
         <div className="absolute top-3 right-3 z-10">
