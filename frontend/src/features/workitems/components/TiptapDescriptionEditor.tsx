@@ -35,22 +35,111 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;");
 }
 
+/** Inline markdown → HTML (escapes first, then applies emphasis/code/links). */
+function inlineMarkdown(text: string): string {
+  let t = escapeHtml(text);
+  t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+  t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  t = t.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+  t = t.replace(/(^|[^*])\*([^*\s][^*]*?)\*/g, "$1<em>$2</em>");
+  t = t.replace(/~~([^~]+)~~/g, "<s>$1</s>");
+  t = t.replace(
+    /\[([^\]]+)\]\(([^)\s]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
+  );
+  return t;
+}
+
+/** Block-level markdown → HTML (headings, lists, quote, hr, fenced code). */
+function markdownToHtml(md: string): string {
+  const lines = md.replace(/\r\n/g, "\n").split("\n");
+  const out: string[] = [];
+  let listType: "ul" | "ol" | null = null;
+  let items: string[] = [];
+
+  const flush = () => {
+    if (listType) {
+      out.push(
+        `<${listType}>${items.map((li) => `<li>${li}</li>`).join("")}</${listType}>`,
+      );
+      listType = null;
+      items = [];
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Fenced code block
+    const fence = /^```(\w+)?\s*$/.exec(line.trim());
+    if (fence) {
+      flush();
+      const buf: string[] = [];
+      i++;
+      while (i < lines.length && !/^```\s*$/.test(lines[i].trim())) {
+        buf.push(lines[i]);
+        i++;
+      }
+      out.push(`<pre><code>${escapeHtml(buf.join("\n"))}</code></pre>`);
+      continue;
+    }
+
+    if (line.trim() === "") {
+      flush();
+      continue;
+    }
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
+      flush();
+      out.push("<hr />");
+      continue;
+    }
+
+    const h = /^(#{1,6})\s+(.*)$/.exec(line);
+    if (h) {
+      flush();
+      const lvl = h[1].length;
+      out.push(`<h${lvl}>${inlineMarkdown(h[2])}</h${lvl}>`);
+      continue;
+    }
+
+    const ol = /^\s*\d+[.)]\s+(.*)$/.exec(line);
+    if (ol) {
+      if (listType !== "ol") flush();
+      listType = "ol";
+      items.push(inlineMarkdown(ol[1]));
+      continue;
+    }
+    const ul = /^\s*[-*+]\s+(.*)$/.exec(line);
+    if (ul) {
+      if (listType !== "ul") flush();
+      listType = "ul";
+      items.push(inlineMarkdown(ul[1]));
+      continue;
+    }
+    const q = /^>\s+(.*)$/.exec(line);
+    if (q) {
+      flush();
+      out.push(`<blockquote>${inlineMarkdown(q[1])}</blockquote>`);
+      continue;
+    }
+
+    flush();
+    out.push(`<p>${inlineMarkdown(line)}</p>`);
+  }
+  flush();
+  return out.join("");
+}
+
 /**
- * Normalize a stored description into HTML that Tiptap / a prose container can
- * render. Legacy plain text is escaped and wrapped in <p>, preserving newlines.
+ * Normalize a stored description into HTML. Tiptap-authored values are already
+ * HTML and pass through; legacy/plain values are parsed as markdown so #
+ * headings, - / 1. lists, **bold**, > quotes etc. render correctly.
  */
 export function descriptionToHtml(value: string | null | undefined): string {
   const raw = (value ?? "").trim();
   if (!raw) return "";
   if (looksLikeHtml(raw)) return raw;
-  // Legacy plain text: split on blank lines into paragraphs, single newlines -> <br>
-  return raw
-    .split(/\n{2,}/)
-    .map(
-      (para) =>
-        `<p>${escapeHtml(para).replace(/\n/g, "<br />")}</p>`,
-    )
-    .join("");
+  return markdownToHtml(raw);
 }
 
 /** Tiptap leaves an empty doc as "<p></p>"; treat that as no content. */
@@ -83,7 +172,11 @@ export function DescriptionPreview({
   }
   return (
     <div
-      className={cn(PROSE_CLASS, className)}
+      // Reuse the editor's `.ProseMirror` content styles (headings, lists,
+      // quotes, code) so the read-only preview matches the editor. The
+      // `prose` classes are kept harmlessly but the project has no typography
+      // plugin, so `.ProseMirror` is what actually styles the markup.
+      className={cn("ProseMirror", PROSE_CLASS, className)}
       // Content is authored by the single app user; safe to render.
       dangerouslySetInnerHTML={{ __html: html }}
     />
