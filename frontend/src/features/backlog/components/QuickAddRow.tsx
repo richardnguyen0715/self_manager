@@ -9,6 +9,7 @@ import { useState, useRef, useEffect } from "react";
 import { Plus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCreateWorkItem } from "@/features/agile";
+import { useProjectStore } from "@/stores";
 
 interface QuickAddRowProps {
   /** If provided, the created item goes straight into this sprint. */
@@ -22,6 +23,7 @@ export function QuickAddRow({ sprint_id, label = "Create" }: QuickAddRowProps) {
   const [title, setTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const createItem = useCreateWorkItem();
+  const currentProjectId = useProjectStore((s) => s.currentProjectId);
 
   useEffect(() => {
     if (active) inputRef.current?.focus();
@@ -37,6 +39,9 @@ export function QuickAddRow({ sprint_id, label = "Create" }: QuickAddRowProps) {
       {
         title: trimmed,
         sprint_id: sprint_id ?? null,
+        // Tag to the currently-selected project so it shows in the scoped
+        // backlog/board (null project = "All projects").
+        project_id: currentProjectId,
         // Items without a sprint land in backlog (sprint_id null = backlog per contract)
       },
       {

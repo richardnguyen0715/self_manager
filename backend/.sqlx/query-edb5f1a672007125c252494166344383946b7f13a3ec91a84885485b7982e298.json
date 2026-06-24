@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*)\n        FROM work_items\n        WHERE user_id   = $1\n          AND deleted_at IS NULL\n          AND sprint_id IS NULL\n          AND ($2::uuid IS NULL OR project_id = $2)\n          AND ($3::uuid IS NULL OR epic_id    = $3)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "edb5f1a672007125c252494166344383946b7f13a3ec91a84885485b7982e298"
+}

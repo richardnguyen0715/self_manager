@@ -77,6 +77,7 @@ pub async fn list_backlog(
         FROM work_items wi
         LEFT JOIN work_item_subtasks s ON s.work_item_id = wi.id
         WHERE wi.user_id   = $1
+          AND wi.deleted_at IS NULL
           AND wi.sprint_id IS NULL
           AND ($2::uuid IS NULL OR wi.project_id = $2)
           AND ($3::uuid IS NULL OR wi.epic_id    = $3)
@@ -98,6 +99,7 @@ pub async fn list_backlog(
         SELECT COUNT(*)
         FROM work_items
         WHERE user_id   = $1
+          AND deleted_at IS NULL
           AND sprint_id IS NULL
           AND ($2::uuid IS NULL OR project_id = $2)
           AND ($3::uuid IS NULL OR epic_id    = $3)
