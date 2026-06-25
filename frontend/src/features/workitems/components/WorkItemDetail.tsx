@@ -1370,11 +1370,11 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
                 </Button>
               </div>
 
-              {/* hidden file input */}
+              {/* hidden file input — attachments accept ANY file type.
+                  (A leading image/* in accept makes macOS grey out other files.) */}
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*,*/*"
                 className="sr-only"
                 onChange={handleFileChange}
               />

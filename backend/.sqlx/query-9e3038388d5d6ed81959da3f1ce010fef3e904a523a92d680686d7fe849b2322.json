@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        UPDATE work_items\n        SET\n            status       = ($3::text)::work_item_status,\n            completed_at = $4,\n            updated_at   = now()\n        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL\n        RETURNING\n            id, user_id, project_id, epic_id, sprint_id,\n            type::text     AS \"item_type!\",\n            title, description,\n            status::text   AS \"status!\",\n            priority::text AS \"priority!\",\n            story_points, position,\n            start_date, due_date, recurrence_rule, completed_at,\n            column_id,\n            labels AS \"labels!: Vec<String>\",\n            pinned_fields AS \"pinned_fields!: Vec<String>\",\n            github_repo, github_branch, github_pr,\n            created_at, updated_at\n        ",
+  "query": "\n        UPDATE work_items wi\n        SET\n            status       = ($3::text)::work_item_status,\n            completed_at = $4,\n            -- Keep the board card in sync: move it to the column whose\n            -- mapped_status matches the new status (same project scope).\n            -- Falls back to the current column when no such column exists.\n            column_id    = COALESCE(\n                (SELECT bc.id FROM board_columns bc\n                 WHERE bc.user_id = $2\n                   AND bc.mapped_status = ($3::text)::work_item_status\n                   AND (bc.project_id IS NOT DISTINCT FROM wi.project_id)\n                 ORDER BY bc.position ASC\n                 LIMIT 1),\n                wi.column_id),\n            updated_at   = now()\n        WHERE wi.id = $1 AND wi.user_id = $2 AND wi.deleted_at IS NULL\n        RETURNING\n            id, user_id, project_id, epic_id, sprint_id,\n            type::text     AS \"item_type!\",\n            title, description,\n            status::text   AS \"status!\",\n            priority::text AS \"priority!\",\n            story_points, position,\n            start_date, due_date, recurrence_rule, completed_at,\n            column_id,\n            labels AS \"labels!: Vec<String>\",\n            pinned_fields AS \"pinned_fields!: Vec<String>\",\n            github_repo, github_branch, github_pr,\n            created_at, updated_at\n        ",
   "describe": {
     "columns": [
       {
@@ -159,5 +159,5 @@
       false
     ]
   },
-  "hash": "a49789a628edce004186505a3c88ee9a6e63dc9e198414037b10f545345c4675"
+  "hash": "9e3038388d5d6ed81959da3f1ce010fef3e904a523a92d680686d7fe849b2322"
 }

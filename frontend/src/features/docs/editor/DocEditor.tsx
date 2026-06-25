@@ -655,10 +655,18 @@ export function DocEditor({
     },
   });
 
-  // Sync externally changed value (e.g. version restore)
+  // Sync externally changed value (e.g. version restore). Never re-set content
+  // while the user is typing — setContent resets the cursor to the end, which
+  // caused the caret to jump on edit/delete.
   const valueRef = useRef(value);
   useEffect(() => {
-    if (!editor || JSON.stringify(valueRef.current) === JSON.stringify(value)) return;
+    if (!editor) return;
+    if (editor.isFocused) {
+      // We're the source of this change; just track it, don't reset.
+      valueRef.current = value;
+      return;
+    }
+    if (JSON.stringify(valueRef.current) === JSON.stringify(value)) return;
     valueRef.current = value;
     editor.commands.setContent(normalizeDoc(value), false);
   }, [editor, value]);

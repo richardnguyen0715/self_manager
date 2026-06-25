@@ -752,12 +752,23 @@ pub async fn set_status(
     let updated = sqlx::query_as!(
         WorkItem,
         r#"
-        UPDATE work_items
+        UPDATE work_items wi
         SET
             status       = ($3::text)::work_item_status,
             completed_at = $4,
+            -- Keep the board card in sync: move it to the column whose
+            -- mapped_status matches the new status (same project scope).
+            -- Falls back to the current column when no such column exists.
+            column_id    = COALESCE(
+                (SELECT bc.id FROM board_columns bc
+                 WHERE bc.user_id = $2
+                   AND bc.mapped_status = ($3::text)::work_item_status
+                   AND (bc.project_id IS NOT DISTINCT FROM wi.project_id)
+                 ORDER BY bc.position ASC
+                 LIMIT 1),
+                wi.column_id),
             updated_at   = now()
-        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+        WHERE wi.id = $1 AND wi.user_id = $2 AND wi.deleted_at IS NULL
         RETURNING
             id, user_id, project_id, epic_id, sprint_id,
             type::text     AS "item_type!",
