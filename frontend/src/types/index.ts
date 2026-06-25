@@ -1478,6 +1478,7 @@ export const API_ENDPOINTS = {
   PAGES_SEARCH: "/api/pages/search",                      // GET ?q=&space_id?
   PAGE_MOVE: "/api/pages/move",                           // POST { id, parent_id?, position }
   PAGE_PUBLISH: (id: string) => `/api/pages/${id}/publish`,
+  PAGE_UNPUBLISH: (id: string) => `/api/pages/${id}/unpublish`,
   PAGE_VERSIONS: (id: string) => `/api/pages/${id}/versions`,            // GET / POST
   PAGE_VERSION_BY_ID: (id: string, vid: string) =>
     `/api/pages/${id}/versions/${vid}`,                                  // GET

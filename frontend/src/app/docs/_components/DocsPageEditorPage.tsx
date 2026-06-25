@@ -19,6 +19,7 @@ import {
   usePage,
   useUpdatePage,
   usePublishPage,
+  useUnpublishPage,
   useDeletePage,
 } from "@/features/docs";
 import { DocEditor } from "@/features/docs/editor/DocEditor";
@@ -73,6 +74,7 @@ export function DocsPageEditorPage({
   const { data: page, isLoading, isError } = usePage(pageId);
   const updatePage = useUpdatePage(pageId);
   const publishPage = usePublishPage();
+  const unpublishPage = useUnpublishPage();
   const deletePage = useDeletePage();
 
   // ── Local UI state ─────────────────────────────────────────────────────────
@@ -155,6 +157,14 @@ export function DocsPageEditorPage({
   function handlePublish() {
     setPublishPending(true);
     publishPage.mutate(pageId, {
+      onSuccess: () => setPublishPending(false),
+      onError: () => setPublishPending(false),
+    });
+  }
+
+  function handleUnpublish() {
+    setPublishPending(true);
+    unpublishPage.mutate(pageId, {
       onSuccess: () => setPublishPending(false),
       onError: () => setPublishPending(false),
     });
@@ -263,8 +273,8 @@ export function DocsPageEditorPage({
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Publish button (internal draft → published status) */}
-        {!isPublished && (
+        {/* Publish / Unpublish (internal draft ↔ published status) */}
+        {!isPublished ? (
           <Button
             size="sm"
             onClick={handlePublish}
@@ -277,6 +287,21 @@ export function DocsPageEditorPage({
               <Globe className="h-3.5 w-3.5" />
             )}
             Publish
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleUnpublish}
+            disabled={publishPending}
+            className="gap-1.5"
+          >
+            {publishPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Globe className="h-3.5 w-3.5" />
+            )}
+            Unpublish
           </Button>
         )}
 

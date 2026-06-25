@@ -189,6 +189,18 @@ pub async fn publish_page(
     Ok(Json(page))
 }
 
+// ── POST /api/pages/:id/unpublish ─────────────────────────────────────────────
+
+/// Unpublish a page: `status → 'draft'`, clears `published_at`.
+pub async fn unpublish_page(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(page_id): Path<Uuid>,
+) -> AppResult<Json<PageResponse>> {
+    let page = service::unpublish_page(&state, auth.user_id, page_id).await?;
+    Ok(Json(page))
+}
+
 // ── POST /api/pages/:id/public ────────────────────────────────────────────────
 
 /// Toggle public-site visibility for a page.

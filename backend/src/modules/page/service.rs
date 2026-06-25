@@ -703,6 +703,41 @@ pub async fn publish_page(
     Ok(updated.into())
 }
 
+/// Unpublish a page: revert `status → 'draft'` and clear `published_at`.
+///
+/// # Errors
+/// - [`AppError::NotFound`] — page missing or owned by another user.
+/// - [`AppError::Db`] — database failure.
+pub async fn unpublish_page(
+    state: &AppState,
+    user_id: Uuid,
+    page_id: Uuid,
+) -> AppResult<PageResponse> {
+    let updated = sqlx::query_as!(
+        Page,
+        r#"
+        UPDATE pages
+        SET status       = 'draft',
+            published_at = NULL,
+            updated_at   = now()
+        WHERE id = $1 AND user_id = $2
+        RETURNING
+            id, space_id, parent_id, user_id, title, kind, status, position,
+            content    AS "content: serde_json::Value",
+            excalidraw AS "excalidraw: serde_json::Value",
+            created_at, updated_at, published_at,
+            icon, cover_url, is_public, public_slug, is_template
+        "#,
+        page_id,
+        user_id,
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    Ok(updated.into())
+}
+
 /// Toggle the public-site visibility flag for a page.
 ///
 /// - `public = true`: sets `is_public = true`; if `public_slug` is currently

@@ -75,6 +75,8 @@ pub fn router() -> Router<AppState> {
         )
         // POST /:id/publish
         .route("/:id/publish", post(handlers::publish_page))
+        // POST /:id/unpublish
+        .route("/:id/unpublish", post(handlers::unpublish_page))
         // POST /:id/public  — publish-as-website toggle
         .route("/:id/public", post(handlers::set_page_public))
         // POST /:id/cover   — cover image upload

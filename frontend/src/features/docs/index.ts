@@ -25,6 +25,7 @@ export {
   useUpdatePage,
   useDeletePage,
   usePublishPage,
+  useUnpublishPage,
   useMovePage,
   // Versions
   usePageVersions,

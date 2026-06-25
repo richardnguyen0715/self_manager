@@ -386,6 +386,23 @@ export function usePublishPage() {
 }
 
 /**
+ * Unpublish a page: reverts status → 'draft' and clears `published_at`.
+ */
+export function useUnpublishPage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.post<Page>(API_ENDPOINTS.PAGE_UNPUBLISH(id)),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(docsKeys.pages.detail(updated.id), updated);
+      queryClient.invalidateQueries({
+        queryKey: docsKeys.pages.tree(updated.space_id),
+      });
+    },
+  });
+}
+
+/**
  * Move a page to a new parent / position within the same space.
  * The backend rejects cross-space moves and cycle-creating reparents (422).
  */
