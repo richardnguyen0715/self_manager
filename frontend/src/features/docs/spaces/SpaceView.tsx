@@ -99,7 +99,7 @@ export function SpaceView({ spaceId, activePageId }: SpaceViewProps) {
   }
 
   return (
-    <div className="flex flex-col gap-0">
+    <div className="mx-auto w-full max-w-5xl">
       {/* Space header */}
       <SpaceHeader
         space={space}
@@ -110,69 +110,56 @@ export function SpaceView({ spaceId, activePageId }: SpaceViewProps) {
         onDelete={() => setDeleteOpen(true)}
       />
 
-      <Separator />
-
-      {/* Content area */}
-      <div className="flex flex-1 gap-0 overflow-hidden">
-        {/* Tree sidebar */}
-        <aside className="flex w-64 shrink-0 flex-col border-r bg-sidebar">
-          <div className="flex items-center justify-between px-3 py-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Pages
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => handleCreatePage()}
-              aria-label="Create page"
-              disabled={createPage.isPending}
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-
-          {treeLoading ? (
-            <div className="flex flex-col gap-1.5 px-3 py-2">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-7 animate-pulse rounded bg-muted"
-                  style={{ width: `${70 + Math.random() * 20}%` }}
-                />
-              ))}
-            </div>
-          ) : (
-            <PageTree
-              spaceId={spaceId}
-              nodes={pageTree}
-              activePageId={activePageId}
-              onCreatePage={handleCreatePage}
-            />
-          )}
-        </aside>
-
-        {/* Main panel */}
-        <main className="flex flex-1 flex-col overflow-auto p-6">
-          {listMode === "table" ? (
-            <PageListTable
-              spaceId={spaceId}
-              nodes={pageTree}
-              onCreatePage={() => handleCreatePage()}
-            />
-          ) : (
-            /* Tree is already visible in the sidebar; give a "click a page" hint */
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-              <FileText className="h-10 w-10 text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">
-                Select a page from the tree to open it.
-              </p>
-              <Button variant="outline" onClick={() => handleCreatePage()}>
-                <Plus className="h-4 w-4" /> New page
+      {/* Content — a single full-width region (no redundant sidebar). */}
+      <div className="mt-6">
+        {listMode === "table" ? (
+          <PageListTable
+            spaceId={spaceId}
+            nodes={pageTree}
+            onCreatePage={() => handleCreatePage()}
+          />
+        ) : (
+          <div className="rounded-xl border bg-card">
+            <div className="flex items-center justify-between border-b px-4 py-2.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Pages
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5"
+                onClick={() => handleCreatePage()}
+                disabled={createPage.isPending}
+              >
+                <Plus className="h-3.5 w-3.5" /> New
               </Button>
             </div>
-          )}
-        </main>
+            {treeLoading ? (
+              <div className="flex flex-col gap-1.5 p-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-7 w-2/3 animate-pulse rounded bg-muted" />
+                ))}
+              </div>
+            ) : pageTree.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-12 text-center">
+                <FileText className="h-8 w-8 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">No pages yet.</p>
+                <Button variant="outline" size="sm" onClick={() => handleCreatePage()}>
+                  <Plus className="h-3.5 w-3.5" /> Create first page
+                </Button>
+              </div>
+            ) : (
+              <div className="p-2">
+                <PageTree
+                  spaceId={spaceId}
+                  nodes={pageTree}
+                  activePageId={activePageId}
+                  onCreatePage={handleCreatePage}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Dialogs */}
@@ -215,80 +202,91 @@ function SpaceHeader({
   onDelete,
 }: SpaceHeaderProps) {
   return (
-    <div className="flex items-center gap-3 px-6 py-4">
-      {/* Back */}
-      <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-        <Link href="/docs" aria-label="Back to docs">
-          <ChevronLeft className="h-4 w-4" />
-        </Link>
-      </Button>
+    <div className="space-y-4">
+      {/* Breadcrumb / back */}
+      <Link
+        href="/docs"
+        className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ChevronLeft className="h-3.5 w-3.5" />
+        All spaces
+      </Link>
 
-      {/* Icon + Name */}
-      <div className="flex min-w-0 flex-1 items-center gap-2">
+      {/* Title row */}
+      <div className="flex items-start gap-4">
+        {/* Icon tile */}
         {space.icon ? (
-          <span className="text-2xl leading-none">{space.icon}</span>
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-muted text-3xl leading-none">
+            {space.icon}
+          </div>
         ) : (
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <FileText className="h-4 w-4" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <FileText className="h-6 w-6" />
           </div>
         )}
-        <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold">{space.name}</h1>
+
+        <div className="min-w-0 flex-1 pt-0.5">
+          <h1 className="truncate text-2xl font-bold tracking-tight">
+            {space.name}
+          </h1>
           {space.description && (
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
               {space.description}
             </p>
           )}
         </div>
-      </div>
 
-      {/* Actions */}
-      <div className="flex shrink-0 items-center gap-1.5">
-        {/* View mode toggles */}
-        <div className="flex rounded-md border bg-background p-0.5">
+        {/* Actions */}
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Segmented view toggle */}
+          <div className="flex rounded-lg border bg-background p-0.5">
+            <button
+              onClick={() => onListModeChange("table")}
+              aria-label="List view"
+              className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+                listMode === "table"
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <List className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => onListModeChange("tree")}
+              aria-label="Tree view"
+              className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+                listMode === "tree"
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+          </div>
+
+          <Button size="sm" onClick={onCreatePage} className="h-8 gap-1.5">
+            <Plus className="h-4 w-4" /> New page
+          </Button>
+
           <Button
             variant="ghost"
             size="icon"
-            className={`h-7 w-7 ${listMode === "table" ? "bg-muted" : ""}`}
-            onClick={() => onListModeChange("table")}
-            aria-label="Table view"
+            className="h-8 w-8 text-muted-foreground"
+            onClick={onEdit}
+            aria-label="Edit space"
           >
-            <List className="h-3.5 w-3.5" />
+            <Pencil className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className={`h-7 w-7 ${listMode === "tree" ? "bg-muted" : ""}`}
-            onClick={() => onListModeChange("tree")}
-            aria-label="Tree view"
+            className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            onClick={onDelete}
+            aria-label="Delete space"
           >
-            <LayoutGrid className="h-3.5 w-3.5" />
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
-
-        <Button variant="outline" size="sm" onClick={onCreatePage}>
-          <Plus className="h-3.5 w-3.5" /> New page
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={onEdit}
-          aria-label="Edit space"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-          onClick={onDelete}
-          aria-label="Delete space"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
       </div>
     </div>
   );
