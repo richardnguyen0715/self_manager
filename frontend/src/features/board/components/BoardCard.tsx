@@ -9,6 +9,8 @@ import {
   Flag,
   GripVertical,
   CheckSquare,
+  Circle,
+  CheckCircle2,
   Zap,
   Layers,
   Tag,
@@ -28,7 +30,7 @@ import { useEpics } from "@/features/agile/hooks/useEpics";
 import { useDeleteWorkItem } from "@/features/hierarchy";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useBoardStore } from "../store";
-import { boardKeys } from "../hooks/useSprintBoard";
+import { boardKeys, useMoveItemToColumn } from "../hooks/useSprintBoard";
 
 // ─── Priority colour helpers ──────────────────────────────────────────────────
 
@@ -66,9 +68,42 @@ export function BoardCard({
 }: BoardCardProps) {
   const openItemDetail = useBoardStore((s) => s.openItemDetail);
   const removeItem = useBoardStore((s) => s.removeItem);
+  const columns = useBoardStore((s) => s.columns);
+  const moveItemToColumn = useMoveItemToColumn();
   const deleteWorkItem = useDeleteWorkItem();
   const confirm = useConfirm();
   const qc = useQueryClient();
+
+  const isDone = item.status === "done";
+
+  // Toggle the card's done state by moving it to (or out of) the column whose
+  // mapped_status === "done". The backend mirrors the column's mapped_status
+  // onto the item's status, so this both relocates the card and flips status.
+  function handleToggleDone(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (isOverlay || moveItemToColumn.isPending) return;
+
+    const doneCol = columns.find((c) => c.mapped_status === "done");
+    if (!doneCol) return;
+
+    const dst = isDone
+      ? columns.find((c) => c.mapped_status === "todo") ??
+        columns.find((c) => c.mapped_status === "backlog") ??
+        columns[0]
+      : doneCol;
+    if (!dst || dst.id === columnId) {
+      if (!isDone) return; // already in the done column, nothing to do
+    }
+
+    const target = dst ?? doneCol;
+    moveItemToColumn.mutate({
+      itemId: item.id,
+      columnId: target.id,
+      srcColumnId: columnId,
+      dstColumnId: target.id,
+      dstIndex: target.items.length,
+    });
+  }
 
   async function handleDelete(e: React.MouseEvent) {
     e.stopPropagation();
@@ -216,6 +251,29 @@ export function BoardCard({
       <div className="px-3 py-2.5 pl-7 pr-7 space-y-1.5">
         {/* Type tag row */}
         <div className="flex items-center gap-1.5">
+          {/* Done toggle */}
+          {!isOverlay && (
+            <button
+              type="button"
+              onClick={handleToggleDone}
+              disabled={moveItemToColumn.isPending}
+              className={cn(
+                "shrink-0 rounded-full transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                isDone
+                  ? "text-emerald-500 hover:text-emerald-600"
+                  : "text-muted-foreground/50 hover:text-foreground",
+              )}
+              aria-label={isDone ? "Mark not done" : "Mark done"}
+              title={isDone ? "Mark not done" : "Mark done"}
+            >
+              {isDone ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : (
+                <Circle className="h-4 w-4" />
+              )}
+            </button>
+          )}
           <WorkItemTypeBadge type={item.type} showLabel className="shrink-0" />
           {item.story_points != null && (
             <Badge
