@@ -93,6 +93,10 @@ function EventChip({ event, topPx, heightPx, column, totalColumns }: EventChipPr
           : {}),
       }}
       data-event-chip="true"
+      // Stop the grid's drag-to-create from starting when interacting with a
+      // chip (dnd-kit uses pointer events, so this mouse handler doesn't affect
+      // dragging the chip itself).
+      onMouseDown={(e) => e.stopPropagation()}
       onClick={() =>
         openEventDialog({ id: masterId, occurrenceStart: event.start_time })
       }
@@ -143,6 +147,7 @@ function TimeBlockChip({ block, topPx, heightPx, column, totalColumns }: TimeBlo
         width: `${widthPct - 2}%`,
       }}
       data-event-chip="true"
+      onMouseDown={(e) => e.stopPropagation()}
       onClick={() => openTimeBlockDialog({ id: block.id })}
       title={`${block.title}\n${formatTimeLabel(parseISO(block.start_time))} – ${formatTimeLabel(parseISO(block.end_time))}`}
     >
