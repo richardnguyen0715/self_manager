@@ -82,6 +82,7 @@ let refreshPromise: Promise<string> | null = null;
 async function refreshAccessToken(): Promise<string> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) {
+    forceLogout();
     throw new ApiClientError("No refresh token available", 401);
   }
 
