@@ -65,7 +65,15 @@ import type { WorkItemActivity } from "@/types";
 import { WorkItemTypeBadge } from "@/features/agile/components/WorkItemTypeBadge";
 import { useBoardStore } from "../store";
 import { boardKeys } from "../hooks/useSprintBoard";
-import type { WorkItemStatus, WorkItemSubtask, WorkItemComment, Priority } from "@/types";
+import type {
+  WorkItemStatus,
+  WorkItemSubtask,
+  WorkItemComment,
+  Priority,
+  WorkItemType,
+} from "@/types";
+import { WORK_ITEM_TYPES } from "@/types";
+import { WORK_ITEM_TYPE_META } from "@/features/workitems/work-item-type-config";
 import { useAuthStore } from "@/stores";
 import { useQueryClient } from "@tanstack/react-query";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -1292,6 +1300,55 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
             </div>
             <PinContext.Provider value={{ pinnedFields, togglePin }}>
             <div className="px-3 py-1 divide-y divide-border">
+              {/* Type — editable */}
+              <DetailRow label="Type" fieldKey="type">
+                <DropdownMenuPrimitive.Root>
+                  <DropdownMenuPrimitive.Trigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex items-center gap-1.5 text-sm font-medium hover:opacity-80 transition-opacity",
+                        WORK_ITEM_TYPE_META[workItem.type]?.text,
+                      )}
+                    >
+                      <WorkItemTypeBadge type={workItem.type} />
+                      {WORK_ITEM_TYPE_META[workItem.type]?.label ?? workItem.type}
+                      <ChevronDown className="h-3 w-3 opacity-50" />
+                    </button>
+                  </DropdownMenuPrimitive.Trigger>
+                  <DropdownMenuPrimitive.Portal>
+                    <DropdownMenuPrimitive.Content
+                      align="start"
+                      sideOffset={4}
+                      className="z-50 max-h-72 overflow-y-auto min-w-[10rem] rounded-md border bg-popover p-1 shadow-md"
+                    >
+                      {WORK_ITEM_TYPES.map((t) => (
+                        <DropdownMenuPrimitive.Item
+                          key={t}
+                          onSelect={() =>
+                            updateItem.mutate(
+                              { type: t },
+                              {
+                                onSuccess: () =>
+                                  qc.invalidateQueries({ queryKey: boardKeys.all }),
+                              },
+                            )
+                          }
+                          className={cn(
+                            "flex cursor-default select-none items-center gap-1.5 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent",
+                            WORK_ITEM_TYPE_META[t].text,
+                          )}
+                        >
+                          <WorkItemTypeBadge type={t} />
+                          {WORK_ITEM_TYPE_META[t].label}
+                          {workItem.type === t && <Check className="h-3 w-3 ml-auto" />}
+                        </DropdownMenuPrimitive.Item>
+                      ))}
+                    </DropdownMenuPrimitive.Content>
+                  </DropdownMenuPrimitive.Portal>
+                </DropdownMenuPrimitive.Root>
+              </DetailRow>
+
               {/* Assignee */}
               <DetailRow label="Assignee" fieldKey="assignee">
                 <div className="flex items-center gap-1.5">
