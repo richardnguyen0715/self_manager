@@ -266,9 +266,12 @@ function DayColumn({ day, events, timeBlocks, onSlotClick }: DayColumnProps) {
           setNodeRef(node);
         }}
         className={cn(
-          "relative flex-1 border-r last:border-r-0",
+          "relative shrink-0 border-r last:border-r-0",
           isOver && "bg-primary/5",
         )}
+        // Fixed, non-shrinking height: `flex-1` let the box collapse to the
+        // viewport, leaving the lower hours (~4 PM+) with no element to receive
+        // drag-to-create pointer events.
         style={{ height: HOUR_HEIGHT_PX * 24 }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}

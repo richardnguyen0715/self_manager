@@ -163,7 +163,7 @@ function DayColumn({ day, tasks }: DayColumnProps) {
           setNodeRef(node);
         }}
         className={cn(
-          "relative flex-1 border-r last:border-r-0",
+          "relative shrink-0 border-r last:border-r-0",
           isOver && "bg-primary/5",
         )}
         style={{ height: HOUR_HEIGHT_PX * 24 }}
