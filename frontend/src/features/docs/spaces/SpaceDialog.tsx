@@ -15,6 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import type { Space } from "@/features/docs";
 import type { CreateSpacePayload, UpdateSpacePayload } from "@/features/docs";
+import { useProjects } from "@/features/tasks/hooks/useProjects";
+
+const NO_PROJECT = "__none__";
 
 // ─── Emoji picker (small static list) ────────────────────────────────────────
 
@@ -30,6 +33,8 @@ interface SpaceFormValues {
   name: string;
   icon: string;
   description: string;
+  /** Project UUID, or NO_PROJECT for unassigned. */
+  project_id: string;
 }
 
 type SpaceDialogMode =
@@ -43,6 +48,8 @@ interface SpaceDialogProps {
   /** Called with the validated payload; caller owns the mutation. */
   onSubmit: (payload: CreateSpacePayload | UpdateSpacePayload) => void;
   isPending?: boolean;
+  /** Pre-selected project for the create form (e.g. the active project). */
+  defaultProjectId?: string | null;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -53,9 +60,16 @@ export function SpaceDialog({
   mode,
   onSubmit,
   isPending = false,
+  defaultProjectId = null,
 }: SpaceDialogProps) {
   const isEdit = mode.kind === "edit";
   const existing = isEdit ? mode.space : null;
+  const { data: projects = [] } = useProjects();
+
+  // Initial project selection: the space's own project when editing, else the
+  // active project passed by the caller.
+  const initialProject =
+    (isEdit ? existing?.project_id : defaultProjectId) ?? "";
 
   const {
     register,
@@ -69,6 +83,7 @@ export function SpaceDialog({
       name: existing?.name ?? "",
       icon: existing?.icon ?? "",
       description: existing?.description ?? "",
+      project_id: initialProject || NO_PROJECT,
     },
   });
 
@@ -78,6 +93,7 @@ export function SpaceDialog({
       name: existing?.name ?? "",
       icon: existing?.icon ?? "",
       description: existing?.description ?? "",
+      project_id: initialProject || NO_PROJECT,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -85,10 +101,14 @@ export function SpaceDialog({
   const selectedIcon = watch("icon");
 
   function handleFormSubmit(values: SpaceFormValues) {
+    const projectId =
+      values.project_id === NO_PROJECT ? null : values.project_id;
     const payload: CreateSpacePayload | UpdateSpacePayload = {
       name: values.name.trim(),
       icon: values.icon || undefined,
       description: values.description.trim() || undefined,
+      // Create: omit null (unassigned). Edit: send null to clear assignment.
+      project_id: isEdit ? projectId : projectId ?? undefined,
     };
     onSubmit(payload);
   }
@@ -168,6 +188,27 @@ export function SpaceDialog({
               placeholder="What is this space for?"
               {...register("description")}
             />
+          </div>
+
+          {/* Project assignment */}
+          <div className="space-y-2">
+            <Label htmlFor="space-project">Project</Label>
+            <select
+              id="space-project"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              {...register("project_id")}
+            >
+              <option value={NO_PROJECT}>No project (all projects only)</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Only the chosen project sees this space. &ldquo;No project&rdquo; shows
+              it only under All projects.
+            </p>
           </div>
 
           <DialogFooter>

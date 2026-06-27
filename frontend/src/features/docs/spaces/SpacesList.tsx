@@ -232,13 +232,9 @@ export function SpacesList() {
 
   // Handlers
   function handleCreate(payload: CreateSpacePayload | UpdateSpacePayload) {
-    // New spaces belong to the currently selected project so other projects
-    // can't see them. Under "All projects" (null) the space stays unassigned.
-    const withProject: CreateSpacePayload = {
-      ...(payload as CreateSpacePayload),
-      project_id: currentProjectId ?? undefined,
-    };
-    createSpace.mutate(withProject, {
+    // The dialog's project picker owns project_id (defaulted to the active
+    // project). Caller just forwards the payload.
+    createSpace.mutate(payload as CreateSpacePayload, {
       onSuccess: () => setCreateOpen(false),
     });
   }
@@ -374,6 +370,7 @@ export function SpacesList() {
         mode={{ kind: "create" }}
         onSubmit={handleCreate}
         isPending={createSpace.isPending}
+        defaultProjectId={currentProjectId}
       />
 
       <SpaceDialog
