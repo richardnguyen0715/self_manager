@@ -78,6 +78,7 @@ function EventChip({ event, topPx, heightPx, column, totalColumns }: EventChipPr
           ? { backgroundColor: `${color}26`, borderLeftColor: color, color }
           : {}),
       }}
+      data-event-chip="true"
       onClick={() => openEventDialog({ id: masterId })}
       title={`${event.title}\n${formatTimeLabel(parseISO(event.start_time))} – ${formatTimeLabel(parseISO(event.end_time))}`}
     >
@@ -125,6 +126,7 @@ function TimeBlockChip({ block, topPx, heightPx, column, totalColumns }: TimeBlo
         left: `${leftPct + 1}%`,
         width: `${widthPct - 2}%`,
       }}
+      data-event-chip="true"
       onClick={() => openTimeBlockDialog({ id: block.id })}
       title={`${block.title}\n${formatTimeLabel(parseISO(block.start_time))} – ${formatTimeLabel(parseISO(block.end_time))}`}
     >
@@ -159,14 +161,29 @@ function DayColumn({ day, events, timeBlocks, onSlotClick }: DayColumnProps) {
   const { openTimeBlockDialog } = useCalendarStore();
   const columnRef = useRef<HTMLDivElement>(null);
 
-  // Click-and-drag selection to create an event over a time range.
+  // Click-and-drag selection to create an event over a time range. Tracking is
+  // done at the column level so a drag works *anywhere* (even starting over an
+  // existing event); a plain click on empty space creates a 60-min slot, and a
+  // plain click on an event chip falls through to the chip's own edit handler.
   const [sel, setSel] = useState<{ startMin: number; endMin: number } | null>(null);
-  const dragAnchorRef = useRef<number | null>(null);
+  const dragRef = useRef<{
+    anchorMin: number;
+    startY: number;
+    moved: boolean;
+    onChip: boolean;
+  } | null>(null);
 
   const minutesAt = (clientY: number): number => {
     const rect = columnRef.current?.getBoundingClientRect();
     if (!rect) return 0;
     return Math.max(0, Math.min(24 * 60, pxToMinutes(clientY - rect.top)));
+  };
+
+  const openRange = (startMin: number, endMin: number) => {
+    const start = minutesToDatetime(day, startMin);
+    const end = minutesToDatetime(day, endMin);
+    if (onSlotClick) onSlotClick(start, end);
+    else openTimeBlockDialog({ start: start.toISOString(), end: end.toISOString() });
   };
 
   const { setNodeRef, isOver } = useDroppable({
@@ -196,40 +213,47 @@ function DayColumn({ day, events, timeBlocks, onSlotClick }: DayColumnProps) {
   const positioned = computeEventLayout(allItems);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Only start a selection on the grid background, not on a chip.
-    if ((e.target as HTMLElement).dataset.grid !== "true") return;
-    const m = minutesAt(e.clientY);
-    dragAnchorRef.current = m;
-    setSel({ startMin: m, endMin: m + 15 });
+    if (e.button !== 0) return; // left click only
+    const onChip = Boolean(
+      (e.target as HTMLElement).closest('[data-event-chip="true"]'),
+    );
+    dragRef.current = {
+      anchorMin: minutesAt(e.clientY),
+      startY: e.clientY,
+      moved: false,
+      onChip,
+    };
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (dragAnchorRef.current === null) return;
+    const d = dragRef.current;
+    if (!d) return;
+    if (!d.moved && Math.abs(e.clientY - d.startY) < 4) return; // ignore jitter
+    d.moved = true;
     const m = minutesAt(e.clientY);
-    const a = Math.min(dragAnchorRef.current, m);
-    const b = Math.max(dragAnchorRef.current, m);
+    const a = Math.min(d.anchorMin, m);
+    const b = Math.max(d.anchorMin, m);
     setSel({ startMin: a, endMin: Math.max(b, a + 15) });
   };
 
   const finishDrag = () => {
-    if (dragAnchorRef.current === null || !sel) {
-      dragAnchorRef.current = null;
-      setSel(null);
+    const d = dragRef.current;
+    const current = sel;
+    dragRef.current = null;
+    setSel(null);
+    if (!d) return;
+
+    if (!d.moved) {
+      // Plain click: create on empty space; let the chip handle its own edit.
+      if (d.onChip) return;
+      openRange(d.anchorMin, d.anchorMin + 60);
       return;
     }
-    let { startMin, endMin } = sel;
-    // A near-zero drag is a plain click → default to a 60-minute slot.
-    if (endMin - startMin < 20) endMin = startMin + 60;
-    dragAnchorRef.current = null;
-    setSel(null);
 
-    const start = minutesToDatetime(day, startMin);
-    const end = minutesToDatetime(day, endMin);
-    if (onSlotClick) {
-      onSlotClick(start, end);
-    } else {
-      openTimeBlockDialog({ start: start.toISOString(), end: end.toISOString() });
-    }
+    const range = current ?? { startMin: d.anchorMin, endMin: d.anchorMin + 60 };
+    const endMin =
+      range.endMin - range.startMin < 15 ? range.startMin + 15 : range.endMin;
+    openRange(range.startMin, endMin);
   };
 
   return (
@@ -249,7 +273,7 @@ function DayColumn({ day, events, timeBlocks, onSlotClick }: DayColumnProps) {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={finishDrag}
-        onMouseLeave={() => dragAnchorRef.current !== null && finishDrag()}
+        onMouseLeave={() => dragRef.current !== null && finishDrag()}
         data-grid="true"
       >
         {/* Hour grid lines */}
