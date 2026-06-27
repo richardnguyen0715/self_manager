@@ -92,9 +92,11 @@ impl IntoResponse for AppError {
         let code = self.error_code();
         let message = self.to_string();
 
-        // Never leak internal details in the response body.
+        // Never leak internal details in the response body — but log the real
+        // cause server-side so 500s are diagnosable.
         let safe_message = match &self {
             Self::Internal | Self::InternalMsg(_) | Self::Db(_) => {
+                tracing::error!(error = %message, code = %code, "request failed (5xx)");
                 "an unexpected error occurred".to_owned()
             }
             _ => message,

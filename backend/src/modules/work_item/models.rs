@@ -196,6 +196,14 @@ pub enum WorkItemType {
     Bug,
     Habit,
     Milestone,
+    Epic,
+    Debug,
+    Fix,
+    Feat,
+    Docs,
+    Revert,
+    Deploy,
+    Release,
 }
 
 impl WorkItemType {
@@ -208,6 +216,14 @@ impl WorkItemType {
             Self::Bug => "bug",
             Self::Habit => "habit",
             Self::Milestone => "milestone",
+            Self::Epic => "epic",
+            Self::Debug => "debug",
+            Self::Fix => "fix",
+            Self::Feat => "feat",
+            Self::Docs => "docs",
+            Self::Revert => "revert",
+            Self::Deploy => "deploy",
+            Self::Release => "release",
         }
     }
 }
