@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { WorkItemType, Priority, Epic } from "@/types";
+import { WORK_ITEM_TYPES } from "@/types";
+import { WORK_ITEM_TYPE_META } from "@/features/workitems/work-item-type-config";
 import { useBacklogStore } from "../store/useBacklogStore";
 
 // ─── Reusable inline select (matches TaskFilters pattern) ─────────────────────
@@ -86,11 +88,7 @@ function FilterSelect<T extends string>({
 
 const TYPE_OPTIONS: { value: WorkItemType | "all"; label: string }[] = [
   { value: "all", label: "All types" },
-  { value: "story", label: "Story" },
-  { value: "task", label: "Task" },
-  { value: "bug", label: "Bug" },
-  { value: "habit", label: "Habit" },
-  { value: "milestone", label: "Milestone" },
+  ...WORK_ITEM_TYPES.map((t) => ({ value: t, label: WORK_ITEM_TYPE_META[t].label })),
 ];
 
 const PRIORITY_OPTIONS: { value: Priority | "all"; label: string }[] = [

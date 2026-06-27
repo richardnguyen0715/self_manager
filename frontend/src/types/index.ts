@@ -737,7 +737,37 @@ export interface SearchResponse {
 export type InitiativeStatus = "active" | "completed" | "paused" | "abandoned";
 export type EpicStatus = "todo" | "in_progress" | "done" | "cancelled";
 export type SprintStatus = "planned" | "active" | "completed";
-export type WorkItemType = "story" | "task" | "bug" | "habit" | "milestone";
+export type WorkItemType =
+  | "story"
+  | "task"
+  | "bug"
+  | "habit"
+  | "milestone"
+  | "epic"
+  | "debug"
+  | "fix"
+  | "feat"
+  | "docs"
+  | "revert"
+  | "deploy"
+  | "release";
+
+/** All work-item types in display order — single source for selectors/filters. */
+export const WORK_ITEM_TYPES: WorkItemType[] = [
+  "task",
+  "story",
+  "epic",
+  "feat",
+  "fix",
+  "bug",
+  "debug",
+  "docs",
+  "revert",
+  "deploy",
+  "release",
+  "milestone",
+  "habit",
+];
 export type WorkItemStatus = "backlog" | "todo" | "in_progress" | "review" | "done";
 // priority reuses existing `Priority`
 

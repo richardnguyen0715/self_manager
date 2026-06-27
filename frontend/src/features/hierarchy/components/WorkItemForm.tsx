@@ -17,6 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DateInput } from "@/components/ui/date-input";
 import type { WorkItem, WorkItemStatus, WorkItemType, Priority } from "@/types";
+import { WORK_ITEM_TYPES } from "@/types";
+import { WORK_ITEM_TYPE_META } from "@/features/workitems/work-item-type-config";
 import { useCreateWorkItem, useUpdateWorkItem } from "../hooks/useHierarchy";
 import { InlineSelect } from "./InlineSelect";
 
@@ -25,7 +27,10 @@ import { InlineSelect } from "./InlineSelect";
 const schema = z.object({
   title: z.string().min(1, "Title is required").max(255),
   description: z.string().max(4000).nullable().optional(),
-  type: z.enum(["story", "task", "bug", "habit", "milestone"] as const),
+  type: z.enum([
+    "story", "task", "bug", "habit", "milestone",
+    "epic", "debug", "fix", "feat", "docs", "revert", "deploy", "release",
+  ] as const),
   status: z.enum([
     "backlog",
     "todo",
@@ -48,13 +53,9 @@ type FormValues = z.infer<typeof schema>;
 
 // ─── Options ──────────────────────────────────────────────────────────────────
 
-const TYPE_OPTIONS: { value: WorkItemType; label: string }[] = [
-  { value: "story", label: "Story" },
-  { value: "task", label: "Task" },
-  { value: "bug", label: "Bug" },
-  { value: "habit", label: "Habit" },
-  { value: "milestone", label: "Milestone" },
-];
+const TYPE_OPTIONS: { value: WorkItemType; label: string }[] = WORK_ITEM_TYPES.map(
+  (t) => ({ value: t, label: WORK_ITEM_TYPE_META[t].label }),
+);
 
 const STATUS_OPTIONS: { value: WorkItemStatus; label: string }[] = [
   { value: "backlog", label: "Backlog" },

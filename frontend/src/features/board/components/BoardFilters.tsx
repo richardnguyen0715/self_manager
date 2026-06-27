@@ -5,14 +5,12 @@ import { Button } from "@/components/ui/button";
 import { useSprintsList } from "@/features/sprints/hooks/useSprints";
 import { useBoardStore } from "../store";
 import type { WorkItemType, Priority } from "@/types";
+import { WORK_ITEM_TYPES } from "@/types";
+import { WORK_ITEM_TYPE_META } from "@/features/workitems/work-item-type-config";
 
 const TYPES: { value: WorkItemType | "all"; label: string }[] = [
   { value: "all", label: "All types" },
-  { value: "story", label: "Story" },
-  { value: "task", label: "Task" },
-  { value: "bug", label: "Bug" },
-  { value: "habit", label: "Habit" },
-  { value: "milestone", label: "Milestone" },
+  ...WORK_ITEM_TYPES.map((t) => ({ value: t, label: WORK_ITEM_TYPE_META[t].label })),
 ];
 
 const PRIORITIES: { value: Priority | "all"; label: string }[] = [

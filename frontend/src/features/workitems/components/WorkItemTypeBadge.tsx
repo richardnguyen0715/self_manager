@@ -1,14 +1,8 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import {
-  BookOpen,
-  CheckSquare,
-  Bug,
-  Repeat2,
-  Milestone,
-} from "lucide-react";
 import type { WorkItemType } from "@/types";
+import { WORK_ITEM_TYPE_META } from "../work-item-type-config";
 
 interface WorkItemTypeBadgeProps {
   type: WorkItemType;
@@ -16,52 +10,18 @@ interface WorkItemTypeBadgeProps {
   showLabel?: boolean;
 }
 
-export const WORK_ITEM_TYPE_CONFIG: Record<
-  WorkItemType,
-  {
-    label: string;
-    icon: React.ComponentType<{ className?: string }>;
-    className: string;
-  }
-> = {
-  story: {
-    label: "Story",
-    icon: BookOpen,
-    className: "text-emerald-600 dark:text-emerald-400",
-  },
-  task: {
-    label: "Task",
-    icon: CheckSquare,
-    className: "text-sky-600 dark:text-sky-400",
-  },
-  bug: {
-    label: "Bug",
-    icon: Bug,
-    className: "text-red-600 dark:text-red-400",
-  },
-  habit: {
-    label: "Habit",
-    icon: Repeat2,
-    className: "text-violet-600 dark:text-violet-400",
-  },
-  milestone: {
-    label: "Milestone",
-    icon: Milestone,
-    className: "text-amber-600 dark:text-amber-400",
-  },
-};
+/** Back-compat alias — some callers import this name. */
+export const WORK_ITEM_TYPE_CONFIG = WORK_ITEM_TYPE_META;
 
 export function WorkItemTypeBadge({
   type,
   className,
   showLabel = false,
 }: WorkItemTypeBadgeProps) {
-  const { label, icon: Icon, className: typeClass } =
-    WORK_ITEM_TYPE_CONFIG[type];
+  const meta = WORK_ITEM_TYPE_META[type] ?? WORK_ITEM_TYPE_META.task;
+  const { label, icon: Icon, text } = meta;
   return (
-    <span
-      className={cn("inline-flex items-center gap-1", typeClass, className)}
-    >
+    <span className={cn("inline-flex items-center gap-1", text, className)}>
       <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       {showLabel && <span className="text-xs font-medium">{label}</span>}
       {!showLabel && <span className="sr-only">{label}</span>}

@@ -26,6 +26,8 @@ import type {
   WorkItemStatus,
   Priority,
 } from "@/types";
+import { WORK_ITEM_TYPES } from "@/types";
+import { WORK_ITEM_TYPE_META } from "../work-item-type-config";
 import { useWorkItems, useDeleteWorkItem } from "../hooks/useWorkItems";
 import { useWorkItemUIStore } from "../store";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -39,11 +41,7 @@ import { CreateWorkItemDialog } from "./CreateWorkItemDialog";
 
 const TYPE_OPTIONS: { value: WorkItemType | "all"; label: string }[] = [
   { value: "all", label: "All types" },
-  { value: "story", label: "Story" },
-  { value: "task", label: "Task" },
-  { value: "bug", label: "Bug" },
-  { value: "habit", label: "Habit" },
-  { value: "milestone", label: "Milestone" },
+  ...WORK_ITEM_TYPES.map((t) => ({ value: t, label: WORK_ITEM_TYPE_META[t].label })),
 ];
 
 const STATUS_OPTIONS: { value: WorkItemStatus | "all"; label: string }[] = [

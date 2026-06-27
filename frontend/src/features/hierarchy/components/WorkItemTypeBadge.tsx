@@ -1,47 +1,19 @@
 "use client";
 
-import {
-  BookOpen,
-  CheckSquare,
-  Bug,
-  Repeat2,
-  Flag,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WorkItemType } from "@/types";
+import { WORK_ITEM_TYPE_META } from "@/features/workitems/work-item-type-config";
 
-const TYPE_CONFIG: Record<
+// Adapt the shared meta to this badge's {label, icon, color} shape.
+const TYPE_CONFIG = Object.fromEntries(
+  (Object.entries(WORK_ITEM_TYPE_META) as [
+    WorkItemType,
+    (typeof WORK_ITEM_TYPE_META)[WorkItemType],
+  ][]).map(([k, v]) => [k, { label: v.label, icon: v.icon, color: v.badge }]),
+) as Record<
   WorkItemType,
   { label: string; icon: React.ComponentType<{ className?: string }>; color: string }
-> = {
-  story: {
-    label: "Story",
-    icon: BookOpen,
-    color: "text-violet-600 bg-violet-100 dark:bg-violet-900/30 dark:text-violet-400",
-  },
-  task: {
-    label: "Task",
-    icon: CheckSquare,
-    color: "text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400",
-  },
-  bug: {
-    label: "Bug",
-    icon: Bug,
-    color: "text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400",
-  },
-  habit: {
-    label: "Habit",
-    icon: Repeat2,
-    color:
-      "text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400",
-  },
-  milestone: {
-    label: "Milestone",
-    icon: Flag,
-    color:
-      "text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400",
-  },
-};
+>;
 
 interface WorkItemTypeBadgeProps {
   type: WorkItemType;

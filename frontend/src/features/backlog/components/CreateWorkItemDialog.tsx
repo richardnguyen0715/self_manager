@@ -27,6 +27,8 @@ import { X, Loader2, CalendarDays, Hash } from "lucide-react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { ChevronDown, Check } from "lucide-react";
 import type { WorkItemType, WorkItemStatus, Priority, Sprint, Epic } from "@/types";
+import { WORK_ITEM_TYPES } from "@/types";
+import { WORK_ITEM_TYPE_META } from "@/features/workitems/work-item-type-config";
 import { useCreateWorkItem } from "@/features/agile";
 import { useBacklogStore } from "../store/useBacklogStore";
 import { useProjectStore } from "@/stores";
@@ -36,7 +38,10 @@ import { useProjectStore } from "@/stores";
 const schema = z.object({
   title: z.string().min(1, "Title is required").max(255),
   description: z.string().max(4000).optional().nullable(),
-  type: z.enum(["story", "task", "bug", "habit", "milestone"]),
+  type: z.enum([
+    "story", "task", "bug", "habit", "milestone",
+    "epic", "debug", "fix", "feat", "docs", "revert", "deploy", "release",
+  ]),
   priority: z.enum(["critical", "high", "medium", "low"]),
   status: z.enum(["backlog", "todo", "in_progress", "review", "done"]),
   story_points: z.coerce
@@ -125,13 +130,9 @@ function InlineSelect<T extends string>({
 
 // ─── Options ──────────────────────────────────────────────────────────────────
 
-const TYPE_OPTS: { value: WorkItemType; label: string }[] = [
-  { value: "story", label: "Story" },
-  { value: "task", label: "Task" },
-  { value: "bug", label: "Bug" },
-  { value: "habit", label: "Habit" },
-  { value: "milestone", label: "Milestone" },
-];
+const TYPE_OPTS: { value: WorkItemType; label: string }[] = WORK_ITEM_TYPES.map(
+  (t) => ({ value: t, label: WORK_ITEM_TYPE_META[t].label }),
+);
 
 const PRIORITY_OPTS: { value: Priority; label: string }[] = [
   { value: "critical", label: "Critical" },

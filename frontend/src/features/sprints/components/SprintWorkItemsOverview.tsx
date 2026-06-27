@@ -10,7 +10,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import type { Sprint, WorkItemStatus } from "@/types";
+import type { Sprint, WorkItemStatus, WorkItemType } from "@/types";
+import { WORK_ITEM_TYPES } from "@/types";
+import { WORK_ITEM_TYPE_META } from "@/features/workitems/work-item-type-config";
 import { useSprintWorkItemsList } from "../hooks/useSprints";
 import { WorkItemStatusBadge } from "@/features/agile/components/WorkItemStatusBadge";
 import { WorkItemTypeBadge } from "@/features/agile/components/WorkItemTypeBadge";
@@ -64,14 +66,17 @@ export function SprintWorkItemsOverview({
   sprint,
 }: SprintWorkItemsOverviewProps) {
   const [statusFilter, setStatusFilter] = useState<WorkItemStatus | "all">("all");
+  const [typeFilter, setTypeFilter] = useState<WorkItemType | "all">("all");
 
   const { data, isLoading, isError } = useSprintWorkItemsList(
     sprintId,
     statusFilter !== "all" ? { status: statusFilter } : undefined,
   );
 
-  const items = data?.data ?? [];
-  const total = data?.total ?? 0;
+  const allItems = data?.data ?? [];
+  const items =
+    typeFilter === "all" ? allItems : allItems.filter((i) => i.type === typeFilter);
+  const total = items.length;
 
   return (
     <div className="space-y-4">
@@ -86,8 +91,21 @@ export function SprintWorkItemsOverview({
             {f.label}
           </FilterPill>
         ))}
+        {/* Type filter */}
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value as WorkItemType | "all")}
+          className="ml-auto h-7 rounded-md border border-input bg-background px-2 text-xs"
+        >
+          <option value="all">All types</option>
+          {WORK_ITEM_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {WORK_ITEM_TYPE_META[t].label}
+            </option>
+          ))}
+        </select>
         {total > 0 && (
-          <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+          <span className="text-xs text-muted-foreground tabular-nums">
             {total} item{total !== 1 ? "s" : ""}
           </span>
         )}

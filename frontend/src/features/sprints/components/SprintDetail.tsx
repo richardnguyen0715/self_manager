@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   Play,
   CheckCircle2,
+  Square,
   Pencil,
   Calendar,
   Target,
@@ -24,6 +25,7 @@ import type { SprintDetailTab } from "../types";
 import {
   useSprintDetail,
   useActivateSprint,
+  useUpdateSprint,
 } from "../hooks/useSprints";
 import { useSprintUIStore } from "../store";
 import { SprintStatusBadge } from "./SprintStatusBadge";
@@ -81,6 +83,7 @@ export function SprintDetail({ sprintId }: SprintDetailProps) {
 
   const { data: sprint, isLoading, isError } = useSprintDetail(sprintId);
   const activate = useActivateSprint();
+  const updateSprint = useUpdateSprint(sprintId);
   const { openEditDialog, openCompleteDialog } = useSprintUIStore();
 
   if (isLoading) {
@@ -177,15 +180,28 @@ export function SprintDetail({ sprintId }: SprintDetailProps) {
           )}
 
           {sprint.status === "active" && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => openCompleteDialog(sprintId)}
-              className="gap-1.5"
-            >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Complete Sprint
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => updateSprint.mutate({ status: "planned" })}
+                disabled={updateSprint.isPending}
+                className="gap-1.5 text-muted-foreground"
+                title="Stop the sprint and return it to planning"
+              >
+                <Square className="h-3.5 w-3.5" />
+                Stop Sprint
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => openCompleteDialog(sprintId)}
+                className="gap-1.5"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Complete Sprint
+              </Button>
+            </>
           )}
         </div>
       </div>
