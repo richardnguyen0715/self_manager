@@ -56,7 +56,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Goals", href: "/goals", icon: Target },
   { label: "Analytics", href: "/analytics", icon: BarChart3 },
   // ── Management ───────────────────────────────────────────────────────────
-  { label: "Organizations", href: "/organizations", icon: Building2 },
   { label: "Trash", href: "/trash", icon: Trash2 },
 ];
 
@@ -121,6 +120,12 @@ export function Sidebar({ variant = "desktop" }: SidebarProps) {
 
       {/* Top-level links — not scoped to the selected project */}
       <div className="px-2 py-2 flex flex-col gap-1">
+        <NavLink
+          item={{ label: "Organizations", href: "/organizations", icon: Building2 }}
+          isActive={pathname.startsWith("/organizations")}
+          collapsed={collapsed}
+          onNavClick={handleNavClick}
+        />
         <NavLink
           item={{ label: "Projects", href: "/projects", icon: FolderOpen }}
           isActive={pathname.startsWith("/projects")}
