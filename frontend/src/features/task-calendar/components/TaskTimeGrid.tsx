@@ -94,25 +94,26 @@ function TaskChip({ task, topPx, heightPx, column, totalColumns }: TaskChipProps
 
 // ─── Time gutter ───────────────────────────────────────────────────────────────
 
-function TimeGutter() {
+function TimeGutter({ showDayHeader = false }: { showDayHeader?: boolean }) {
   return (
-    <div
-      className="flex flex-col shrink-0 w-14 select-none"
-      style={{ height: HOUR_HEIGHT_PX * 24 }}
-    >
-      {HOURS.map((hour) => (
-        <div
-          key={hour}
-          className="relative flex items-start justify-end pr-2"
-          style={{ height: HOUR_HEIGHT_PX }}
-        >
-          {hour > 0 && (
-            <span className="text-[10px] text-muted-foreground -mt-2 tabular-nums">
-              {formatHourLabel(hour)}
-            </span>
-          )}
-        </div>
-      ))}
+    <div className="flex flex-col shrink-0 w-14 select-none">
+      {/* Spacer matching each day column's header so hour labels line up. */}
+      {showDayHeader && <div className="h-12 border-b" />}
+      <div className="flex flex-col" style={{ height: HOUR_HEIGHT_PX * 24 }}>
+        {HOURS.map((hour) => (
+          <div
+            key={hour}
+            className="relative flex items-start justify-end pr-2"
+            style={{ height: HOUR_HEIGHT_PX }}
+          >
+            {hour > 0 && (
+              <span className="text-[10px] text-muted-foreground -mt-2 tabular-nums">
+                {formatHourLabel(hour)}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -247,7 +248,7 @@ export function TaskTimeGrid({ days, tasks, showDayHeaders = true }: TaskTimeGri
     <div className="flex flex-col flex-1 min-h-0">
       <div ref={scrollRef} className="flex flex-1 overflow-y-auto overflow-x-auto min-h-0">
         <div className="flex flex-1" style={{ minWidth: gridMinWidth + 56 }}>
-          <TimeGutter />
+          <TimeGutter showDayHeader={showDayHeaders} />
           <div className="flex flex-1 min-w-0">
             {days.map((day) => (
               <DayColumn

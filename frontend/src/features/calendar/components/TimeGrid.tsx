@@ -341,13 +341,14 @@ function DayColumn({ day, events, timeBlocks, showDayHeader, onSlotClick }: DayC
 
 // ─── Time gutter ─────────────────────────────────────────────────────────────
 
-function TimeGutter() {
+function TimeGutter({ showDayHeader = false }: { showDayHeader?: boolean }) {
   return (
-    <div
-      className="flex flex-col shrink-0 w-14 select-none"
-      style={{ height: HOUR_HEIGHT_PX * 24 }}
-    >
-      {HOURS.map((hour) => (
+    <div className="flex flex-col shrink-0 w-14 select-none">
+      {/* Spacer matching each day column's header so hour labels line up with
+          the grid lines (the columns reserve h-12 for the weekday header). */}
+      {showDayHeader && <div className="h-12 border-b" />}
+      <div className="flex flex-col" style={{ height: HOUR_HEIGHT_PX * 24 }}>
+        {HOURS.map((hour) => (
         <div
           key={hour}
           className="relative flex items-start justify-end pr-2"
@@ -359,7 +360,8 @@ function TimeGutter() {
             </span>
           )}
         </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -431,7 +433,7 @@ export function TimeGrid({ days, events, timeBlocks, showDayHeaders = true, onSl
         {/* Inner wrapper enforces min-width for horizontal scroll on narrow screens */}
         <div className="flex flex-1" style={{ minWidth: gridMinWidth + 56 }}>
           {/* Gutter */}
-          <TimeGutter />
+          <TimeGutter showDayHeader={showDayHeaders} />
 
           {/* Day columns */}
           <div className="flex flex-1 min-w-0">
