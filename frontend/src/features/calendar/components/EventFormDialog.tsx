@@ -25,7 +25,7 @@ import {
   useUpdateCalendarEvent,
   useDeleteCalendarEvent,
 } from "../hooks/useCalendarEvents";
-import { useCalendarTypes } from "../hooks/useCalendarTypes";
+import { useCalendarTypes, useDeleteCalendarType } from "../hooks/useCalendarTypes";
 import {
   buildRRule,
   parseRRule,
@@ -88,10 +88,12 @@ export function EventFormDialog() {
   const updateMutation = useUpdateCalendarEvent();
   const deleteMutation = useDeleteCalendarEvent();
   const { data: calendarTypes = [] } = useCalendarTypes();
+  const deleteTypeMutation = useDeleteCalendarType();
 
   // Type assignments + recurrence live outside react-hook-form (arrays/custom).
   const [selectedTypeIds, setSelectedTypeIds] = useState<string[]>([]);
   const [recurrence, setRecurrence] = useState<RecurrenceOptions>(DEFAULT_RECURRENCE);
+  const [showDeleteMenu, setShowDeleteMenu] = useState(false);
 
   function toggleType(id: string) {
     setSelectedTypeIds((prev) =>
@@ -102,7 +104,8 @@ export function EventFormDialog() {
   const isBusy =
     createMutation.isPending ||
     updateMutation.isPending ||
-    deleteMutation.isPending;
+    deleteMutation.isPending ||
+    deleteTypeMutation.isPending;
 
   const {
     register,
@@ -174,12 +177,31 @@ export function EventFormDialog() {
     closeEventDialog();
   };
 
-  const handleDelete = async () => {
-    if (editingEventId) {
-      await deleteMutation.mutateAsync(editingEventId);
-      closeEventDialog();
-    }
+  // ── Delete options ──────────────────────────────────────────────────────
+  // "Delete all": remove the whole event (all occurrences of a recurring one).
+  const handleDeleteEvent = async () => {
+    if (!editingEventId) return;
+    await deleteMutation.mutateAsync(editingEventId);
+    closeEventDialog();
   };
+
+  // "Delete from this calendar": unassign one calendar type; event stays.
+  const handleRemoveFromCalendar = async (typeId: string) => {
+    if (!editingEventId) return;
+    await updateMutation.mutateAsync({
+      id: editingEventId,
+      type_ids: selectedTypeIds.filter((t) => t !== typeId),
+    });
+    closeEventDialog();
+  };
+
+  // "Delete this calendar": delete the calendar type entirely.
+  const handleDeleteCalendar = async (typeId: string) => {
+    await deleteTypeMutation.mutateAsync(typeId);
+    closeEventDialog();
+  };
+
+  const assignedTypes = calendarTypes.filter((t) => selectedTypeIds.includes(t.id));
 
   return (
     <Dialog open={eventDialogOpen} onOpenChange={(open) => !open && closeEventDialog()}>
@@ -435,6 +457,49 @@ export function EventFormDialog() {
               </div>
             </div>
 
+            {/* Delete options menu */}
+            {isEditing && showDeleteMenu && (
+              <div className="rounded-md border bg-muted/40 p-2 space-y-1.5">
+                <p className="text-xs font-semibold text-muted-foreground px-1">
+                  Delete options
+                </p>
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={handleDeleteEvent}
+                  className="w-full text-left text-sm rounded px-2 py-1.5 text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  Delete event (all occurrences)
+                </button>
+                {assignedTypes.map((t) => (
+                  <button
+                    key={`rm-${t.id}`}
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => handleRemoveFromCalendar(t.id)}
+                    className="w-full text-left text-sm rounded px-2 py-1.5 hover:bg-accent transition-colors flex items-center gap-1.5"
+                  >
+                    <span
+                      className="h-2.5 w-2.5 rounded-full border shrink-0"
+                      style={{ backgroundColor: t.color }}
+                    />
+                    Remove from “{t.name}”
+                  </button>
+                ))}
+                {assignedTypes.map((t) => (
+                  <button
+                    key={`del-${t.id}`}
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => handleDeleteCalendar(t.id)}
+                    className="w-full text-left text-sm rounded px-2 py-1.5 text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    Delete calendar “{t.name}” (and unassign everywhere)
+                  </button>
+                ))}
+              </div>
+            )}
+
             <DialogFooter className="gap-2 pt-2">
               {isEditing && (
                 <Button
@@ -442,10 +507,10 @@ export function EventFormDialog() {
                   variant="destructive"
                   size="sm"
                   disabled={isBusy}
-                  onClick={handleDelete}
+                  onClick={() => setShowDeleteMenu((v) => !v)}
                 >
                   <Trash2 className="h-4 w-4" />
-                  Delete
+                  Delete…
                 </Button>
               )}
               <Button

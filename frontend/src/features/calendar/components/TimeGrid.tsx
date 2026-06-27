@@ -26,7 +26,8 @@ import {
   EVENT_COLORS,
 } from "../utils";
 import { useCalendarStore } from "../store";
-import { useDroppable } from "@dnd-kit/core";
+import { useDroppable, useDraggable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 
 // ─── Current time indicator ───────────────────────────────────────────────────
 
@@ -60,20 +61,34 @@ function EventChip({ event, topPx, heightPx, column, totalColumns }: EventChipPr
   const leftPct = column * widthPct;
   const short = heightPx < 32;
   // Recurring occurrences carry a synthetic id "<master>__<ts>"; edit the master.
-  const masterId = event.id.includes("__") ? event.id.split("__")[0] : event.id;
+  const isRecurring = event.id.includes("__");
+  const masterId = isRecurring ? event.id.split("__")[0] : event.id;
   const color = event.color || null;
+
+  // Drag to reschedule. Recurring occurrences aren't draggable (would need to
+  // move the whole series); only single events can be dragged.
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `move-${event.id}`,
+    data: { type: "event-move", event },
+    disabled: isRecurring,
+  });
 
   return (
     <div
+      ref={setNodeRef}
+      {...(isRecurring ? {} : attributes)}
+      {...(isRecurring ? {} : listeners)}
       className={cn(
         "absolute rounded-md border-l-2 px-1.5 py-0.5 cursor-pointer transition-opacity hover:opacity-90 overflow-hidden z-10",
         !color && [EVENT_COLORS.default.bg, EVENT_COLORS.default.border, EVENT_COLORS.default.text],
+        isDragging && "opacity-60 z-30",
       )}
       style={{
         top: topPx + 1,
         height: heightPx - 2,
         left: `${leftPct + 1}%`,
         width: `${widthPct - 2}%`,
+        transform: CSS.Translate.toString(transform),
         ...(color
           ? { backgroundColor: `${color}26`, borderLeftColor: color, color }
           : {}),

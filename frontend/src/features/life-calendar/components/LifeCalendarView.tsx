@@ -1,7 +1,24 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { addDays, startOfWeek, parseISO } from "date-fns";
+import {
+  addDays,
+  addMinutes,
+  startOfWeek,
+  parseISO,
+  getHours,
+  getMinutes,
+  setHours,
+  setMinutes,
+  setSeconds,
+} from "date-fns";
+import {
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent } from "@/types";
@@ -12,7 +29,11 @@ import type { CalendarEvent } from "@/types";
 // the project-task panel and task drag-and-drop.
 import { useCalendarStore, getViewRange } from "@/features/calendar/store";
 import { useCalendarPrefs } from "@/features/calendar/prefs";
-import { useCalendarEvents } from "@/features/calendar/hooks/useCalendarEvents";
+import {
+  useCalendarEvents,
+  useUpdateCalendarEvent,
+} from "@/features/calendar/hooks/useCalendarEvents";
+import { HOUR_HEIGHT_PX } from "@/features/calendar/utils";
 import { useCalendarTimeBlocks } from "@/features/calendar/hooks/useCalendarTimeBlocks";
 import { useCalendarTypes } from "@/features/calendar/hooks/useCalendarTypes";
 import { expandOccurrences } from "@/features/calendar/recurrence";
@@ -51,6 +72,46 @@ export function LifeCalendarView() {
   } = useCalendarTimeBlocks({ start, end });
 
   const { data: calendarTypes } = useCalendarTypes();
+  const updateEvent = useUpdateCalendarEvent();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
+
+  // Drag an event chip to reschedule it: the drop column gives the new day,
+  // the vertical drag delta shifts the time (snapped to 15 min). Recurring
+  // occurrences are non-draggable, so only single events reach here.
+  const handleDragEnd = useCallback(
+    (e: DragEndEvent) => {
+      const data = e.active.data.current as
+        | { type: string; event: CalendarEvent }
+        | undefined;
+      if (data?.type !== "event-move") return;
+      const ev = data.event;
+      if (ev.recurrence_rule) return;
+      const day = (e.over?.data.current as { day?: Date } | undefined)?.day;
+
+      const origStart = parseISO(ev.start_time);
+      const durationMs = parseISO(ev.end_time).getTime() - origStart.getTime();
+      const deltaMin = Math.round((e.delta.y / HOUR_HEIGHT_PX) * 60 / 15) * 15;
+      const baseDay = day ?? origStart;
+
+      let newStart = setSeconds(
+        setMinutes(setHours(baseDay, getHours(origStart)), getMinutes(origStart)),
+        0,
+      );
+      newStart = addMinutes(newStart, deltaMin);
+      if (!day && deltaMin === 0) return; // no-op
+
+      const newEnd = new Date(newStart.getTime() + durationMs);
+      updateEvent.mutate({
+        id: ev.id,
+        start_time: newStart.toISOString(),
+        end_time: newEnd.toISOString(),
+      });
+    },
+    [updateEvent],
+  );
 
   // Resolve display colour (first assigned type → its colour, else event colour)
   // and expand recurring events into concrete occurrences within the window.
@@ -107,6 +168,7 @@ export function LifeCalendarView() {
   const isError = eventsError || blocksError;
 
   return (
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
     <div className="flex flex-col h-full min-h-0 gap-3">
       {/* Toolbar — Today / prev / next, view switcher, New Event */}
       <CalendarToolbar />
@@ -157,5 +219,6 @@ export function LifeCalendarView() {
       <EventFormDialog />
       <TimeBlockFormDialog />
     </div>
+    </DndContext>
   );
 }
