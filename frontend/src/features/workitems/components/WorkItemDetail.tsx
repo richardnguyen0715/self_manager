@@ -62,6 +62,8 @@ import {
   useWorkItemActivity,
 } from "../hooks/useWorkItems";
 import { WorkItemTypeBadge } from "./WorkItemTypeBadge";
+import { WORK_ITEM_TYPE_META } from "../work-item-type-config";
+import { WORK_ITEM_TYPES } from "@/types";
 import {
   TiptapDescriptionEditor,
   DescriptionPreview,
@@ -1580,6 +1582,47 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
             </div>
 
             <div className="px-4 py-1">
+              {/* Type — inline editable dropdown */}
+              <DetailRow label="Type">
+                <DropdownMenuPrimitive.Root>
+                  <DropdownMenuPrimitive.Trigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex items-center gap-1.5 font-medium hover:opacity-80 transition-opacity",
+                        WORK_ITEM_TYPE_META[workItem.type]?.text,
+                      )}
+                    >
+                      <WorkItemTypeBadge type={workItem.type} />
+                      {WORK_ITEM_TYPE_META[workItem.type]?.label ?? workItem.type}
+                      <ChevronDown className="h-3 w-3 opacity-50" />
+                    </button>
+                  </DropdownMenuPrimitive.Trigger>
+                  <DropdownMenuPrimitive.Portal>
+                    <DropdownMenuPrimitive.Content
+                      align="start"
+                      sideOffset={4}
+                      className="z-50 max-h-72 overflow-y-auto min-w-[10rem] rounded-md border bg-popover p-1 shadow-md"
+                    >
+                      {WORK_ITEM_TYPES.map((t) => (
+                        <DropdownMenuPrimitive.Item
+                          key={t}
+                          onSelect={() => updateItem.mutate({ type: t })}
+                          className={cn(
+                            "flex cursor-default select-none items-center gap-1.5 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent",
+                            WORK_ITEM_TYPE_META[t].text,
+                          )}
+                        >
+                          <WorkItemTypeBadge type={t} />
+                          {WORK_ITEM_TYPE_META[t].label}
+                          {workItem.type === t && <Check className="h-3 w-3 ml-auto" />}
+                        </DropdownMenuPrimitive.Item>
+                      ))}
+                    </DropdownMenuPrimitive.Content>
+                  </DropdownMenuPrimitive.Portal>
+                </DropdownMenuPrimitive.Root>
+              </DetailRow>
+
               {/* Assignee */}
               <DetailRow label="Assignee">
                 <div className="flex items-center gap-2">
