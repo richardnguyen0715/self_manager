@@ -146,7 +146,6 @@ interface DayColumnProps {
   day: Date;
   events: CalendarEvent[];
   timeBlocks: TimeBlockSummary[];
-  showDayHeader: boolean;
   /**
    * Called when an empty slot is clicked, with the slot's start/end datetimes.
    * When omitted, an empty-slot click opens the time-block dialog (default
@@ -156,7 +155,7 @@ interface DayColumnProps {
   onSlotClick?: (start: Date, end: Date) => void;
 }
 
-function DayColumn({ day, events, timeBlocks, showDayHeader, onSlotClick }: DayColumnProps) {
+function DayColumn({ day, events, timeBlocks, onSlotClick }: DayColumnProps) {
   const { openTimeBlockDialog } = useCalendarStore();
   const columnRef = useRef<HTMLDivElement>(null);
 
@@ -235,29 +234,7 @@ function DayColumn({ day, events, timeBlocks, showDayHeader, onSlotClick }: DayC
 
   return (
     <div className="flex flex-col flex-1" style={{ minWidth: 80 }}>
-      {/* Day header */}
-      {showDayHeader && (
-        <div
-          className={cn(
-            "h-12 flex flex-col items-center justify-center border-b text-sm select-none",
-            isToday(day) && "text-primary",
-          )}
-        >
-          <span className="text-xs font-medium text-muted-foreground uppercase">
-            {format(day, "EEE")}
-          </span>
-          <span
-            className={cn(
-              "w-7 h-7 flex items-center justify-center rounded-full font-semibold text-sm",
-              isToday(day) && "bg-primary text-primary-foreground",
-            )}
-          >
-            {format(day, "d")}
-          </span>
-        </div>
-      )}
-
-      {/* Time slots */}
+      {/* Time slots (day headers are rendered in a fixed row above the scroll) */}
       <div
         ref={(node) => {
           (columnRef as React.MutableRefObject<HTMLDivElement | null>).current =
@@ -341,14 +318,15 @@ function DayColumn({ day, events, timeBlocks, showDayHeader, onSlotClick }: DayC
 
 // ─── Time gutter ─────────────────────────────────────────────────────────────
 
-function TimeGutter({ showDayHeader = false }: { showDayHeader?: boolean }) {
+function TimeGutter() {
+  // Hours only — day headers live in a fixed row above the scroll area, so the
+  // gutter, grid lines, and events all share the same origin (no offset).
   return (
-    <div className="flex flex-col shrink-0 w-14 select-none">
-      {/* Spacer matching each day column's header so hour labels line up with
-          the grid lines (the columns reserve h-12 for the weekday header). */}
-      {showDayHeader && <div className="h-12 border-b" />}
-      <div className="flex flex-col" style={{ height: HOUR_HEIGHT_PX * 24 }}>
-        {HOURS.map((hour) => (
+    <div
+      className="flex flex-col shrink-0 w-14 select-none"
+      style={{ height: HOUR_HEIGHT_PX * 24 }}
+    >
+      {HOURS.map((hour) => (
         <div
           key={hour}
           className="relative flex items-start justify-end pr-2"
@@ -360,8 +338,7 @@ function TimeGutter({ showDayHeader = false }: { showDayHeader?: boolean }) {
             </span>
           )}
         </div>
-        ))}
-      </div>
+      ))}
     </div>
   );
 }
@@ -393,6 +370,38 @@ export function TimeGrid({ days, events, timeBlocks, showDayHeaders = true, onSl
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      {/* Day-of-week header row — fixed above the scroll so it never shifts the
+          time grid's coordinate origin (keeps labels/lines/events aligned). */}
+      {showDayHeaders && (
+        <div className="flex shrink-0" style={{ minWidth: gridMinWidth + 56 }}>
+          <div className="w-14 shrink-0" />
+          <div className="flex flex-1">
+            {days.map((day) => (
+              <div
+                key={day.toISOString()}
+                className={cn(
+                  "flex-1 h-12 flex flex-col items-center justify-center border-b border-r last:border-r-0 text-sm select-none",
+                  isToday(day) && "text-primary",
+                )}
+                style={{ minWidth: minColWidth }}
+              >
+                <span className="text-xs font-medium text-muted-foreground uppercase">
+                  {format(day, "EEE")}
+                </span>
+                <span
+                  className={cn(
+                    "w-7 h-7 flex items-center justify-center rounded-full font-semibold text-sm",
+                    isToday(day) && "bg-primary text-primary-foreground",
+                  )}
+                >
+                  {format(day, "d")}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* All-day row */}
       {showDayHeaders && (
         <div className="flex border-b shrink-0" style={{ minWidth: gridMinWidth + 56 }}>
@@ -433,7 +442,7 @@ export function TimeGrid({ days, events, timeBlocks, showDayHeaders = true, onSl
         {/* Inner wrapper enforces min-width for horizontal scroll on narrow screens */}
         <div className="flex flex-1" style={{ minWidth: gridMinWidth + 56 }}>
           {/* Gutter */}
-          <TimeGutter showDayHeader={showDayHeaders} />
+          <TimeGutter />
 
           {/* Day columns */}
           <div className="flex flex-1 min-w-0">
@@ -443,7 +452,6 @@ export function TimeGrid({ days, events, timeBlocks, showDayHeaders = true, onSl
                 day={day}
                 events={eventsForDay(events, day)}
                 timeBlocks={timeBlocksForDay(timeBlocks, day)}
-                showDayHeader={showDayHeaders}
                 onSlotClick={onSlotClick}
               />
             ))}
