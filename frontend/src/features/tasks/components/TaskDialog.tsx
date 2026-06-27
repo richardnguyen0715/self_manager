@@ -206,6 +206,7 @@ export function TaskDialog() {
     isCreateDialogOpen,
     isEditDialogOpen,
     editingTaskId,
+    createPrefill,
     closeDialog,
   } = useTaskUIStore();
 
@@ -271,7 +272,8 @@ export function TaskDialog() {
         description: "",
         priority: "medium",
         status: "inbox",
-        due_date: null,
+        // Prefill due date when opened from the Calendar (RFC3339 → YYYY-MM-DD).
+        due_date: createPrefill?.due_date?.slice(0, 10) ?? null,
         start_date: null,
         estimated_time: null,
         project_id: null,
@@ -279,7 +281,7 @@ export function TaskDialog() {
         recurrence_rule: null,
       });
     }
-  }, [editingTask, isEdit, reset]);
+  }, [editingTask, isEdit, reset, createPrefill]);
 
   // Backend expects RFC3339 datetimes; <input type="date"> yields "YYYY-MM-DD".
   function toIso(v: string | null | undefined): string | null {

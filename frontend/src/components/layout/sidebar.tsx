@@ -20,6 +20,7 @@ import {
   SquareKanban,
   Network,
   FolderOpen,
+  CalendarHeart,
   FileText,
   Building2,
   Trash2,
@@ -118,11 +119,18 @@ export function Sidebar({ variant = "desktop" }: SidebarProps) {
 
       <Separator />
 
-      {/* Projects management link */}
-      <div className="px-2 py-2">
+      {/* Top-level links — not scoped to the selected project */}
+      <div className="px-2 py-2 flex flex-col gap-1">
         <NavLink
           item={{ label: "Projects", href: "/projects", icon: FolderOpen }}
           isActive={pathname.startsWith("/projects")}
+          collapsed={collapsed}
+          onNavClick={handleNavClick}
+        />
+        {/* Life Calendar — personal, Notion-style, independent of any project */}
+        <NavLink
+          item={{ label: "Life Calendar", href: "/life", icon: CalendarHeart }}
+          isActive={pathname.startsWith("/life")}
           collapsed={collapsed}
           onNavClick={handleNavClick}
         />

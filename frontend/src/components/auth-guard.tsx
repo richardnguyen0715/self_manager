@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth.store";
+import { getAccessToken } from "@/lib/api";
 
 // Routes that do not require authentication.
 const PUBLIC_PREFIXES = ["/auth", "/login", "/register", "/p"];
@@ -59,9 +60,14 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     if (!hydrated) return; // don't decide until we know the real auth state
     const pub = isPublic(pathname);
     const pubReadonly = isPublicReadonly(pathname);
-    if (!isAuthenticated && !pub) {
+    // Treat a token in storage as "logged in" for the redirect decision. This
+    // closes a reload race where the persisted `isAuthenticated` flag lags one
+    // tick behind: without it, a reload on /calendar would bounce to /auth and
+    // then get re-bounced to /dashboard, losing the page the user was on.
+    const loggedIn = isAuthenticated || Boolean(getAccessToken());
+    if (!loggedIn && !pub) {
       router.replace("/auth?tab=login");
-    } else if (isAuthenticated && pub && !pubReadonly) {
+    } else if (loggedIn && pub && !pubReadonly) {
       // Only bounce authenticated users away from auth pages, not from public pages.
       router.replace("/dashboard");
     }

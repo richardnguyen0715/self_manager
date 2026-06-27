@@ -15,11 +15,18 @@ interface TaskUIState {
   // Detail panel
   selectedTaskId: string | null;
 
+  /**
+   * Optional values to pre-fill when opening the create dialog — e.g. the
+   * Calendar passes a `due_date` when a day/slot is clicked so the new task
+   * lands on that date. Cleared on close.
+   */
+  createPrefill: { due_date?: string } | null;
+
   // Active filters
   filters: TaskFiltersState;
 
   // Actions
-  openCreateDialog: () => void;
+  openCreateDialog: (prefill?: { due_date?: string }) => void;
   openEditDialog: (taskId: string) => void;
   closeDialog: () => void;
 
@@ -48,10 +55,15 @@ export const useTaskUIStore = create<TaskUIState>((set) => ({
   isEditDialogOpen: false,
   editingTaskId: null,
   selectedTaskId: null,
+  createPrefill: null,
   filters: { ...DEFAULT_FILTERS },
 
-  openCreateDialog: () =>
-    set({ isCreateDialogOpen: true, editingTaskId: null }),
+  openCreateDialog: (prefill) =>
+    set({
+      isCreateDialogOpen: true,
+      editingTaskId: null,
+      createPrefill: prefill ?? null,
+    }),
 
   openEditDialog: (taskId) =>
     set({ isEditDialogOpen: true, editingTaskId: taskId }),
@@ -61,6 +73,7 @@ export const useTaskUIStore = create<TaskUIState>((set) => ({
       isCreateDialogOpen: false,
       isEditDialogOpen: false,
       editingTaskId: null,
+      createPrefill: null,
     }),
 
   selectTask: (id) => set({ selectedTaskId: id }),

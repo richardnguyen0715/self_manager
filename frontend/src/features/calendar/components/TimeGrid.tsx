@@ -146,9 +146,16 @@ interface DayColumnProps {
   events: CalendarEvent[];
   timeBlocks: TimeBlockSummary[];
   showDayHeader: boolean;
+  /**
+   * Called when an empty slot is clicked, with the slot's start/end datetimes.
+   * When omitted, an empty-slot click opens the time-block dialog (default
+   * project-Calendar behaviour). The Life Calendar passes a handler that opens
+   * the event dialog instead, so it stays event-centric.
+   */
+  onSlotClick?: (start: Date, end: Date) => void;
 }
 
-function DayColumn({ day, events, timeBlocks, showDayHeader }: DayColumnProps) {
+function DayColumn({ day, events, timeBlocks, showDayHeader, onSlotClick }: DayColumnProps) {
   const { openTimeBlockDialog } = useCalendarStore();
   const columnRef = useRef<HTMLDivElement>(null);
 
@@ -188,12 +195,16 @@ function DayColumn({ day, events, timeBlocks, showDayHeader }: DayColumnProps) {
       const mins = pxToMinutes(offsetY);
       const start = minutesToDatetime(day, mins);
       const end = addMinutes(start, 60);
+      if (onSlotClick) {
+        onSlotClick(start, end);
+        return;
+      }
       openTimeBlockDialog({
         start: start.toISOString(),
         end: end.toISOString(),
       });
     },
-    [day, openTimeBlockDialog],
+    [day, openTimeBlockDialog, onSlotClick],
   );
 
   return (
@@ -320,9 +331,11 @@ interface TimeGridProps {
   events: CalendarEvent[];
   timeBlocks: TimeBlockSummary[];
   showDayHeaders?: boolean;
+  /** Forwarded to each day column; see DayColumnProps.onSlotClick. */
+  onSlotClick?: (start: Date, end: Date) => void;
 }
 
-export function TimeGrid({ days, events, timeBlocks, showDayHeaders = true }: TimeGridProps) {
+export function TimeGrid({ days, events, timeBlocks, showDayHeaders = true, onSlotClick }: TimeGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Min width per day column so week view scrolls on narrow screens
@@ -389,6 +402,7 @@ export function TimeGrid({ days, events, timeBlocks, showDayHeaders = true }: Ti
                 events={eventsForDay(events, day)}
                 timeBlocks={timeBlocksForDay(timeBlocks, day)}
                 showDayHeader={showDayHeaders}
+                onSlotClick={onSlotClick}
               />
             ))}
           </div>

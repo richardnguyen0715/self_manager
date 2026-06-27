@@ -39,7 +39,7 @@ function EmptyState({ hasFilters }: { hasFilters: boolean }) {
       <p className="text-xs text-muted-foreground mt-1">
         Create your first task to get started.
       </p>
-      <Button size="sm" onClick={openCreateDialog} className="mt-4 gap-1.5">
+      <Button size="sm" onClick={() => openCreateDialog()} className="mt-4 gap-1.5">
         <Plus className="h-4 w-4" />
         Create task
       </Button>
@@ -170,7 +170,7 @@ export function TaskList() {
           )}
         </div>
 
-        <Button onClick={openCreateDialog} size="sm" className="gap-1.5">
+        <Button onClick={() => openCreateDialog()} size="sm" className="gap-1.5">
           <Plus className="h-4 w-4" />
           New task
         </Button>
