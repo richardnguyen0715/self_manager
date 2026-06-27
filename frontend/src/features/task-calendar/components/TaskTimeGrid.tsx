@@ -174,7 +174,7 @@ function DayColumn({ day, tasks }: DayColumnProps) {
           <div
             key={hour}
             data-grid="true"
-            className="absolute left-0 right-0 border-t border-border/40"
+            className="absolute left-0 right-0 border-t-2 border-border"
             style={{ top: hour * HOUR_HEIGHT_PX }}
           />
         ))}
@@ -182,7 +182,7 @@ function DayColumn({ day, tasks }: DayColumnProps) {
           <div
             key={`${hour}-half`}
             data-grid="true"
-            className="absolute left-0 right-0 border-t border-border/20 border-dashed"
+            className="absolute left-0 right-0 border-t border-border/60 border-dashed"
             style={{ top: hour * HOUR_HEIGHT_PX + HOUR_HEIGHT_PX / 2 }}
           />
         ))}
