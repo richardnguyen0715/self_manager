@@ -21,6 +21,7 @@ import {
   Network,
   FolderOpen,
   CalendarHeart,
+  BookOpen,
   FileText,
   Building2,
   Trash2,
@@ -136,6 +137,13 @@ export function Sidebar({ variant = "desktop" }: SidebarProps) {
         <NavLink
           item={{ label: "Life Calendar", href: "/life", icon: CalendarHeart }}
           isActive={pathname.startsWith("/life")}
+          collapsed={collapsed}
+          onNavClick={handleNavClick}
+        />
+        {/* Usage — how to use every feature */}
+        <NavLink
+          item={{ label: "Usage", href: "/usage", icon: BookOpen }}
+          isActive={pathname.startsWith("/usage")}
           collapsed={collapsed}
           onNavClick={handleNavClick}
         />
