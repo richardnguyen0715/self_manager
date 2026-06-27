@@ -13,6 +13,7 @@ import {
   useDeleteSpace,
 } from "@/features/docs";
 import type { Space, CreateSpacePayload, UpdateSpacePayload } from "@/features/docs";
+import { useProjectStore } from "@/stores";
 import { SpaceCard } from "./SpaceCard";
 import { SpaceDialog } from "./SpaceDialog";
 import { DeleteSpaceDialog } from "./DeleteSpaceDialog";
@@ -206,8 +207,14 @@ export function SpacesList() {
   const [editTarget, setEditTarget] = React.useState<Space | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<Space | null>(null);
 
+  // Scope spaces to the selected project. When "All projects" is active
+  // (currentProjectId === null), pass undefined → backend returns every space.
+  const currentProjectId = useProjectStore((s) => s.currentProjectId);
+
   // Data hooks
-  const { data: spaces = [], isLoading, isError } = useSpaces();
+  const { data: spaces = [], isLoading, isError } = useSpaces(
+    currentProjectId ?? undefined,
+  );
   const createSpace = useCreateSpace();
   const updateSpace = useUpdateSpace(editTarget?.id ?? "");
   const deleteSpace = useDeleteSpace();
@@ -225,7 +232,13 @@ export function SpacesList() {
 
   // Handlers
   function handleCreate(payload: CreateSpacePayload | UpdateSpacePayload) {
-    createSpace.mutate(payload as CreateSpacePayload, {
+    // New spaces belong to the currently selected project so other projects
+    // can't see them. Under "All projects" (null) the space stays unassigned.
+    const withProject: CreateSpacePayload = {
+      ...(payload as CreateSpacePayload),
+      project_id: currentProjectId ?? undefined,
+    };
+    createSpace.mutate(withProject, {
       onSuccess: () => setCreateOpen(false),
     });
   }
