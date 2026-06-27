@@ -54,6 +54,11 @@ pub struct CreateEventRequest {
         message = "recurrence_rule must not exceed 2 000 characters"
     ))]
     pub recurrence_rule: Option<String>,
+
+    /// Calendar-type UUIDs this event belongs to (0+). The event inherits its
+    /// display colour and defaults from these types on the client.
+    #[serde(default)]
+    pub type_ids: Vec<Uuid>,
 }
 
 /// Body for `PATCH /api/calendar/:id`.
@@ -83,6 +88,10 @@ pub struct UpdateEventRequest {
         message = "recurrence_rule must not exceed 2 000 characters"
     ))]
     pub recurrence_rule: Option<Option<String>>,
+
+    /// Replace the event's calendar-type assignments. Absent = leave unchanged;
+    /// empty array = clear all assignments.
+    pub type_ids: Option<Vec<Uuid>>,
 }
 
 /// Query parameters for `GET /api/calendar`.
@@ -96,9 +105,17 @@ pub struct RangeQuery {
 
 // ── Response DTOs ─────────────────────────────────────────────────────────────
 
+/// A calendar event plus its assigned calendar-type UUIDs.
+#[derive(Debug, Serialize)]
+pub struct EventWithTypes {
+    #[serde(flatten)]
+    pub event: CalendarEvent,
+    pub type_ids: Vec<Uuid>,
+}
+
 /// Paginated list response envelope.
 #[derive(Debug, Serialize)]
 pub struct EventListResponse {
-    pub events: Vec<CalendarEvent>,
+    pub events: Vec<EventWithTypes>,
     pub total: i64,
 }

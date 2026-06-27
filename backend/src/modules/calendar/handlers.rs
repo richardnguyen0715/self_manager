@@ -49,7 +49,7 @@ pub async fn get_event(
     State(state): State<AppState>,
     Path(event_id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
-    let event = service::get_event(&state, auth.user_id, event_id).await?;
+    let event = service::get_event_with_types(&state, auth.user_id, event_id).await?;
     Ok(Json(event))
 }
 

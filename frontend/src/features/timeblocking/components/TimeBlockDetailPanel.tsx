@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { formatTime, formatDate } from "@/lib/utils";
 import type { TimeBlock } from "@/types";
 import { useDeleteTimeBlock } from "../hooks/useTimeBlocks";
+import { useTask } from "@/features/tasks/hooks/useTasks";
 import { useTimeBlockingStore } from "../timeblocking.store";
 import { FocusLaunchButton } from "./FocusSessionPanel";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -14,6 +15,20 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface TimeBlockDetailPanelProps {
   block: TimeBlock;
+}
+
+// ─── Linked task row (resolves task_id → title) ───────────────────────────────
+
+function LinkedTaskRow({ taskId }: { taskId: string }) {
+  const { data: task, isLoading } = useTask(taskId);
+  return (
+    <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+      <LinkIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      <p className="text-sm truncate">
+        {isLoading ? "Loading…" : task?.title ?? "Unknown task"}
+      </p>
+    </div>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -129,12 +144,7 @@ export function TimeBlockDetailPanel({ block }: TimeBlockDetailPanelProps) {
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Linked task
             </p>
-            <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-              <LinkIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <p className="text-sm text-muted-foreground truncate">
-                Task ID: {block.task_id}
-              </p>
-            </div>
+            <LinkedTaskRow taskId={block.task_id} />
           </div>
         )}
 

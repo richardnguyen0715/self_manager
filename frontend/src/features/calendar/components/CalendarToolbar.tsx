@@ -1,11 +1,13 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { useState } from "react";
+import { ChevronLeft, ChevronRight, CalendarDays, Tags } from "lucide-react";
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useCalendarStore } from "../store";
 import type { CalendarView } from "../store";
+import { CalendarTypesDialog } from "./CalendarTypesDialog";
 
 const VIEW_LABELS: Record<CalendarView, string> = {
   day: "Day",
@@ -36,6 +38,7 @@ function formatViewTitle(view: CalendarView, anchorDate: Date): string {
 export function CalendarToolbar() {
   const { view, anchorDate, setView, goToPrev, goToNext, goToToday, openEventDialog } =
     useCalendarStore();
+  const [typesOpen, setTypesOpen] = useState(false);
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b">
@@ -87,11 +90,18 @@ export function CalendarToolbar() {
           ))}
         </div>
 
+        <Button variant="outline" size="sm" onClick={() => setTypesOpen(true)}>
+          <Tags className="h-4 w-4" />
+          <span className="hidden sm:inline">Calendars</span>
+        </Button>
+
         <Button size="sm" onClick={() => openEventDialog()}>
           <CalendarDays className="h-4 w-4" />
           <span className="hidden sm:inline">New Event</span>
         </Button>
       </div>
+
+      <CalendarTypesDialog open={typesOpen} onOpenChange={setTypesOpen} />
     </div>
   );
 }

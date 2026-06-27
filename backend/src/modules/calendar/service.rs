@@ -5,6 +5,8 @@
 //! macros.  Domain events are broadcast where appropriate so that the
 //! `notification` module can schedule reminders.
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
@@ -14,7 +16,66 @@ use crate::shared::{
     state::AppState,
 };
 
-use super::models::{CalendarEvent, CreateEventRequest, EventListResponse, UpdateEventRequest};
+use super::models::{
+    CalendarEvent, CreateEventRequest, EventListResponse, EventWithTypes, UpdateEventRequest,
+};
+
+// ── Calendar-type associations (runtime queries; no offline cache needed) ──────
+
+/// Fetch the calendar-type UUIDs for each of `event_ids`, keyed by event id.
+async fn fetch_type_ids(
+    state: &AppState,
+    event_ids: &[Uuid],
+) -> AppResult<HashMap<Uuid, Vec<Uuid>>> {
+    let mut map: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+    if event_ids.is_empty() {
+        return Ok(map);
+    }
+    let rows = sqlx::query_as::<_, (Uuid, Uuid)>(
+        "SELECT event_id, calendar_type_id FROM event_calendar_types WHERE event_id = ANY($1)",
+    )
+    .bind(event_ids)
+    .fetch_all(&state.db)
+    .await?;
+    for (event_id, type_id) in rows {
+        map.entry(event_id).or_default().push(type_id);
+    }
+    Ok(map)
+}
+
+/// Replace an event's type assignments with `type_ids`, ignoring any id that
+/// isn't a calendar type owned by `user_id`.
+async fn set_event_types(
+    state: &AppState,
+    user_id: Uuid,
+    event_id: Uuid,
+    type_ids: &[Uuid],
+) -> AppResult<()> {
+    sqlx::query("DELETE FROM event_calendar_types WHERE event_id = $1")
+        .bind(event_id)
+        .execute(&state.db)
+        .await?;
+    if !type_ids.is_empty() {
+        sqlx::query(
+            "INSERT INTO event_calendar_types (event_id, calendar_type_id) \
+             SELECT $1, id FROM calendar_types WHERE id = ANY($2) AND user_id = $3 \
+             ON CONFLICT DO NOTHING",
+        )
+        .bind(event_id)
+        .bind(type_ids)
+        .bind(user_id)
+        .execute(&state.db)
+        .await?;
+    }
+    Ok(())
+}
+
+/// Wrap a single event with its current type assignments.
+async fn with_types(state: &AppState, event: CalendarEvent) -> AppResult<EventWithTypes> {
+    let map = fetch_type_ids(state, &[event.id]).await?;
+    let type_ids = map.get(&event.id).cloned().unwrap_or_default();
+    Ok(EventWithTypes { event, type_ids })
+}
 
 // ── Read ──────────────────────────────────────────────────────────────────────
 
@@ -52,6 +113,34 @@ pub async fn list_events_in_range(
     .fetch_all(&state.db)
     .await?;
 
+    // Recurring events whose anchor started *before* this window must also be
+    // returned so the client can expand their occurrences into the range. The
+    // macro query above only matched start_time >= range_start, so this picks
+    // up the earlier recurring masters (disjoint set — no dedupe needed).
+    let mut events = events;
+    let recurring_before = sqlx::query_as::<_, CalendarEvent>(
+        "SELECT id, user_id, title, description, start_time, end_time, all_day, \
+                location, color, recurrence_rule, created_at, updated_at \
+         FROM calendar_events \
+         WHERE user_id = $1 AND recurrence_rule IS NOT NULL AND start_time < $2",
+    )
+    .bind(user_id)
+    .bind(range_start)
+    .fetch_all(&state.db)
+    .await?;
+    events.extend(recurring_before);
+
+    // Attach calendar-type assignments in one batched query.
+    let ids: Vec<Uuid> = events.iter().map(|e| e.id).collect();
+    let mut type_map = fetch_type_ids(state, &ids).await?;
+    let events: Vec<EventWithTypes> = events
+        .into_iter()
+        .map(|event| {
+            let type_ids = type_map.remove(&event.id).unwrap_or_default();
+            EventWithTypes { event, type_ids }
+        })
+        .collect();
+
     let total = events.len() as i64;
     Ok(EventListResponse { events, total })
 }
@@ -82,6 +171,16 @@ pub async fn get_event(
     .ok_or(AppError::NotFound)
 }
 
+/// Like [`get_event`] but with the event's calendar-type assignments attached.
+pub async fn get_event_with_types(
+    state: &AppState,
+    user_id: Uuid,
+    event_id: Uuid,
+) -> AppResult<EventWithTypes> {
+    let event = get_event(state, user_id, event_id).await?;
+    with_types(state, event).await
+}
+
 // ── Write ─────────────────────────────────────────────────────────────────────
 
 /// Insert a new calendar event owned by `user_id`.
@@ -92,7 +191,7 @@ pub async fn create_event(
     state: &AppState,
     user_id: Uuid,
     req: CreateEventRequest,
-) -> AppResult<CalendarEvent> {
+) -> AppResult<EventWithTypes> {
     if req.end_time < req.start_time {
         return Err(AppError::Validation(
             "end_time must not be before start_time".to_owned(),
@@ -124,6 +223,9 @@ pub async fn create_event(
     .fetch_one(&state.db)
     .await?;
 
+    // Persist calendar-type assignments.
+    set_event_types(state, user_id, event.id, &req.type_ids).await?;
+
     // Notify the event bus; the notification module subscribes and schedules
     // reminder notifications.  A send failure means no subscribers are listening
     // yet — that is not an error from the caller's perspective.
@@ -132,7 +234,7 @@ pub async fn create_event(
         user_id,
     });
 
-    Ok(event)
+    with_types(state, event).await
 }
 
 /// Apply a partial update to a calendar event.
@@ -144,7 +246,7 @@ pub async fn update_event(
     user_id: Uuid,
     event_id: Uuid,
     req: UpdateEventRequest,
-) -> AppResult<CalendarEvent> {
+) -> AppResult<EventWithTypes> {
     // Load the existing row first — this enforces ownership and gives us current
     // values for fields the caller did not supply.
     let existing = get_event(state, user_id, event_id).await?;
@@ -198,7 +300,12 @@ pub async fn update_event(
     .fetch_one(&state.db)
     .await?;
 
-    Ok(event)
+    // Replace type assignments only when the caller supplied them.
+    if let Some(type_ids) = req.type_ids {
+        set_event_types(state, user_id, event.id, &type_ids).await?;
+    }
+
+    with_types(state, event).await
 }
 
 /// Delete a calendar event owned by `user_id`.

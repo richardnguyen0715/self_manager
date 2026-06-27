@@ -27,7 +27,9 @@ export interface CreateCalendarEventPayload {
   all_day?: boolean;
   location?: string;
   color?: string;
-  recurrence_rule?: string;
+  recurrence_rule?: string | null;
+  /** Calendar-type UUIDs to assign (0+). */
+  type_ids?: string[];
 }
 
 export type UpdateCalendarEventPayload = Partial<CreateCalendarEventPayload>;

@@ -6,6 +6,8 @@
 //! Domain events are emitted on the broadcast channel when relevant state
 //! transitions occur (e.g. a goal reaches `completed` status).
 
+use std::collections::HashMap;
+
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -16,8 +18,8 @@ use crate::shared::{
 };
 
 use super::models::{
-    CreateGoalRequest, Goal, GoalListResponse, GoalResponse, GoalStatus, ListGoalsQuery,
-    UpdateGoalRequest,
+    CreateGoalRequest, Goal, GoalListResponse, GoalProgress, GoalResponse, GoalStatus,
+    ListGoalsQuery, UpdateGoalRequest,
 };
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -32,6 +34,57 @@ fn clamp_limit(raw: Option<i64>) -> i64 {
 #[inline]
 fn clamp_offset(raw: Option<i64>) -> i64 {
     raw.unwrap_or(0).max(0)
+}
+
+/// Fill each goal's `progress` by aggregating tasks across the goal's linked
+/// projects. Uses the sqlx runtime API (no offline-cache regen needed).
+async fn attach_progress(
+    state: &AppState,
+    user_id: Uuid,
+    mut goals: Vec<GoalResponse>,
+) -> AppResult<Vec<GoalResponse>> {
+    if goals.is_empty() {
+        return Ok(goals);
+    }
+    let ids: Vec<Uuid> = goals.iter().map(|g| g.id).collect();
+
+    // (goal_id, total_projects, total_tasks, completed_tasks)
+    let rows = sqlx::query_as::<_, (Uuid, i64, i64, i64)>(
+        "SELECT p.goal_id, \
+                COUNT(DISTINCT p.id)                                      AS total_projects, \
+                COUNT(t.id)                                               AS total_tasks, \
+                COUNT(t.id) FILTER (WHERE t.status::text = 'completed')   AS completed_tasks \
+         FROM projects p \
+         LEFT JOIN tasks t ON t.project_id = p.id \
+         WHERE p.user_id = $1 AND p.goal_id = ANY($2) \
+         GROUP BY p.goal_id",
+    )
+    .bind(user_id)
+    .bind(&ids)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mut by_goal: HashMap<Uuid, (i64, i64, i64)> = HashMap::new();
+    for (goal_id, projects, tasks, done) in rows {
+        by_goal.insert(goal_id, (projects, tasks, done));
+    }
+
+    for g in goals.iter_mut() {
+        if let Some(&(projects, tasks, done)) = by_goal.get(&g.id) {
+            let percent = if tasks > 0 {
+                ((done as f64 / tasks as f64) * 100.0).round() as i32
+            } else {
+                0
+            };
+            g.progress = GoalProgress {
+                total_projects: projects,
+                total_tasks: tasks,
+                completed_tasks: done,
+                percent,
+            };
+        }
+    }
+    Ok(goals)
 }
 
 // ── public service functions ───────────────────────────────────────────────────
@@ -114,10 +167,14 @@ pub async fn list_goals(
         (rows, total)
     };
 
-    Ok(GoalListResponse {
-        data: goals.into_iter().map(GoalResponse::from).collect(),
-        total,
-    })
+    let data = attach_progress(
+        state,
+        user_id,
+        goals.into_iter().map(GoalResponse::from).collect(),
+    )
+    .await?;
+
+    Ok(GoalListResponse { data, total })
 }
 
 /// Create a new goal for the authenticated user.
@@ -186,7 +243,11 @@ pub async fn get_goal(state: &AppState, user_id: Uuid, goal_id: Uuid) -> AppResu
     .await?
     .ok_or(AppError::NotFound)?;
 
-    Ok(GoalResponse::from(goal))
+    let resp = attach_progress(state, user_id, vec![GoalResponse::from(goal)])
+        .await?
+        .pop()
+        .expect("attach_progress preserves the single input goal");
+    Ok(resp)
 }
 
 /// Partially update a goal; only provided fields are mutated.

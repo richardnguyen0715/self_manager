@@ -45,6 +45,27 @@ pub struct Goal {
 
 // ── Response DTOs ──────────────────────────────────────────────────────────────
 
+/// Roll-up of work under a goal, aggregated from tasks of its linked projects.
+#[derive(Debug, Clone, Serialize)]
+pub struct GoalProgress {
+    pub total_projects: i64,
+    pub total_tasks: i64,
+    pub completed_tasks: i64,
+    /// 0–100, share of tasks completed across the goal's projects.
+    pub percent: i32,
+}
+
+impl Default for GoalProgress {
+    fn default() -> Self {
+        Self {
+            total_projects: 0,
+            total_tasks: 0,
+            completed_tasks: 0,
+            percent: 0,
+        }
+    }
+}
+
 /// Response body for a single goal.
 #[derive(Debug, Serialize)]
 pub struct GoalResponse {
@@ -57,6 +78,8 @@ pub struct GoalResponse {
     pub position: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// Progress rolled up from the goal's linked projects' tasks.
+    pub progress: GoalProgress,
 }
 
 impl From<Goal> for GoalResponse {
@@ -71,6 +94,7 @@ impl From<Goal> for GoalResponse {
             position: g.position,
             created_at: g.created_at,
             updated_at: g.updated_at,
+            progress: GoalProgress::default(),
         }
     }
 }

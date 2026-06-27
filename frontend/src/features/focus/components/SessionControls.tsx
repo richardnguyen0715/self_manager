@@ -9,6 +9,7 @@ import {
   useResumeSession,
   useFinishSession,
 } from "../hooks/useFocusSessions";
+import { useCreateTimeBlock } from "@/features/calendar/hooks/useCalendarTimeBlocks";
 import { FOCUS_MODES } from "../types";
 import type { FocusMode } from "../types";
 
@@ -16,6 +17,7 @@ export function SessionControls() {
   const phase = useFocusStore((s) => s.phase);
   const activeSession = useFocusStore((s) => s.activeSession);
   const activeBlockId = useFocusStore((s) => s.activeBlockId);
+  const linkedTask = useFocusStore((s) => s.linkedTask);
   const selectedMode = useFocusStore((s) => s.selectedMode);
   const customWorkMinutes = useFocusStore((s) => s.customWorkMinutes);
   const elapsedSeconds = useFocusStore((s) => s.elapsedSeconds);
@@ -31,6 +33,7 @@ export function SessionControls() {
   const pauseMutation = usePauseSession();
   const resumeMutation = useResumeSession();
   const finishMutation = useFinishSession();
+  const createBlockMutation = useCreateTimeBlock();
 
   const isPaused = phase === "work" && clientStartedAt === null && !!activeSession;
   const isBreak = phase === "break";
@@ -45,25 +48,31 @@ export function SessionControls() {
   }
 
   /**
-   * Start requires a timeblock id. In this UI, the focus feature creates its own
-   * ad-hoc timeblock that spans the work duration. We use a pre-existing or
-   * externally supplied blockId stored in the store, or the user must link one.
-   *
-   * For now the Start flow creates a timeblock first via the TIMEBLOCKS endpoint,
-   * then immediately starts a session under it. If no external block is provided
-   * we fall back to using any blockId already in the store (e.g. from sync).
+   * Focus sessions are children of a time block. If the user picked one, we use
+   * it; otherwise we auto-create an ad-hoc block spanning the work duration
+   * (carrying the linked task, if any) so "Start Focus" always works. The block
+   * persists, so the session counts toward analytics and shows on the calendar.
    */
   async function handleStart() {
-    // activeBlockId may have been set externally (e.g. from a linked time block).
-    // If none, the UI should prompt the user to select a time block first, but to
-    // avoid a full architectural change we guard here and show nothing for now.
-    if (!activeBlockId) return;
+    let blockId = activeBlockId;
+
+    if (!blockId) {
+      const start = new Date();
+      const end = new Date(start.getTime() + getWorkDurationSeconds() * 1000);
+      const block = await createBlockMutation.mutateAsync({
+        title: linkedTask?.title ? `Focus: ${linkedTask.title}` : "Focus session",
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+        task_id: linkedTask?.id,
+      });
+      blockId = block.id;
+    }
 
     const session = await startMutation.mutateAsync({
-      blockId: activeBlockId,
+      blockId,
       data: { mode: getModeForRequest() },
     });
-    sessionStarted(activeBlockId, session);
+    sessionStarted(blockId, session);
   }
 
   async function handlePause() {
@@ -116,7 +125,8 @@ export function SessionControls() {
     startMutation.isPending ||
     pauseMutation.isPending ||
     resumeMutation.isPending ||
-    finishMutation.isPending;
+    finishMutation.isPending ||
+    createBlockMutation.isPending;
 
   // ── Break phase controls ──────────────────────────────────────────────────
   if (isBreak) {
@@ -142,8 +152,12 @@ export function SessionControls() {
         size="lg"
         className="gap-2 px-8"
         onClick={handleStart}
-        disabled={isMutating || !activeBlockId}
-        title={!activeBlockId ? "Select a time block to start a focus session" : undefined}
+        disabled={isMutating}
+        title={
+          activeBlockId
+            ? undefined
+            : "Starts now and creates a focus time block automatically"
+        }
       >
         <Play className="h-4 w-4" />
         Start Focus

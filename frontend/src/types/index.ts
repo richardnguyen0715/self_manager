@@ -86,6 +86,13 @@ export interface Goal {
   position: number;
   created_at: string;
   updated_at: string;
+  /** Roll-up from the goal's linked projects' tasks. */
+  progress: {
+    total_projects: number;
+    total_tasks: number;
+    completed_tasks: number;
+    percent: number;
+  };
 }
 
 /**
@@ -362,11 +369,31 @@ export interface CalendarEvent {
   recurrence_rule: string | null;
   created_at: string;
   updated_at: string;
+  /** Calendar-type UUIDs this event is assigned to (0+). */
+  type_ids: string[];
 }
 
 export interface EventListResponse {
   events: CalendarEvent[];
   total: number;
+}
+
+/**
+ * CalendarType — user-defined Life Calendar category carrying shared config
+ * (colour, icon, defaults) inherited by all events of that type.
+ * Backend: GET/POST /api/calendar-types, GET/PATCH/DELETE /api/calendar-types/:id
+ */
+export interface CalendarType {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  icon: string | null;
+  description: string | null;
+  default_all_day: boolean;
+  default_reminder_minutes: number | null;
+  created_at: string;
+  updated_at: string;
 }
 
 /**
@@ -1309,6 +1336,9 @@ export const API_ENDPOINTS = {
   CALENDAR: "/api/calendar",
   // GET / PATCH / DELETE /api/calendar/:id
   CALENDAR_BY_ID: (id: string) => `/api/calendar/${id}`,
+  // Calendar types (categories) — GET list / POST
+  CALENDAR_TYPES: "/api/calendar-types",
+  CALENDAR_TYPE_BY_ID: (id: string) => `/api/calendar-types/${id}`,
 
   // ── Timeblocks (/api/timeblocks) ──────────────────────────────────────────
   // GET (?from&to&task_id&offset&limit) / POST /api/timeblocks

@@ -66,6 +66,13 @@ async fn main() -> anyhow::Result<()> {
     // ── 6. AppState ───────────────────────────────────────────────────────────
     let state = AppState::new(db, redis, config.clone());
 
+    // ── 6b. Analytics listener ────────────────────────────────────────────────
+    // Consumes DomainEvents (task/habit/focus/etc.) and writes analytics_events
+    // + incrementally refreshes daily_stats. Without this, every analytics and
+    // dashboard metric stays at zero no matter how much work is logged.
+    modules::analytics::listener::spawn_listener(state.clone());
+    tracing::info!("analytics event listener spawned");
+
     // ── 7. Router ─────────────────────────────────────────────────────────────
     let api_router = Router::new()
         // ── Legacy (kept) ─────────────────────────────────────────────────────
@@ -77,6 +84,7 @@ async fn main() -> anyhow::Result<()> {
         .nest("/goals",         modules::goal::router())
         .nest("/habits",        modules::habit::router())
         .nest("/calendar",      modules::calendar::router())
+        .nest("/calendar-types", modules::calendar_type::router())
         .nest("/timeblocks",    modules::timeblock::router())
         .nest("/analytics",     modules::analytics::router())
         .nest("/notifications", modules::notification::router())

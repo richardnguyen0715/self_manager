@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { DateInput } from "@/components/ui/date-input";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, parseISO } from "date-fns";
+import { cn } from "@/lib/utils";
 import { Loader2, Trash2 } from "lucide-react";
 import {
   Dialog,
@@ -24,6 +25,15 @@ import {
   useUpdateCalendarEvent,
   useDeleteCalendarEvent,
 } from "../hooks/useCalendarEvents";
+import { useCalendarTypes } from "../hooks/useCalendarTypes";
+import {
+  buildRRule,
+  parseRRule,
+  DEFAULT_RECURRENCE,
+  WEEKDAY_LABELS,
+  type RecurrenceOptions,
+  type RecurrenceFreq,
+} from "../recurrence";
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -77,6 +87,17 @@ export function EventFormDialog() {
   const createMutation = useCreateCalendarEvent();
   const updateMutation = useUpdateCalendarEvent();
   const deleteMutation = useDeleteCalendarEvent();
+  const { data: calendarTypes = [] } = useCalendarTypes();
+
+  // Type assignments + recurrence live outside react-hook-form (arrays/custom).
+  const [selectedTypeIds, setSelectedTypeIds] = useState<string[]>([]);
+  const [recurrence, setRecurrence] = useState<RecurrenceOptions>(DEFAULT_RECURRENCE);
+
+  function toggleType(id: string) {
+    setSelectedTypeIds((prev) =>
+      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id],
+    );
+  }
 
   const isBusy =
     createMutation.isPending ||
@@ -115,6 +136,8 @@ export function EventFormDialog() {
         all_day: existingEvent.all_day,
         color: existingEvent.color ?? "",
       });
+      setSelectedTypeIds(existingEvent.type_ids ?? []);
+      setRecurrence(parseRRule(existingEvent.recurrence_rule));
     } else if (!isEditing) {
       reset({
         title: "",
@@ -124,14 +147,23 @@ export function EventFormDialog() {
         all_day: false,
         color: "",
       });
+      setSelectedTypeIds([]);
+      setRecurrence(DEFAULT_RECURRENCE);
     }
   }, [isEditing, existingEvent, newEventStart, newEventEnd, reset]);
 
   const onSubmit = async (values: EventFormValues) => {
+    // Display colour falls back to the first assigned type's colour.
+    const firstType = calendarTypes.find((t) => t.id === selectedTypeIds[0]);
+    const color = values.color?.trim() || firstType?.color || undefined;
+
     const payload = {
       ...values,
+      color,
       start_time: fromDatetimeLocal(values.start_time),
       end_time: fromDatetimeLocal(values.end_time),
+      recurrence_rule: buildRRule(recurrence),
+      type_ids: selectedTypeIds,
     };
 
     if (isEditing && editingEventId) {
@@ -264,9 +296,129 @@ export function EventFormDialog() {
               </div>
             )}
 
+            {/* Calendars (types) */}
+            {calendarTypes.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>Calendars</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {calendarTypes.map((t) => {
+                    const active = selectedTypeIds.includes(t.id);
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => toggleType(t.id)}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors",
+                          active
+                            ? "border-transparent text-white"
+                            : "bg-background hover:bg-accent",
+                        )}
+                        style={active ? { backgroundColor: t.color } : undefined}
+                      >
+                        <span
+                          className="h-2.5 w-2.5 rounded-full border"
+                          style={{ backgroundColor: t.color }}
+                        />
+                        {t.icon && <span>{t.icon}</span>}
+                        {t.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Repeat / recurrence */}
+            <div className="space-y-2">
+              <Label htmlFor="event-repeat">Repeat</Label>
+              <select
+                id="event-repeat"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={recurrence.freq}
+                onChange={(e) =>
+                  setRecurrence((r) => ({ ...r, freq: e.target.value as RecurrenceFreq }))
+                }
+              >
+                <option value="none">Does not repeat</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="custom">Custom (weekdays)</option>
+              </select>
+
+              {recurrence.freq === "custom" && (
+                <div className="flex flex-wrap gap-1">
+                  {WEEKDAY_LABELS.map((label, i) => {
+                    const active = recurrence.weekdays.includes(i);
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() =>
+                          setRecurrence((r) => ({
+                            ...r,
+                            weekdays: active
+                              ? r.weekdays.filter((d) => d !== i)
+                              : [...r.weekdays, i],
+                          }))
+                        }
+                        className={cn(
+                          "h-8 w-9 rounded-md border text-xs font-medium transition-colors",
+                          active
+                            ? "bg-primary text-primary-foreground border-transparent"
+                            : "bg-background hover:bg-accent",
+                        )}
+                      >
+                        {label[0]}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {recurrence.freq !== "none" && (
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Ends:</span>
+                  <select
+                    className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                    value={recurrence.end}
+                    onChange={(e) =>
+                      setRecurrence((r) => ({
+                        ...r,
+                        end: e.target.value as "never" | "count",
+                      }))
+                    }
+                  >
+                    <option value="never">Never (permanent)</option>
+                    <option value="count">After N times</option>
+                  </select>
+                  {recurrence.end === "count" && (
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        type="number"
+                        min={1}
+                        className="h-8 w-20"
+                        value={recurrence.count}
+                        onChange={(e) =>
+                          setRecurrence((r) => ({
+                            ...r,
+                            count: Math.max(1, Number(e.target.value) || 1),
+                          }))
+                        }
+                      />
+                      <span className="text-muted-foreground">times</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Color */}
             <div className="space-y-1.5">
-              <Label htmlFor="event-color">Color (hex)</Label>
+              <Label htmlFor="event-color">
+                Color (hex){selectedTypeIds.length > 0 && " — overrides calendar colour"}
+              </Label>
               <div className="flex gap-2 items-center">
                 <input
                   id="event-color-picker"

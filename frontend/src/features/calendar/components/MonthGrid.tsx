@@ -64,18 +64,21 @@ function MonthDayCell({ day, anchorDate, events, timeBlocks }: MonthDayCellProps
       </button>
 
       {/* Events */}
-      {visibleEvents.map((e) => (
+      {visibleEvents.map((e) => {
+        const masterId = e.id.includes("__") ? e.id.split("__")[0] : e.id;
+        const color = e.color || null;
+        return (
         <button
           key={e.id}
           onClick={(ev) => {
             ev.stopPropagation();
-            openEventDialog({ id: e.id });
+            openEventDialog({ id: masterId });
           }}
           className={cn(
             "text-left text-[10px] rounded px-1 leading-4 truncate w-full",
-            EVENT_COLORS.default.bg,
-            EVENT_COLORS.default.text,
+            !color && [EVENT_COLORS.default.bg, EVENT_COLORS.default.text],
           )}
+          style={color ? { backgroundColor: `${color}26`, color } : undefined}
           title={e.title}
         >
           {!e.all_day && (
@@ -85,7 +88,8 @@ function MonthDayCell({ day, anchorDate, events, timeBlocks }: MonthDayCellProps
           )}
           {e.title}
         </button>
-      ))}
+        );
+      })}
 
       {/* Time blocks (fill remaining slots up to 3 total) */}
       {timeBlocks.slice(0, Math.max(0, 3 - visibleEvents.length)).map((b) => (

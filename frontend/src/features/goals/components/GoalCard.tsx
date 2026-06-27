@@ -22,6 +22,7 @@ import type { Goal } from "@/types";
 import { useGoalsStore } from "../store/goals.store";
 import { useCompleteGoal, useAbandonGoal } from "../hooks/useGoals";
 import { GoalStatusBadge } from "./GoalStatusBadge";
+import { GoalProgressBar } from "./GoalProgressBar";
 import { GoalTreeView } from "./GoalTreeView";
 
 // ─── Dropdown menu (custom, no extra Radix dep beyond what's installed) ────────
@@ -192,6 +193,23 @@ export function GoalCard({
                 </span>
               )}
             </div>
+
+            {/* Progress rolled up from linked projects' tasks */}
+            {goal.progress.total_projects > 0 ? (
+              <div className="mt-2">
+                <GoalProgressBar value={goal.progress.percent} size="sm" />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {goal.progress.completed_tasks}/{goal.progress.total_tasks} tasks
+                  {" · "}
+                  {goal.progress.total_projects} project
+                  {goal.progress.total_projects === 1 ? "" : "s"}
+                </p>
+              </div>
+            ) : (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                No projects linked yet — add one to track progress.
+              </p>
+            )}
           </div>
 
           {/* Actions */}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useState } from "react";
 import {
   format,
   addDays,
@@ -8,8 +8,6 @@ import {
   isSameDay,
   isToday,
   parseISO,
-  addMinutes,
-  startOfDay,
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, TimeBlockSummary } from "@/types";
@@ -61,23 +59,26 @@ function EventChip({ event, topPx, heightPx, column, totalColumns }: EventChipPr
   const widthPct = 100 / totalColumns;
   const leftPct = column * widthPct;
   const short = heightPx < 32;
+  // Recurring occurrences carry a synthetic id "<master>__<ts>"; edit the master.
+  const masterId = event.id.includes("__") ? event.id.split("__")[0] : event.id;
+  const color = event.color || null;
 
   return (
     <div
       className={cn(
-        "absolute rounded-md border-l-2 px-1.5 py-0.5 cursor-pointer transition-opacity hover:opacity-90 overflow-hidden",
-        EVENT_COLORS.default.bg,
-        EVENT_COLORS.default.border,
-        EVENT_COLORS.default.text,
-        "z-10",
+        "absolute rounded-md border-l-2 px-1.5 py-0.5 cursor-pointer transition-opacity hover:opacity-90 overflow-hidden z-10",
+        !color && [EVENT_COLORS.default.bg, EVENT_COLORS.default.border, EVENT_COLORS.default.text],
       )}
       style={{
         top: topPx + 1,
         height: heightPx - 2,
         left: `${leftPct + 1}%`,
         width: `${widthPct - 2}%`,
+        ...(color
+          ? { backgroundColor: `${color}26`, borderLeftColor: color, color }
+          : {}),
       }}
-      onClick={() => openEventDialog({ id: event.id })}
+      onClick={() => openEventDialog({ id: masterId })}
       title={`${event.title}\n${formatTimeLabel(parseISO(event.start_time))} – ${formatTimeLabel(parseISO(event.end_time))}`}
     >
       <p className={cn("font-medium leading-tight truncate", short ? "text-[10px]" : "text-xs")}>
@@ -159,6 +160,16 @@ function DayColumn({ day, events, timeBlocks, showDayHeader, onSlotClick }: DayC
   const { openTimeBlockDialog } = useCalendarStore();
   const columnRef = useRef<HTMLDivElement>(null);
 
+  // Click-and-drag selection to create an event over a time range.
+  const [sel, setSel] = useState<{ startMin: number; endMin: number } | null>(null);
+  const dragAnchorRef = useRef<number | null>(null);
+
+  const minutesAt = (clientY: number): number => {
+    const rect = columnRef.current?.getBoundingClientRect();
+    if (!rect) return 0;
+    return Math.max(0, Math.min(24 * 60, pxToMinutes(clientY - rect.top)));
+  };
+
   const { setNodeRef, isOver } = useDroppable({
     id: `day-column-${day.toISOString()}`,
     data: { day },
@@ -185,27 +196,42 @@ function DayColumn({ day, events, timeBlocks, showDayHeader, onSlotClick }: DayC
   const allItems = [...eventItems, ...blockItems];
   const positioned = computeEventLayout(allItems);
 
-  const handleGridClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      // Only register direct clicks on the grid background, not on chips
-      if ((e.target as HTMLElement).dataset.grid !== "true") return;
-      const rect = columnRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const offsetY = e.clientY - rect.top;
-      const mins = pxToMinutes(offsetY);
-      const start = minutesToDatetime(day, mins);
-      const end = addMinutes(start, 60);
-      if (onSlotClick) {
-        onSlotClick(start, end);
-        return;
-      }
-      openTimeBlockDialog({
-        start: start.toISOString(),
-        end: end.toISOString(),
-      });
-    },
-    [day, openTimeBlockDialog, onSlotClick],
-  );
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only start a selection on the grid background, not on a chip.
+    if ((e.target as HTMLElement).dataset.grid !== "true") return;
+    const m = minutesAt(e.clientY);
+    dragAnchorRef.current = m;
+    setSel({ startMin: m, endMin: m + 15 });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (dragAnchorRef.current === null) return;
+    const m = minutesAt(e.clientY);
+    const a = Math.min(dragAnchorRef.current, m);
+    const b = Math.max(dragAnchorRef.current, m);
+    setSel({ startMin: a, endMin: Math.max(b, a + 15) });
+  };
+
+  const finishDrag = () => {
+    if (dragAnchorRef.current === null || !sel) {
+      dragAnchorRef.current = null;
+      setSel(null);
+      return;
+    }
+    let { startMin, endMin } = sel;
+    // A near-zero drag is a plain click → default to a 60-minute slot.
+    if (endMin - startMin < 20) endMin = startMin + 60;
+    dragAnchorRef.current = null;
+    setSel(null);
+
+    const start = minutesToDatetime(day, startMin);
+    const end = minutesToDatetime(day, endMin);
+    if (onSlotClick) {
+      onSlotClick(start, end);
+    } else {
+      openTimeBlockDialog({ start: start.toISOString(), end: end.toISOString() });
+    }
+  };
 
   return (
     <div className="flex flex-col flex-1" style={{ minWidth: 80 }}>
@@ -243,7 +269,10 @@ function DayColumn({ day, events, timeBlocks, showDayHeader, onSlotClick }: DayC
           isOver && "bg-primary/5",
         )}
         style={{ height: HOUR_HEIGHT_PX * 24 }}
-        onClick={handleGridClick}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={finishDrag}
+        onMouseLeave={() => dragAnchorRef.current !== null && finishDrag()}
         data-grid="true"
       >
         {/* Hour grid lines */}
@@ -268,6 +297,17 @@ function DayColumn({ day, events, timeBlocks, showDayHeader, onSlotClick }: DayC
 
         {/* Today indicator */}
         {isToday(day) && <NowIndicator />}
+
+        {/* Drag-to-create selection overlay */}
+        {sel && (
+          <div
+            className="absolute left-1 right-1 z-10 rounded-md border border-primary/50 bg-primary/20 pointer-events-none"
+            style={{
+              top: (sel.startMin / 60) * HOUR_HEIGHT_PX,
+              height: ((sel.endMin - sel.startMin) / 60) * HOUR_HEIGHT_PX,
+            }}
+          />
+        )}
 
         {/* Positioned events and time blocks */}
         {positioned.map((pos, idx) => {

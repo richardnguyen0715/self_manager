@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { addDays, startOfWeek } from "date-fns";
+import { addDays, startOfWeek, parseISO } from "date-fns";
 import { Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { CalendarEvent } from "@/types";
 
 // Reuse the shared (user-scoped) calendar primitives. Calendar events and time
 // blocks are owned by the user — not by any project — so this personal "Life
@@ -12,6 +13,8 @@ import { cn } from "@/lib/utils";
 import { useCalendarStore, getViewRange } from "@/features/calendar/store";
 import { useCalendarEvents } from "@/features/calendar/hooks/useCalendarEvents";
 import { useCalendarTimeBlocks } from "@/features/calendar/hooks/useCalendarTimeBlocks";
+import { useCalendarTypes } from "@/features/calendar/hooks/useCalendarTypes";
+import { expandOccurrences } from "@/features/calendar/recurrence";
 import { TimeGrid } from "@/features/calendar/components/TimeGrid";
 import { MonthGrid } from "@/features/calendar/components/MonthGrid";
 import { CalendarToolbar } from "@/features/calendar/components/CalendarToolbar";
@@ -44,6 +47,38 @@ export function LifeCalendarView() {
     isLoading: blocksLoading,
     isError: blocksError,
   } = useCalendarTimeBlocks({ start, end });
+
+  const { data: calendarTypes } = useCalendarTypes();
+
+  // Resolve display colour (first assigned type → its colour, else event colour)
+  // and expand recurring events into concrete occurrences within the window.
+  const displayEvents = useMemo<CalendarEvent[]>(() => {
+    const typeColor = new Map(
+      (calendarTypes ?? []).map((t) => [t.id, t.color] as const),
+    );
+    const out: CalendarEvent[] = [];
+    for (const ev of events ?? []) {
+      const color =
+        ev.type_ids?.map((id) => typeColor.get(id)).find(Boolean) ??
+        ev.color ??
+        null;
+      const anchorStart = parseISO(ev.start_time);
+      const durationMs = parseISO(ev.end_time).getTime() - anchorStart.getTime();
+      const occurrences = expandOccurrences(anchorStart, ev.recurrence_rule, start, end);
+      for (const occStart of occurrences) {
+        const isRecurring = Boolean(ev.recurrence_rule);
+        out.push({
+          ...ev,
+          // Synthetic id per occurrence; chips strip the suffix to edit master.
+          id: isRecurring ? `${ev.id}__${occStart.getTime()}` : ev.id,
+          start_time: occStart.toISOString(),
+          end_time: new Date(occStart.getTime() + durationMs).toISOString(),
+          color,
+        });
+      }
+    }
+    return out;
+  }, [events, calendarTypes, start, end]);
 
   // Event-centric empty-slot behaviour: create an event at the clicked slot.
   const handleSlotClick = useCallback(
@@ -100,13 +135,13 @@ export function LifeCalendarView() {
           {view === "month" ? (
             <MonthGrid
               anchorDate={anchorDate}
-              events={events ?? []}
+              events={displayEvents}
               timeBlocks={timeBlocks ?? []}
             />
           ) : (
             <TimeGrid
               days={days}
-              events={events ?? []}
+              events={displayEvents}
               timeBlocks={timeBlocks ?? []}
               showDayHeaders={view === "week"}
               onSlotClick={handleSlotClick}

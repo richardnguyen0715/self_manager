@@ -10,6 +10,7 @@ pub mod auth;
 pub mod backlog;
 pub mod board_column;
 pub mod calendar;
+pub mod calendar_type;
 pub mod dashboard;
 pub mod database;
 pub mod doc_comment;
