@@ -135,14 +135,22 @@ interface MonthGridProps {
   anchorDate: Date;
   events: CalendarEvent[];
   timeBlocks: TimeBlockSummary[];
+  weekStartsOn?: 0 | 1;
 }
 
 const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DOW_LABELS_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 
-export function MonthGrid({ anchorDate, events, timeBlocks }: MonthGridProps) {
+/** Rotate the weekday label arrays so index 0 is the configured first day. */
+function rotate<T>(arr: T[], by: number): T[] {
+  return arr.map((_, i) => arr[(i + by) % arr.length]);
+}
+
+export function MonthGrid({ anchorDate, events, timeBlocks, weekStartsOn = 0 }: MonthGridProps) {
+  const dowLabels = rotate(DOW_LABELS, weekStartsOn);
+  const dowLabelsShort = rotate(DOW_LABELS_SHORT, weekStartsOn);
   const monthStart = startOfMonth(anchorDate);
-  const calStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+  const calStart = startOfWeek(monthStart, { weekStartsOn });
 
   // Build 6 weeks × 7 days
   const weeks: Date[][] = [];
@@ -160,13 +168,13 @@ export function MonthGrid({ anchorDate, events, timeBlocks }: MonthGridProps) {
       <div className="flex flex-col flex-1 min-h-0" style={{ minWidth: 280 }}>
         {/* Day-of-week headers */}
         <div className="grid grid-cols-7 border-b">
-          {DOW_LABELS.map((label, i) => (
+          {dowLabels.map((label, i) => (
             <div
-              key={label}
+              key={i}
               className="text-center text-xs font-medium text-muted-foreground py-2 uppercase tracking-wide"
             >
               <span className="hidden sm:inline">{label}</span>
-              <span className="sm:hidden">{DOW_LABELS_SHORT[i]}</span>
+              <span className="sm:hidden">{dowLabelsShort[i]}</span>
             </div>
           ))}
         </div>

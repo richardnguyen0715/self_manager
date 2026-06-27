@@ -5,6 +5,7 @@ import { format, startOfWeek, endOfWeek } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useTaskUIStore } from "@/features/tasks/store";
+import { useCalendarPrefs } from "@/features/calendar/prefs";
 import { useTaskCalendarStore } from "../store";
 import type { TaskCalendarViewMode } from "../store";
 
@@ -14,13 +15,17 @@ const VIEW_LABELS: Record<TaskCalendarViewMode, string> = {
   month: "Month",
 };
 
-function formatViewTitle(view: TaskCalendarViewMode, anchorDate: Date): string {
+function formatViewTitle(
+  view: TaskCalendarViewMode,
+  anchorDate: Date,
+  weekStartsOn: 0 | 1,
+): string {
   switch (view) {
     case "day":
       return format(anchorDate, "EEEE, MMMM d, yyyy");
     case "week": {
-      const ws = startOfWeek(anchorDate, { weekStartsOn: 0 });
-      const we = endOfWeek(anchorDate, { weekStartsOn: 0 });
+      const ws = startOfWeek(anchorDate, { weekStartsOn });
+      const we = endOfWeek(anchorDate, { weekStartsOn });
       if (ws.getMonth() === we.getMonth()) {
         return `${format(ws, "MMMM d")} – ${format(we, "d, yyyy")}`;
       }
@@ -38,6 +43,7 @@ export function TaskCalendarToolbar() {
   const { view, anchorDate, setView, goToPrev, goToNext, goToToday } =
     useTaskCalendarStore();
   const openCreateDialog = useTaskUIStore((s) => s.openCreateDialog);
+  const { weekStartsOn, setWeekStartsOn } = useCalendarPrefs();
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b">
@@ -65,12 +71,33 @@ export function TaskCalendarToolbar() {
           </Button>
         </div>
         <h2 className="text-sm sm:text-base font-semibold tabular-nums truncate min-w-0">
-          {formatViewTitle(view, anchorDate)}
+          {formatViewTitle(view, anchorDate, weekStartsOn)}
         </h2>
       </div>
 
       {/* Right: view switcher + create */}
       <div className="flex items-center gap-2 shrink-0">
+        {/* Week-start toggle */}
+        <div
+          className="hidden sm:flex rounded-md border overflow-hidden"
+          title="First day of week"
+        >
+          {([0, 1] as const).map((d) => (
+            <button
+              key={d}
+              onClick={() => setWeekStartsOn(d)}
+              className={cn(
+                "px-2.5 py-1.5 text-xs font-medium transition-colors",
+                weekStartsOn === d
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background text-foreground hover:bg-accent",
+              )}
+            >
+              {d === 0 ? "Sun" : "Mon"}
+            </button>
+          ))}
+        </div>
+
         <div className="flex rounded-md border overflow-hidden">
           {(["day", "week", "month"] as TaskCalendarViewMode[]).map((v) => (
             <button

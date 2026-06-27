@@ -131,11 +131,18 @@ function MonthDayCell({ day, anchorDate, tasks }: MonthDayCellProps) {
 interface TaskMonthGridProps {
   anchorDate: Date;
   tasks: TaskListItem[];
+  weekStartsOn?: 0 | 1;
 }
 
-export function TaskMonthGrid({ anchorDate, tasks }: TaskMonthGridProps) {
+function rotate<T>(arr: T[], by: number): T[] {
+  return arr.map((_, i) => arr[(i + by) % arr.length]);
+}
+
+export function TaskMonthGrid({ anchorDate, tasks, weekStartsOn = 0 }: TaskMonthGridProps) {
+  const dowLabels = rotate(DOW_LABELS, weekStartsOn);
+  const dowLabelsShort = rotate(DOW_LABELS_SHORT, weekStartsOn);
   const monthStart = startOfMonth(anchorDate);
-  const calStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+  const calStart = startOfWeek(monthStart, { weekStartsOn });
 
   const weeks: Date[][] = [];
   for (let w = 0; w < 6; w++) {
@@ -148,13 +155,13 @@ export function TaskMonthGrid({ anchorDate, tasks }: TaskMonthGridProps) {
     <div className="flex flex-col flex-1 min-h-0 overflow-x-auto">
       <div className="flex flex-col flex-1 min-h-0" style={{ minWidth: 280 }}>
         <div className="grid grid-cols-7 border-b">
-          {DOW_LABELS.map((label, i) => (
+          {dowLabels.map((label, i) => (
             <div
-              key={label}
+              key={i}
               className="text-center text-xs font-medium text-muted-foreground py-2 uppercase tracking-wide"
             >
               <span className="hidden sm:inline">{label}</span>
-              <span className="sm:hidden">{DOW_LABELS_SHORT[i]}</span>
+              <span className="sm:hidden">{dowLabelsShort[i]}</span>
             </div>
           ))}
         </div>

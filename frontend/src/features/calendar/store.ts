@@ -134,18 +134,22 @@ export const useCalendarStore = create<CalendarUIState>((set, get) => ({
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 
-/** Returns the visible date range for the current view */
-export function getViewRange(view: CalendarView, anchorDate: Date): { start: Date; end: Date } {
+/** Returns the visible date range for the current view. */
+export function getViewRange(
+  view: CalendarView,
+  anchorDate: Date,
+  weekStartsOn: 0 | 1 = 0,
+): { start: Date; end: Date } {
   switch (view) {
     case "day":
       return { start: startOfDay(anchorDate), end: startOfDay(addDays(anchorDate, 1)) };
     case "week": {
-      const weekStart = startOfWeek(anchorDate, { weekStartsOn: 0 });
+      const weekStart = startOfWeek(anchorDate, { weekStartsOn });
       return { start: weekStart, end: addDays(weekStart, 7) };
     }
     case "month": {
       const monthStart = startOfMonth(anchorDate);
-      const calStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+      const calStart = startOfWeek(monthStart, { weekStartsOn });
       return { start: calStart, end: addDays(calStart, 42) };
     }
   }

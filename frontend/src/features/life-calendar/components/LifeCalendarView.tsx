@@ -11,6 +11,7 @@ import type { CalendarEvent } from "@/types";
 // Calendar" renders the exact same data layer the project Calendar uses, minus
 // the project-task panel and task drag-and-drop.
 import { useCalendarStore, getViewRange } from "@/features/calendar/store";
+import { useCalendarPrefs } from "@/features/calendar/prefs";
 import { useCalendarEvents } from "@/features/calendar/hooks/useCalendarEvents";
 import { useCalendarTimeBlocks } from "@/features/calendar/hooks/useCalendarTimeBlocks";
 import { useCalendarTypes } from "@/features/calendar/hooks/useCalendarTypes";
@@ -30,10 +31,11 @@ import { TimeBlockFormDialog } from "@/features/calendar/components/TimeBlockFor
 
 export function LifeCalendarView() {
   const { view, anchorDate, openEventDialog } = useCalendarStore();
+  const weekStartsOn = useCalendarPrefs((s) => s.weekStartsOn);
 
   const { start, end } = useMemo(
-    () => getViewRange(view, anchorDate),
-    [view, anchorDate],
+    () => getViewRange(view, anchorDate, weekStartsOn),
+    [view, anchorDate, weekStartsOn],
   );
 
   const {
@@ -95,11 +97,11 @@ export function LifeCalendarView() {
   const days = useMemo(() => {
     if (view === "day") return [anchorDate];
     if (view === "week") {
-      const ws = startOfWeek(anchorDate, { weekStartsOn: 0 });
+      const ws = startOfWeek(anchorDate, { weekStartsOn });
       return Array.from({ length: 7 }, (_, i) => addDays(ws, i));
     }
     return [];
-  }, [view, anchorDate]);
+  }, [view, anchorDate, weekStartsOn]);
 
   const isLoading = eventsLoading || blocksLoading;
   const isError = eventsError || blocksError;
@@ -137,6 +139,7 @@ export function LifeCalendarView() {
               anchorDate={anchorDate}
               events={displayEvents}
               timeBlocks={timeBlocks ?? []}
+              weekStartsOn={weekStartsOn}
             />
           ) : (
             <TimeGrid

@@ -22,6 +22,7 @@ import { Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TaskListItem } from "@/types";
 import { TaskDialog } from "@/features/tasks/components/TaskDialog";
+import { useCalendarPrefs } from "@/features/calendar/prefs";
 import { useTaskCalendarStore } from "../store";
 import { useProjectTasks, useRescheduleTask } from "../hooks/useTaskCalendar";
 import { TaskCalendarToolbar } from "./TaskCalendarToolbar";
@@ -40,6 +41,7 @@ const DEFAULT_HOUR = 9;
 
 export function TaskCalendarView() {
   const { view, anchorDate } = useTaskCalendarStore();
+  const weekStartsOn = useCalendarPrefs((s) => s.weekStartsOn);
   const { scheduled, unscheduled, isLoading, isError } = useProjectTasks();
   const reschedule = useRescheduleTask();
 
@@ -78,11 +80,11 @@ export function TaskCalendarView() {
   const days = useMemo(() => {
     if (view === "day") return [anchorDate];
     if (view === "week") {
-      const ws = startOfWeek(anchorDate, { weekStartsOn: 0 });
+      const ws = startOfWeek(anchorDate, { weekStartsOn });
       return Array.from({ length: 7 }, (_, i) => addDays(ws, i));
     }
     return [];
-  }, [view, anchorDate]);
+  }, [view, anchorDate, weekStartsOn]);
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
@@ -110,7 +112,11 @@ export function TaskCalendarView() {
 
           <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-x-auto">
             {view === "month" ? (
-              <TaskMonthGrid anchorDate={anchorDate} tasks={scheduled} />
+              <TaskMonthGrid
+                anchorDate={anchorDate}
+                tasks={scheduled}
+                weekStartsOn={weekStartsOn}
+              />
             ) : (
               <TaskTimeGrid
                 days={days}
