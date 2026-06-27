@@ -44,6 +44,28 @@ export function clearTokens(): void {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
+/** Persisted auth-store key (zustand persist `name`). */
+const AUTH_STORE_KEY = "mml_auth";
+
+/**
+ * Hard sign-out used when a 401 can't be recovered. Clears tokens AND the
+ * persisted `isAuthenticated` flag, then bounces to the login page. Clearing
+ * the persisted auth is essential: the AuthGuard treats a stored token OR
+ * isAuthenticated as "logged in", so without this the user gets stuck on a
+ * page that keeps 401-ing instead of being asked to log in again.
+ */
+let loggingOut = false;
+function forceLogout(): void {
+  if (typeof window === "undefined") return;
+  clearTokens();
+  localStorage.removeItem(AUTH_STORE_KEY);
+  if (loggingOut) return; // avoid redirect loops from parallel 401s
+  loggingOut = true;
+  const here = window.location.pathname + window.location.search;
+  const redirect = here.startsWith("/auth") ? "" : `?redirect=${encodeURIComponent(here)}`;
+  window.location.href = `/auth?tab=login${redirect ? `&${redirect.slice(1)}` : ""}`;
+}
+
 // ─── Refresh logic ─────────────────────────────────────────────────────────────
 
 /**
@@ -70,11 +92,7 @@ async function refreshAccessToken(): Promise<string> {
   });
 
   if (!response.ok) {
-    clearTokens();
-    // Redirect to login if running in browser
-    if (typeof window !== "undefined") {
-      window.location.href = "/login";
-    }
+    forceLogout();
     throw new ApiClientError("Session expired. Please log in again.", 401);
   }
 
@@ -140,8 +158,14 @@ export async function apiClient<T = unknown>(
       accessToken = await refreshPromise;
       response = await makeRequest(accessToken);
     } catch {
-      // refreshAccessToken already redirected; rethrow
+      // refreshAccessToken already triggered forceLogout; rethrow.
       throw new ApiClientError("Unauthorized", 401);
+    }
+
+    // A fresh token still rejected → unrecoverable; sign out and redirect.
+    if (response.status === 401) {
+      forceLogout();
+      throw new ApiClientError("Session expired. Please log in again.", 401);
     }
   }
 
