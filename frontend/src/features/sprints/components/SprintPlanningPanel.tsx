@@ -23,6 +23,7 @@ import {
   useMoveItemToBacklog,
 } from "../hooks/useSprints";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useProjectStore } from "@/stores";
 import { CapacityBar } from "./CapacityBar";
 import { BacklogItemRow, SprintItemRow } from "./WorkItemPlanRow";
 
@@ -41,12 +42,16 @@ export function SprintPlanningPanel({ sprintId }: SprintPlanningPanelProps) {
   const { data: sprintItemsData, isLoading: itemsLoading } =
     useSprintWorkItemsList(sprintId);
 
-  // GET /api/backlog?status? — Response: { data: WorkItemListItem[], total }
+  // Scope the backlog to the selected project (null = all projects).
+  const currentProjectId = useProjectStore((s) => s.currentProjectId);
+
+  // GET /api/backlog?status?&project_id? — { data: WorkItemListItem[], total }
   const backlogParams: Record<string, string | undefined> = {};
   if (statusFilter !== "all") backlogParams.status = statusFilter;
+  if (currentProjectId) backlogParams.project_id = currentProjectId;
 
   const { data: backlogData, isLoading: backlogLoading } = useQuery({
-    queryKey: ["backlog", { statusFilter }],
+    queryKey: ["backlog", { statusFilter, projectId: currentProjectId }],
     queryFn: () =>
       api.get<AgileListResponse<WorkItemListItem>>(
         API_ENDPOINTS.BACKLOG,
