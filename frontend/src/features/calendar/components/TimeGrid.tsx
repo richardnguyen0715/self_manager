@@ -65,19 +65,18 @@ function EventChip({ event, topPx, heightPx, column, totalColumns }: EventChipPr
   const masterId = isRecurring ? event.id.split("__")[0] : event.id;
   const color = event.color || null;
 
-  // Drag to reschedule. Recurring occurrences aren't draggable (would need to
-  // move the whole series); only single events can be dragged.
+  // Drag to reschedule. For a recurring event the whole series shifts in time;
+  // for a single event it moves to the dropped day + time.
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `move-${event.id}`,
     data: { type: "event-move", event },
-    disabled: isRecurring,
   });
 
   return (
     <div
       ref={setNodeRef}
-      {...(isRecurring ? {} : attributes)}
-      {...(isRecurring ? {} : listeners)}
+      {...attributes}
+      {...listeners}
       className={cn(
         "absolute rounded-md border-l-2 px-1.5 py-0.5 cursor-pointer transition-opacity hover:opacity-90 overflow-hidden z-10",
         !color && [EVENT_COLORS.default.bg, EVENT_COLORS.default.border, EVENT_COLORS.default.text],
@@ -94,7 +93,9 @@ function EventChip({ event, topPx, heightPx, column, totalColumns }: EventChipPr
           : {}),
       }}
       data-event-chip="true"
-      onClick={() => openEventDialog({ id: masterId })}
+      onClick={() =>
+        openEventDialog({ id: masterId, occurrenceStart: event.start_time })
+      }
       title={`${event.title}\n${formatTimeLabel(parseISO(event.start_time))} – ${formatTimeLabel(parseISO(event.end_time))}`}
     >
       <p className={cn("font-medium leading-tight truncate", short ? "text-[10px]" : "text-xs")}>

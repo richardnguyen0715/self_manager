@@ -70,11 +70,33 @@ async fn set_event_types(
     Ok(())
 }
 
-/// Wrap a single event with its current type assignments.
+/// Fetch the per-occurrence exclusion list for each event id.
+async fn fetch_excluded(
+    state: &AppState,
+    event_ids: &[Uuid],
+) -> AppResult<HashMap<Uuid, Vec<String>>> {
+    let mut map: HashMap<Uuid, Vec<String>> = HashMap::new();
+    if event_ids.is_empty() {
+        return Ok(map);
+    }
+    let rows = sqlx::query_as::<_, (Uuid, Vec<String>)>(
+        "SELECT id, excluded_dates FROM calendar_events WHERE id = ANY($1)",
+    )
+    .bind(event_ids)
+    .fetch_all(&state.db)
+    .await?;
+    for (id, dates) in rows {
+        map.insert(id, dates);
+    }
+    Ok(map)
+}
+
+/// Wrap a single event with its type assignments and exclusion list.
 async fn with_types(state: &AppState, event: CalendarEvent) -> AppResult<EventWithTypes> {
-    let map = fetch_type_ids(state, &[event.id]).await?;
-    let type_ids = map.get(&event.id).cloned().unwrap_or_default();
-    Ok(EventWithTypes { event, type_ids })
+    let id = event.id;
+    let type_ids = fetch_type_ids(state, &[id]).await?.remove(&id).unwrap_or_default();
+    let excluded_dates = fetch_excluded(state, &[id]).await?.remove(&id).unwrap_or_default();
+    Ok(EventWithTypes { event, type_ids, excluded_dates })
 }
 
 // ── Read ──────────────────────────────────────────────────────────────────────
@@ -130,14 +152,16 @@ pub async fn list_events_in_range(
     .await?;
     events.extend(recurring_before);
 
-    // Attach calendar-type assignments in one batched query.
+    // Attach calendar-type assignments + exclusions in batched queries.
     let ids: Vec<Uuid> = events.iter().map(|e| e.id).collect();
     let mut type_map = fetch_type_ids(state, &ids).await?;
+    let mut excl_map = fetch_excluded(state, &ids).await?;
     let events: Vec<EventWithTypes> = events
         .into_iter()
         .map(|event| {
             let type_ids = type_map.remove(&event.id).unwrap_or_default();
-            EventWithTypes { event, type_ids }
+            let excluded_dates = excl_map.remove(&event.id).unwrap_or_default();
+            EventWithTypes { event, type_ids, excluded_dates }
         })
         .collect();
 
@@ -303,6 +327,16 @@ pub async fn update_event(
     // Replace type assignments only when the caller supplied them.
     if let Some(type_ids) = req.type_ids {
         set_event_types(state, user_id, event.id, &type_ids).await?;
+    }
+
+    // Replace per-occurrence exclusions when supplied (runtime query).
+    if let Some(excluded) = req.excluded_dates {
+        sqlx::query("UPDATE calendar_events SET excluded_dates = $1 WHERE id = $2 AND user_id = $3")
+            .bind(&excluded)
+            .bind(event.id)
+            .bind(user_id)
+            .execute(&state.db)
+            .await?;
     }
 
     with_types(state, event).await

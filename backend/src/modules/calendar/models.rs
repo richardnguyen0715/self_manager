@@ -92,6 +92,10 @@ pub struct UpdateEventRequest {
     /// Replace the event's calendar-type assignments. Absent = leave unchanged;
     /// empty array = clear all assignments.
     pub type_ids: Option<Vec<Uuid>>,
+
+    /// Replace the per-occurrence exclusion list (RFC-3339 start instants).
+    /// Used by "delete only this instance" on recurring events.
+    pub excluded_dates: Option<Vec<String>>,
 }
 
 /// Query parameters for `GET /api/calendar`.
@@ -105,12 +109,14 @@ pub struct RangeQuery {
 
 // ── Response DTOs ─────────────────────────────────────────────────────────────
 
-/// A calendar event plus its assigned calendar-type UUIDs.
+/// A calendar event plus its assigned calendar-type UUIDs and per-occurrence
+/// exclusions (RFC-3339 start instants skipped for recurring events).
 #[derive(Debug, Serialize)]
 pub struct EventWithTypes {
     #[serde(flatten)]
     pub event: CalendarEvent,
     pub type_ids: Vec<Uuid>,
+    pub excluded_dates: Vec<String>,
 }
 
 /// Paginated list response envelope.

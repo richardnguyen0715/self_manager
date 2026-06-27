@@ -371,6 +371,8 @@ export interface CalendarEvent {
   updated_at: string;
   /** Calendar-type UUIDs this event is assigned to (0+). */
   type_ids: string[];
+  /** RFC-3339 occurrence start instants excluded from a recurring series. */
+  excluded_dates: string[];
 }
 
 export interface EventListResponse {

@@ -30,6 +30,8 @@ export interface CreateCalendarEventPayload {
   recurrence_rule?: string | null;
   /** Calendar-type UUIDs to assign (0+). */
   type_ids?: string[];
+  /** RFC-3339 occurrence starts to exclude from a recurring series. */
+  excluded_dates?: string[];
 }
 
 export type UpdateCalendarEventPayload = Partial<CreateCalendarEventPayload>;

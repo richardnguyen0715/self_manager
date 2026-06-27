@@ -106,6 +106,7 @@ export function expandOccurrences(
   rule: string | null,
   rangeStart: Date,
   rangeEnd: Date,
+  excludedDates: string[] = [],
 ): Date[] {
   if (!rule) {
     // Non-recurring: include only if the anchor is inside the window.
@@ -117,10 +118,24 @@ export function expandOccurrences(
     return anchorStart >= rangeStart && anchorStart < rangeEnd ? [anchorStart] : [];
   }
 
+  // "Delete this and future" sets UNTIL on the rule; stop emitting at/after it.
+  const untilRaw = rule
+    .split(";")
+    .map((p) => p.split("="))
+    .find(([k]) => k.toUpperCase() === "UNTIL")?.[1];
+  const until = untilRaw ? new Date(untilRaw) : null;
+
+  // "Delete only this instance" stores excluded occurrence start instants.
+  const excluded = new Set(
+    excludedDates.map((d) => new Date(d).getTime()),
+  );
+
   const limit = opts.end === "count" ? Math.min(opts.count, MAX_OCCURRENCES) : MAX_OCCURRENCES;
   const out: Date[] = [];
 
   const pushIfInRange = (d: Date) => {
+    if (until && d >= until) return;
+    if (excluded.has(d.getTime())) return;
     if (d >= rangeStart && d < rangeEnd) out.push(d);
   };
 

@@ -87,30 +87,46 @@ export function LifeCalendarView() {
         | { type: string; event: CalendarEvent }
         | undefined;
       if (data?.type !== "event-move") return;
-      const ev = data.event;
-      if (ev.recurrence_rule) return;
-      const day = (e.over?.data.current as { day?: Date } | undefined)?.day;
 
-      const origStart = parseISO(ev.start_time);
-      const durationMs = parseISO(ev.end_time).getTime() - origStart.getTime();
+      // Resolve the underlying master event (the dragged chip may be a
+      // recurring occurrence with a synthetic "<id>__<ts>" id).
+      const realId = data.event.id.includes("__")
+        ? data.event.id.split("__")[0]
+        : data.event.id;
+      const master = (events ?? []).find((m) => m.id === realId);
+      if (!master) return;
+
       const deltaMin = Math.round((e.delta.y / HOUR_HEIGHT_PX) * 60 / 15) * 15;
-      const baseDay = day ?? origStart;
+      const day = (e.over?.data.current as { day?: Date } | undefined)?.day;
+      const mStart = parseISO(master.start_time);
+      const mEnd = parseISO(master.end_time);
+      const durationMs = mEnd.getTime() - mStart.getTime();
 
-      let newStart = setSeconds(
-        setMinutes(setHours(baseDay, getHours(origStart)), getMinutes(origStart)),
-        0,
-      );
-      newStart = addMinutes(newStart, deltaMin);
-      if (!day && deltaMin === 0) return; // no-op
+      let newStart: Date;
+      if (master.recurrence_rule) {
+        // Recurring: shift the whole series in time only (keep its days/rule).
+        if (deltaMin === 0) return;
+        newStart = addMinutes(mStart, deltaMin);
+      } else {
+        // Single event: move to the dropped day, shifted by the drag delta.
+        const baseDay = day ?? mStart;
+        newStart = addMinutes(
+          setSeconds(
+            setMinutes(setHours(baseDay, getHours(mStart)), getMinutes(mStart)),
+            0,
+          ),
+          deltaMin,
+        );
+        if (!day && deltaMin === 0) return;
+      }
 
-      const newEnd = new Date(newStart.getTime() + durationMs);
       updateEvent.mutate({
-        id: ev.id,
+        id: realId,
         start_time: newStart.toISOString(),
-        end_time: newEnd.toISOString(),
+        end_time: new Date(newStart.getTime() + durationMs).toISOString(),
       });
     },
-    [updateEvent],
+    [updateEvent, events],
   );
 
   // Resolve display colour (first assigned type → its colour, else event colour)
@@ -127,7 +143,13 @@ export function LifeCalendarView() {
         null;
       const anchorStart = parseISO(ev.start_time);
       const durationMs = parseISO(ev.end_time).getTime() - anchorStart.getTime();
-      const occurrences = expandOccurrences(anchorStart, ev.recurrence_rule, start, end);
+      const occurrences = expandOccurrences(
+        anchorStart,
+        ev.recurrence_rule,
+        start,
+        end,
+        ev.excluded_dates,
+      );
       for (const occStart of occurrences) {
         const isRecurring = Boolean(ev.recurrence_rule);
         out.push({

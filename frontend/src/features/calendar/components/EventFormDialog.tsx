@@ -74,6 +74,7 @@ export function EventFormDialog() {
   const {
     eventDialogOpen,
     editingEventId,
+    editingOccurrenceStart,
     newEventStart,
     newEventEnd,
     closeEventDialog,
@@ -198,6 +199,38 @@ export function EventFormDialog() {
   // "Delete this calendar": delete the calendar type entirely.
   const handleDeleteCalendar = async (typeId: string) => {
     await deleteTypeMutation.mutateAsync(typeId);
+    closeEventDialog();
+  };
+
+  const isRecurring = Boolean(existingEvent?.recurrence_rule);
+
+  // "Delete only this instance": add the clicked occurrence to the exclusions.
+  const handleDeleteThisInstance = async () => {
+    if (!editingEventId || !editingOccurrenceStart || !existingEvent) return;
+    await updateMutation.mutateAsync({
+      id: editingEventId,
+      excluded_dates: [
+        ...(existingEvent.excluded_dates ?? []),
+        editingOccurrenceStart,
+      ],
+    });
+    closeEventDialog();
+  };
+
+  // "Delete this and future": cap the series with UNTIL = this occurrence.
+  const handleDeleteThisAndFuture = async () => {
+    if (!editingEventId || !editingOccurrenceStart || !existingEvent?.recurrence_rule) return;
+    const kept = existingEvent.recurrence_rule
+      .split(";")
+      .filter((p) => {
+        const k = p.split("=")[0].toUpperCase();
+        return k !== "UNTIL" && k !== "COUNT";
+      });
+    kept.push(`UNTIL=${editingOccurrenceStart}`);
+    await updateMutation.mutateAsync({
+      id: editingEventId,
+      recurrence_rule: kept.join(";"),
+    });
     closeEventDialog();
   };
 
@@ -463,13 +496,33 @@ export function EventFormDialog() {
                 <p className="text-xs font-semibold text-muted-foreground px-1">
                   Delete options
                 </p>
+                {isRecurring && editingOccurrenceStart && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={handleDeleteThisInstance}
+                      className="w-full text-left text-sm rounded px-2 py-1.5 text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                      Delete only this instance
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={handleDeleteThisAndFuture}
+                      className="w-full text-left text-sm rounded px-2 py-1.5 text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                      Delete this and all future instances
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   disabled={isBusy}
                   onClick={handleDeleteEvent}
                   className="w-full text-left text-sm rounded px-2 py-1.5 text-destructive hover:bg-destructive/10 transition-colors"
                 >
-                  Delete event (all occurrences)
+                  {isRecurring ? "Delete all instances" : "Delete event"}
                 </button>
                 {assignedTypes.map((t) => (
                   <button

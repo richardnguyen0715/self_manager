@@ -28,6 +28,9 @@ interface CalendarUIState {
   /** Modal state for create/edit event dialog */
   eventDialogOpen: boolean;
   editingEventId: string | null;
+  /** The specific occurrence start (ISO) of the recurring event being edited,
+   *  so per-instance delete options know which occurrence was clicked. */
+  editingOccurrenceStart: string | null;
   /** Pre-filled slot when clicking an empty slot to create */
   newEventStart: string | null;
   newEventEnd: string | null;
@@ -45,7 +48,12 @@ interface CalendarUIState {
   goToPrev: () => void;
   goToNext: () => void;
   goToDate: (date: Date) => void;
-  openEventDialog: (opts?: { start?: string; end?: string; id?: string }) => void;
+  openEventDialog: (opts?: {
+    start?: string;
+    end?: string;
+    id?: string;
+    occurrenceStart?: string;
+  }) => void;
   closeEventDialog: () => void;
   openTimeBlockDialog: (opts?: { start?: string; end?: string; id?: string }) => void;
   closeTimeBlockDialog: () => void;
@@ -59,6 +67,7 @@ export const useCalendarStore = create<CalendarUIState>((set, get) => ({
   anchorDate: startOfDay(new Date()),
   eventDialogOpen: false,
   editingEventId: null,
+  editingOccurrenceStart: null,
   newEventStart: null,
   newEventEnd: null,
   timeBlockDialogOpen: false,
@@ -100,6 +109,7 @@ export const useCalendarStore = create<CalendarUIState>((set, get) => ({
     set({
       eventDialogOpen: true,
       editingEventId: opts.id ?? null,
+      editingOccurrenceStart: opts.occurrenceStart ?? null,
       newEventStart: opts.start ?? null,
       newEventEnd: opts.end ?? null,
     }),
@@ -108,6 +118,7 @@ export const useCalendarStore = create<CalendarUIState>((set, get) => ({
     set({
       eventDialogOpen: false,
       editingEventId: null,
+      editingOccurrenceStart: null,
       newEventStart: null,
       newEventEnd: null,
     }),
