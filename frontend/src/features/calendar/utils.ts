@@ -5,9 +5,7 @@ import {
   differenceInMinutes,
   isSameDay,
   parseISO,
-  isWithinInterval,
   startOfDay,
-  endOfDay,
   addMinutes,
 } from "date-fns";
 import type { CalendarEvent, TimeBlockSummary, Priority } from "@/types";
@@ -176,15 +174,11 @@ export function computeEventLayout<T extends IntervalItem>(
 // ─── Filter helpers ───────────────────────────────────────────────────────────
 
 export function eventsForDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
-  return events.filter((e) => {
-    const s = parseISO(e.start_time);
-    const end = parseISO(e.end_time);
-    if (e.all_day) {
-      return isSameDay(s, day);
-    }
-    return isWithinInterval(day, { start: startOfDay(s), end: endOfDay(end) }) ||
-      isSameDay(s, day);
-  });
+  // Match on the start day only. Recurrence is already expanded into one
+  // occurrence per day, so an event must render exactly once — keying off the
+  // span would duplicate a late event onto the next day when it crosses
+  // midnight (e.g. a 10 PM–midnight block showing on both days).
+  return events.filter((e) => isSameDay(parseISO(e.start_time), day));
 }
 
 export function timeBlocksForDay(blocks: TimeBlockSummary[], day: Date): TimeBlockSummary[] {
