@@ -4,6 +4,7 @@ import React, { useRef, useState } from "react";
 import {
   format,
   addDays,
+  startOfDay,
   startOfWeek,
   isSameDay,
   isToday,
@@ -214,20 +215,30 @@ function DayColumn({ day, events, timeBlocks, onSlotClick }: DayColumnProps) {
 
   // Build event layout — combine CalendarEvents and TimeBlocks into a unified
   // interval list, then annotate each with column/totalColumns.
+  //
+  // Clamp every interval to this day's bounds so an event crossing midnight is
+  // split into a head (day 1: start–24:00) and a tail (day 2: 00:00–end). Both
+  // days receive the event via eventsForDay; clamping keeps each chip inside the
+  // grid (topPx/heightPx derive from the clamped interval).
+  const dayStart = startOfDay(day);
+  const dayEnd = addDays(dayStart, 1);
+  const clampToDay = (d: Date): Date =>
+    d < dayStart ? dayStart : d > dayEnd ? dayEnd : d;
+
   const eventItems = events
     .filter((e) => !e.all_day)
     .map((e) => ({
       type: "event" as const,
       item: e,
-      start: parseISO(e.start_time),
-      end: parseISO(e.end_time),
+      start: clampToDay(parseISO(e.start_time)),
+      end: clampToDay(parseISO(e.end_time)),
     }));
 
   const blockItems = timeBlocks.map((b) => ({
     type: "timeblock" as const,
     item: b,
-    start: parseISO(b.start_time),
-    end: parseISO(b.end_time),
+    start: clampToDay(parseISO(b.start_time)),
+    end: clampToDay(parseISO(b.end_time)),
   }));
 
   const allItems = [...eventItems, ...blockItems];

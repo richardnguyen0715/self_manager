@@ -3,10 +3,10 @@ import {
   getHours,
   getMinutes,
   differenceInMinutes,
-  isSameDay,
   parseISO,
   startOfDay,
   addMinutes,
+  addDays,
 } from "date-fns";
 import type { CalendarEvent, TimeBlockSummary, Priority } from "@/types";
 
@@ -174,17 +174,27 @@ export function computeEventLayout<T extends IntervalItem>(
 // ─── Filter helpers ───────────────────────────────────────────────────────────
 
 export function eventsForDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
-  // Match on the start day only. Recurrence is already expanded into one
-  // occurrence per day, so an event must render exactly once — keying off the
-  // span would duplicate a late event onto the next day when it crosses
-  // midnight (e.g. a 10 PM–midnight block showing on both days).
-  return events.filter((e) => isSameDay(parseISO(e.start_time), day));
+  // Match any event whose span overlaps [day 00:00, next day 00:00). An event
+  // that crosses midnight (e.g. 11:30 PM–12:30 AM) therefore renders on BOTH
+  // days; DayColumn clamps each chip to the day's bounds so the head shows on
+  // day 1 and the tail on day 2 (Google-Calendar style). End is exclusive so an
+  // event ending exactly at midnight stays on the start day only.
+  const dayStart = startOfDay(day);
+  const dayEnd = addDays(dayStart, 1);
+  return events.filter((e) => {
+    const s = parseISO(e.start_time);
+    const en = parseISO(e.end_time);
+    return s < dayEnd && en > dayStart;
+  });
 }
 
 export function timeBlocksForDay(blocks: TimeBlockSummary[], day: Date): TimeBlockSummary[] {
+  const dayStart = startOfDay(day);
+  const dayEnd = addDays(dayStart, 1);
   return blocks.filter((b) => {
     const s = parseISO(b.start_time);
-    return isSameDay(s, day);
+    const en = parseISO(b.end_time);
+    return s < dayEnd && en > dayStart;
   });
 }
 
