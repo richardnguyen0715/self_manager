@@ -21,6 +21,7 @@ import { useDraggable } from "@dnd-kit/core";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ItemKeyChip } from "@/components/ui/item-key-chip";
 import { cn } from "@/lib/utils";
 import type { WorkItemListItem, Sprint } from "@/types";
 import { WorkItemTypeBadge } from "@/features/agile/components/WorkItemTypeBadge";
@@ -157,6 +158,7 @@ export function WorkItemRow({
         className="flex-1 min-w-0 text-sm font-medium truncate hover:text-primary transition-colors"
         title={item.title}
       >
+        <ItemKeyChip itemKey={item.key} className="mr-1.5 align-middle" />
         {item.title}
       </Link>
 

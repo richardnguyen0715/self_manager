@@ -56,6 +56,8 @@ pub fn router() -> Router<AppState> {
         .route("/", get(handlers::list_work_items).post(handlers::create_work_item))
         // Bulk update / soft-delete (static segment; does not clash with `/:id`)
         .route("/bulk", post(handlers::bulk_work_items))
+        // Lookup by human key, e.g. `/by-key/MML-12` (static prefix, registered before `/:id`)
+        .route("/by-key/:key", get(handlers::get_work_item_by_key))
         // Item CRUD
         .route(
             "/:id",

@@ -10,6 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { NotificationIcon } from "./NotificationIcon";
+import { SnoozeMenu } from "./SnoozeMenu";
 import { useMarkNotificationRead, useDeleteNotification } from "../hooks/useNotifications";
 import type { Notification } from "@/types";
 
@@ -19,6 +20,8 @@ interface NotificationItemProps {
   compact?: boolean;
   /** Hide the dismiss (X) button */
   hideDismiss?: boolean;
+  /** "unsnooze" on the Snoozed tab; snooze presets otherwise. Hidden in compact mode. */
+  snoozeMode?: "snooze" | "unsnooze";
 }
 
 function formatRelativeTime(isoString: string): string {
@@ -42,6 +45,7 @@ export const NotificationItem = memo(function NotificationItem({
   notification,
   compact = false,
   hideDismiss = false,
+  snoozeMode = "snooze",
 }: NotificationItemProps) {
   const { mutate: markRead } = useMarkNotificationRead();
   const { mutate: deleteNotification, isPending: isDeleting } =
@@ -113,6 +117,11 @@ export const NotificationItem = memo(function NotificationItem({
           {formatRelativeTime(timestamp ?? notification.created_at)}
         </p>
       </div>
+
+      {/* Snooze / unsnooze menu (full list only) */}
+      {!compact && (
+        <SnoozeMenu notificationId={notification.id} mode={snoozeMode} />
+      )}
 
       {/* Dismiss button */}
       {!hideDismiss && (

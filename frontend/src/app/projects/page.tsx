@@ -11,6 +11,7 @@ import {
   Loader2,
   AlertTriangle,
   Building2,
+  NotebookPen,
 } from "lucide-react";
 import {
   useProjects,
@@ -25,6 +26,12 @@ import { API_ENDPOINTS } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useOpenRetro } from "@/features/retros";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +50,7 @@ type ProjectPatch = {
   color?: string | null;
   deadline?: string | null;
   organization_id?: string | null;
+  key?: string | null;
 };
 
 const NO_ORG = "__none__";
@@ -55,6 +63,7 @@ export default function ProjectsPage() {
   const deleteMut = useDeleteProject();
   const { currentProjectId, setCurrentProject } = useProjectStore();
   const router = useRouter();
+  const openRetro = useOpenRetro();
 
   const orgs = organizations ?? [];
   const orgById = new Map(orgs.map((o) => [o.id, o]));
@@ -69,6 +78,8 @@ export default function ProjectsPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [organizationId, setOrganizationId] = useState<string>(NO_ORG);
+  const [itemKey, setItemKey] = useState("");
+  const [itemKeyError, setItemKeyError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
 
   // Counts for the delete confirmation, fetched only when a target is set.
@@ -133,6 +144,8 @@ export default function ProjectsPage() {
     setName("");
     setDescription("");
     setOrganizationId(NO_ORG);
+    setItemKey("");
+    setItemKeyError(null);
     setOpen(true);
   }
   function openEdit(p: Project) {
@@ -140,15 +153,26 @@ export default function ProjectsPage() {
     setName(p.name);
     setDescription(p.description ?? "");
     setOrganizationId(p.organization_id ?? NO_ORG);
+    setItemKey(p.key ?? "");
+    setItemKeyError(null);
     setOpen(true);
   }
   function submit() {
     const n = name.trim();
     if (!n) return;
+    const k = itemKey.trim().toUpperCase();
+    if (k && !/^[A-Z]{2,5}$/.test(k)) {
+      setItemKeyError("Key must be 2-5 letters (A-Z)");
+      return;
+    }
+    setItemKeyError(null);
     const payload: ProjectPatch = {
       name: n,
       description: description.trim() || null,
       organization_id: organizationId === NO_ORG ? null : organizationId,
+      // Blank key on create = derive from the name on the server.
+      // On edit, send only a changed key.
+      ...(k && k !== (editing?.key ?? "") ? { key: k } : {}),
     };
     if (editing) {
       updateMut.mutate(
@@ -268,6 +292,33 @@ export default function ProjectsPage() {
                     </select>
                   )}
                   <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          disabled={openRetro.isPending}
+                          aria-label="Start retro"
+                          onClick={() =>
+                            openRetro.mutate(
+                              {
+                                kind: "project",
+                                scope_type: "project",
+                                scope_id: p.id,
+                              },
+                              {
+                                onSuccess: (data) =>
+                                  router.push(`/retros/${data.retro.id}`),
+                              },
+                            )
+                          }
+                        >
+                          <NotebookPen className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Start retro</TooltipContent>
+                    </Tooltip>
                     <Button
                       variant={
                         currentProjectId === p.id ? "secondary" : "ghost"
@@ -318,6 +369,32 @@ export default function ProjectsPage() {
                 if (e.key === "Enter") submit();
               }}
             />
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="project-item-key"
+                className="text-xs font-medium text-muted-foreground"
+              >
+                Key
+              </label>
+              <Input
+                id="project-item-key"
+                placeholder="e.g. MML (from name if empty)"
+                maxLength={5}
+                value={itemKey}
+                onChange={(e) => {
+                  setItemKey(e.target.value.toUpperCase());
+                  setItemKeyError(null);
+                }}
+                className="w-40 font-mono"
+              />
+              <p className="text-xs text-muted-foreground">
+                Work items show as {itemKey.trim().toUpperCase() || "KEY"}-1,
+                {" "}{itemKey.trim().toUpperCase() || "KEY"}-2…
+              </p>
+              {itemKeyError && (
+                <p className="text-xs text-destructive">{itemKeyError}</p>
+              )}
+            </div>
             <textarea
               placeholder="Description (optional)"
               value={description}
@@ -344,6 +421,11 @@ export default function ProjectsPage() {
               </select>
             </div>
           </div>
+          {(createMut.error || updateMut.error) && (
+            <p className="text-xs text-destructive">
+              {(createMut.error ?? updateMut.error)?.message}
+            </p>
+          )}
           <DialogFooter>
             <Button
               variant="outline"

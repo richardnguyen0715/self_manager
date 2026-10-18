@@ -25,7 +25,8 @@ use crate::shared::{
 // absent (sqlx offline mode) but are required at compile time with a live DB.
 #[allow(unused_imports)]
 use super::models::{
-    BurndownPoint, BurndownResponse, CompleteSprintRequest, CreateSprintRequest, ListSprintsQuery,
+    BurndownPoint, BurndownResponse, CompleteSprintRequest, CompleteSprintResponse,
+    CreateSprintRequest, ListSprintsQuery, UnfinishedItemsAction,
     RetrospectiveResponse, RetrospectiveRow, SprintListResponse, SprintResponse,
     SprintReviewResponse, SprintReviewRow, SprintRow, SprintStatus, UpdateSprintRequest,
     UpsertRetrospectiveRequest, UpsertReviewRequest, VelocityListResponse, VelocityPoint,
@@ -501,7 +502,11 @@ pub async fn complete_sprint(
     user_id: Uuid,
     sprint_id: Uuid,
     req: CompleteSprintRequest,
-) -> AppResult<SprintReviewResponse> {
+) -> AppResult<CompleteSprintResponse> {
+    // Everything below (status checks, point totals, item moves, sprint and
+    // review writes) runs in one transaction; dropping `tx` on error rolls back.
+    let mut tx = state.db.begin().await?;
+
     // Verify ownership.
     let current = sqlx::query_as!(
         SprintRow,
@@ -518,7 +523,7 @@ pub async fn complete_sprint(
         sprint_id,
         user_id,
     )
-    .fetch_optional(&state.db)
+    .fetch_optional(&mut *tx)
     .await?
     .ok_or(AppError::NotFound)?;
 
@@ -526,12 +531,44 @@ pub async fn complete_sprint(
         return Err(AppError::Conflict("sprint is already completed".into()));
     }
 
-    // Compute points from work items.
+    // Validate the destination sprint before anything is written.
+    let next_sprint_id = match req.unfinished {
+        UnfinishedItemsAction::NextSprint => {
+            let next = req.next_sprint_id.ok_or_else(|| {
+                AppError::Validation("next_sprint_id is required when unfinished = next_sprint".into())
+            })?;
+            if next == sprint_id {
+                return Err(AppError::Validation(
+                    "next_sprint_id must differ from the sprint being completed".into(),
+                ));
+            }
+            let next_status: Option<String> = sqlx::query_scalar(
+                "SELECT status::text FROM sprints WHERE id = $1 AND user_id = $2",
+            )
+            .bind(next)
+            .bind(user_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+            match next_status.as_deref() {
+                None => return Err(AppError::NotFound),
+                Some("planned") => Some(next),
+                Some(_) => {
+                    return Err(AppError::Conflict(
+                        "next sprint must be in planned status".into(),
+                    ))
+                }
+            }
+        }
+        _ => None,
+    };
+
+    // Compute points from work items (before any item is moved, so the review
+    // reflects the sprint's original commitment).
     let planned_points: i64 = sqlx::query_scalar!(
         "SELECT COALESCE(SUM(story_points), 0) FROM work_items WHERE sprint_id = $1",
         sprint_id,
     )
-    .fetch_one(&state.db)
+    .fetch_one(&mut *tx)
     .await?
     .unwrap_or(0);
 
@@ -539,7 +576,7 @@ pub async fn complete_sprint(
         "SELECT COALESCE(SUM(story_points), 0) FROM work_items WHERE sprint_id = $1 AND status::text = 'done'",
         sprint_id,
     )
-    .fetch_one(&state.db)
+    .fetch_one(&mut *tx)
     .await?
     .unwrap_or(0);
 
@@ -547,6 +584,31 @@ pub async fn complete_sprint(
         (completed_points as f64 / planned_points as f64 * 100.0).clamp(0.0, 100.0)
     } else {
         0.0
+    };
+
+    // Move unfinished (status != done) items according to the requested policy.
+    // Soft-deleted items are left alone.
+    let moved_count: i64 = match (req.unfinished, next_sprint_id) {
+        (UnfinishedItemsAction::Backlog, _) => sqlx::query(
+            "UPDATE work_items SET sprint_id = NULL, updated_at = now() \
+             WHERE sprint_id = $1 AND user_id = $2 AND status <> 'done' AND deleted_at IS NULL",
+        )
+        .bind(sprint_id)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected() as i64,
+        (UnfinishedItemsAction::NextSprint, Some(next)) => sqlx::query(
+            "UPDATE work_items SET sprint_id = $3, updated_at = now() \
+             WHERE sprint_id = $1 AND user_id = $2 AND status <> 'done' AND deleted_at IS NULL",
+        )
+        .bind(sprint_id)
+        .bind(user_id)
+        .bind(next)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected() as i64,
+        _ => 0,
     };
 
     // Update the sprint row.
@@ -565,7 +627,7 @@ pub async fn complete_sprint(
         completed_points as i32,
         velocity,
     )
-    .execute(&state.db)
+    .execute(&mut *tx)
     .await?;
 
     // Upsert the sprint review.
@@ -594,8 +656,10 @@ pub async fn complete_sprint(
         velocity,
         req.summary,
     )
-    .fetch_one(&state.db)
+    .fetch_one(&mut *tx)
     .await?;
+
+    tx.commit().await?;
 
     let _ = state.events.send(DomainEvent::SprintCompleted {
         sprint_id,
@@ -604,7 +668,10 @@ pub async fn complete_sprint(
         velocity,
     });
 
-    Ok(SprintReviewResponse::from(review))
+    Ok(CompleteSprintResponse {
+        review: SprintReviewResponse::from(review),
+        moved_count,
+    })
 }
 
 // ── Work items under a sprint ────────────────────────────────────────────────────

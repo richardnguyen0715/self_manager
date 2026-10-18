@@ -24,13 +24,16 @@ function isToday(isoString: string): boolean {
 }
 
 export function NotificationsList() {
-  const { activeFilter } = useNotificationsStore();
+  const { activeFilter, inboxView } = useNotificationsStore();
   const { mutate: markAllRead, isPending: isMarkingAll } =
     useMarkAllNotificationsRead();
 
-  // Derive query params from active filter.
-  // The backend list endpoint only supports unread_only; there is no type filter.
-  const unread_only = activeFilter === "unread" ? true : undefined;
+  // Derive query params from the status tab. The server sorts unread first and
+  // hides snoozed rows unless `snoozed` is requested.
+  // The backend list endpoint has no type filter; that is applied client-side.
+  const unread_only = inboxView === "unread" ? true : undefined;
+  const snoozed = inboxView === "snoozed" ? true : undefined;
+  const snoozeMode = inboxView === "snoozed" ? "unsnooze" : "snooze";
 
   const {
     data,
@@ -40,7 +43,7 @@ export function NotificationsList() {
     fetchNextPage,
     isError,
     error,
-  } = useInfiniteNotifications({ unread_only, page_size: 20 });
+  } = useInfiniteNotifications({ unread_only, snoozed, page_size: 20 });
 
   // Flatten all pages into a single array
   const allNotifications: Notification[] =
@@ -60,11 +63,11 @@ export function NotificationsList() {
   // Note: type-filter tabs (deadline_reminder, habit_reminder, etc.) are client-side
   // only since the backend list endpoint has no type query param. Filter after fetch.
   const visibleToday =
-    activeFilter !== "all" && activeFilter !== "unread"
+    activeFilter !== "all"
       ? todayItems.filter((n) => n.type === activeFilter)
       : todayItems;
   const visibleEarlier =
-    activeFilter !== "all" && activeFilter !== "unread"
+    activeFilter !== "all"
       ? earlierItems.filter((n) => n.type === activeFilter)
       : earlierItems;
 
@@ -115,14 +118,18 @@ export function NotificationsList() {
       <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
         <Bell className="h-10 w-10 text-muted-foreground/30" />
         <p className="text-base font-medium text-muted-foreground">
-          {activeFilter === "unread"
+          {inboxView === "unread"
             ? "No unread notifications"
-            : "No notifications yet"}
+            : inboxView === "snoozed"
+              ? "No snoozed notifications"
+              : "No notifications yet"}
         </p>
         <p className="text-sm text-muted-foreground/70">
-          {activeFilter === "unread"
+          {inboxView === "unread"
             ? "You're all caught up!"
-            : "Deadline reminders, habit nudges and more will appear here."}
+            : inboxView === "snoozed"
+              ? "Snoozed notifications return to the inbox when their time is up."
+              : "Deadline reminders, habit nudges and more will appear here."}
         </p>
       </div>
     );
@@ -165,7 +172,7 @@ export function NotificationsList() {
           <div role="list" className="rounded-xl border bg-card">
             {visibleToday.map((n, idx) => (
               <div key={n.id}>
-                <NotificationItem notification={n} />
+                <NotificationItem notification={n} snoozeMode={snoozeMode} />
                 {idx < visibleToday.length - 1 && (
                   <Separator className="mx-4" />
                 )}
@@ -187,7 +194,7 @@ export function NotificationsList() {
           <div role="list" className="rounded-xl border bg-card">
             {visibleEarlier.map((n, idx) => (
               <div key={n.id}>
-                <NotificationItem notification={n} />
+                <NotificationItem notification={n} snoozeMode={snoozeMode} />
                 {idx < visibleEarlier.length - 1 && (
                   <Separator className="mx-4" />
                 )}

@@ -29,6 +29,7 @@ import { useSprintsList } from "@/features/sprints/hooks/useSprints";
 import { useEpics } from "@/features/agile/hooks/useEpics";
 import { useDeleteWorkItem } from "@/features/hierarchy";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ItemKeyChip } from "@/components/ui/item-key-chip";
 import { useBoardStore } from "../store";
 import { boardKeys, useMoveItemToColumn } from "../hooks/useSprintBoard";
 
@@ -292,6 +293,7 @@ export function BoardCard({
             item.status === "done" && "line-through text-muted-foreground",
           )}
         >
+          <ItemKeyChip itemKey={item.key} className="mr-1.5 align-middle" />
           {item.title}
         </p>
 

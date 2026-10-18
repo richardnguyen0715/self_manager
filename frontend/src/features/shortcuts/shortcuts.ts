@@ -40,6 +40,7 @@ const NAV_CHORDS: { key: string; label: string; href: string }[] = [
   { key: "t", label: "Trash", href: "/trash" },
   { key: "f", label: "Focus", href: "/focus" },
   { key: "g", label: "Goals", href: "/goals" },
+  { key: "r", label: "Retros", href: "/retros" },
 ];
 
 export const SHORTCUTS: ShortcutDef[] = [

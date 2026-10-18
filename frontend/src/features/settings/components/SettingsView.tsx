@@ -7,6 +7,7 @@ import { ProfileSection } from "./ProfileSection";
 import { AccountSection } from "./AccountSection";
 import { NotificationsSection } from "./NotificationsSection";
 import { AppearanceSection } from "./AppearanceSection";
+import { LabelsSection } from "./LabelsSection";
 
 function SettingsContent() {
   const activeSection = useSettingsUIStore((s) => s.activeSection);
@@ -24,6 +25,7 @@ function SettingsContent() {
         {activeSection === "account" && <AccountSection />}
         {activeSection === "notifications" && <NotificationsSection />}
         {activeSection === "appearance" && <AppearanceSection />}
+        {activeSection === "labels" && <LabelsSection />}
       </div>
     </div>
   );

@@ -73,6 +73,9 @@ async fn fetch_deleted_work_items(
             wi.github_pr,
             COUNT(s.id)                          AS "subtask_count!: i64",
             COUNT(s.id) FILTER (WHERE s.is_done) AS "done_subtask_count!: i64",
+            COALESCE((SELECT p.key FROM projects p WHERE p.id = wi.project_id), 'WI')
+                || '-' || wi.seq_id                 AS "key?",
+            wi.seq_id                               AS "seq_id?",
             wi.created_at,
             wi.updated_at
         FROM work_items wi
@@ -150,6 +153,7 @@ async fn fetch_deleted_projects(
             position,
             organization_id,
             deleted_at,
+            key,
             created_at,
             updated_at
         FROM projects

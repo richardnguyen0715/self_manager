@@ -122,6 +122,17 @@ pub struct ListNotificationsQuery {
     /// Items per page (1–100). Defaults to `20`.
     #[serde(default = "default_page_size")]
     pub page_size: u32,
+
+    /// `true` lists only snoozed notifications; `false` (default) hides them.
+    #[serde(default)]
+    pub snoozed: bool,
+}
+
+/// Body for `POST /api/notifications/:id/snooze`.
+#[derive(Clone, Debug, Deserialize)]
+pub struct SnoozeNotificationRequest {
+    /// RFC 3339 timestamp; the notification reappears after this moment.
+    pub until: DateTime<Utc>,
 }
 
 fn default_page() -> u32 {

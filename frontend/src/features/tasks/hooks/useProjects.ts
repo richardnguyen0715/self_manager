@@ -26,6 +26,8 @@ export interface ProjectPayload {
   color?: string | null;
   deadline?: string | null;
   organization_id?: string | null;
+  /** Item-key prefix, 2-5 uppercase letters. */
+  key?: string | null;
 }
 
 /** POST /api/projects */

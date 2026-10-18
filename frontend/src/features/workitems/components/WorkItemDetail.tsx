@@ -31,7 +31,6 @@ import {
   FileIcon,
   GitBranch,
   Github,
-  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -74,8 +73,11 @@ import type { WorkItemStatus, WorkItemSubtask, WorkItemActivity } from "@/types"
 import type { WorkItemLink, WorkItemWebLink, WorkItemAttachment } from "../types";
 import { useAuthStore } from "@/stores";
 import { useEpics } from "@/features/agile/hooks/useEpics";
+import { AddToRetroButton, RetroLinkedList } from "@/features/retros";
 import { useSprintsList } from "@/features/sprints/hooks/useSprints";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ItemKeyChip } from "@/components/ui/item-key-chip";
+import { LabelsField } from "@/features/labels";
 
 const NEXT_PUBLIC_API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -471,71 +473,6 @@ function GithubPrEditor({ value, onSave }: GithubPrEditorProps) {
   );
 }
 
-// ─── Labels chip editor ───────────────────────────────────────────────────────
-
-interface LabelsEditorProps {
-  labels: string[];
-  onSave: (labels: string[]) => void;
-}
-
-function LabelsEditor({ labels, onSave }: LabelsEditorProps) {
-  const [inputValue, setInputValue] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  function addLabel() {
-    const trimmed = inputValue.trim();
-    if (!trimmed || labels.includes(trimmed)) {
-      setInputValue("");
-      return;
-    }
-    onSave([...labels, trimmed]);
-    setInputValue("");
-  }
-
-  function removeLabel(label: string) {
-    onSave(labels.filter((l) => l !== label));
-  }
-
-  return (
-    <div className="flex flex-wrap gap-1 items-center">
-      {labels.map((label) => (
-        <span
-          key={label}
-          className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary border border-primary/20"
-        >
-          <Tag className="h-2.5 w-2.5 shrink-0" />
-          {label}
-          <button
-            type="button"
-            onClick={() => removeLabel(label)}
-            className="ml-0.5 hover:text-destructive transition-colors"
-            aria-label={`Remove ${label}`}
-          >
-            <X className="h-2.5 w-2.5" />
-          </button>
-        </span>
-      ))}
-      <input
-        ref={inputRef}
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === ",") {
-            e.preventDefault();
-            addLabel();
-          }
-          if (e.key === "Backspace" && !inputValue && labels.length > 0) {
-            removeLabel(labels[labels.length - 1]);
-          }
-        }}
-        onBlur={addLabel}
-        placeholder={labels.length === 0 ? "Add label..." : "+"}
-        className="flex-1 min-w-[4rem] bg-transparent outline-none text-sm placeholder:text-muted-foreground/60"
-      />
-    </div>
-  );
-}
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 interface SubtaskRowProps {
@@ -925,6 +862,7 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
           </>
         )}
         <ChevronRight className="h-3 w-3 shrink-0" />
+        <ItemKeyChip itemKey={workItem.key} />
         <WorkItemTypeBadge type={workItem.type} showLabel />
       </div>
 
@@ -1407,6 +1345,23 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
 
             <Separator />
 
+            {/* Retros */}
+            <div className="space-y-2">
+              <RetroLinkedList
+                targetType="work_item"
+                targetId={workItemId}
+                title="Retros"
+                emptyText="No retros reference this work item yet."
+              />
+              <AddToRetroButton
+                targetType="work_item"
+                targetId={workItemId}
+                label="Add to this week's review"
+              />
+            </div>
+
+            <Separator />
+
             {/* Activity */}
             <div className="space-y-3">
               <h2 className="text-sm font-semibold">Activity</h2>
@@ -1729,11 +1684,12 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
                 />
               </DetailRow>
 
-              {/* Labels — chip input */}
+              {/* Labels — coloured chips + picker */}
               <DetailRow label="Labels">
-                <LabelsEditor
-                  labels={workItem.labels ?? []}
-                  onSave={(labels) => updateItem.mutate({ labels })}
+                <LabelsField
+                  value={workItem.labels ?? []}
+                  projectId={workItem.project_id ?? null}
+                  onChange={(labels) => updateItem.mutate({ labels })}
                 />
               </DetailRow>
 

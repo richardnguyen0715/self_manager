@@ -138,6 +138,9 @@ pub struct WorkItemResponse {
     pub github_repo: Option<String>,
     pub github_branch: Option<String>,
     pub github_pr: Option<String>,
+    /// Human-readable key, e.g. `"MML-12"` (`projects.key` or `WI`, plus `seq_id`).
+    pub key: Option<String>,
+    pub seq_id: Option<i32>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub subtasks: Vec<WorkItemSubtask>,
@@ -170,6 +173,9 @@ pub struct WorkItemListItem {
     pub github_pr: Option<String>,
     pub subtask_count: i64,
     pub done_subtask_count: i64,
+    /// Human-readable key, e.g. `"MML-12"`.
+    pub key: Option<String>,
+    pub seq_id: Option<i32>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

@@ -85,6 +85,7 @@ async fn main() -> anyhow::Result<()> {
         .nest("/habits",        modules::habit::router())
         .nest("/calendar",      modules::calendar::router())
         .nest("/calendar-types", modules::calendar_type::router())
+        .nest("/labels",        modules::label::router())
         .nest("/timeblocks",    modules::timeblock::router())
         .nest("/analytics",     modules::analytics::router())
         .nest("/notifications", modules::notification::router())
@@ -101,6 +102,8 @@ async fn main() -> anyhow::Result<()> {
         .nest("/board-columns", modules::board_column::router())
         // ── Saved views (work-item filter presets) ────────────────────────────
         .nest("/saved-views", modules::saved_view::router())
+        // ── Retros (periodic reviews & retrospectives) ────────────────────────
+        .nest("/retros", modules::retro::router())
         // ── Docs ──────────────────────────────────────────────────────────────
         .nest("/spaces",    modules::space::router())
         .nest(

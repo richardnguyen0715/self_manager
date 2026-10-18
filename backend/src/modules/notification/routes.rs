@@ -25,7 +25,7 @@ use crate::shared::state::AppState;
 use super::handlers::{
     create_notification, delete_notification, get_notification, get_unread_count,
     list_notifications, mark_all_read, mark_notification_read, push_subscribe, push_unsubscribe,
-    update_notification,
+    snooze_notification, unsnooze_notification, update_notification,
 };
 
 /// Build and return the notification module router.
@@ -49,4 +49,6 @@ pub fn router() -> Router<AppState> {
                 .delete(delete_notification),
         )
         .route("/:id/read", post(mark_notification_read))
+        .route("/:id/snooze", post(snooze_notification))
+        .route("/:id/unsnooze", post(unsnooze_notification))
 }

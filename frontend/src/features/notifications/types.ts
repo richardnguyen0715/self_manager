@@ -10,13 +10,15 @@ export type { Notification, NotificationType };
 
 /**
  * Query params for GET /api/notifications.
- * Backend accepts: unread_only (bool), page (default 1), page_size (default 20).
+ * Backend accepts: unread_only (bool), snoozed (bool), page (default 1), page_size (default 20).
  * There is no `type` filter at the list endpoint.
  */
 export interface NotificationListParams {
   page?: number;
   page_size?: number;
   unread_only?: boolean;
+  /** true = only snoozed notifications; omitted = snoozed ones are hidden. */
+  snoozed?: boolean;
 }
 
 // ─── Local UI grouping helper ──────────────────────────────────────────────────

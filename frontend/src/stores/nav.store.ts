@@ -22,6 +22,7 @@ export const HIDEABLE_NAV_ITEMS: { href: string; label: string }[] = [
   { href: "/docs", label: "Docs" },
   { href: "/usage", label: "Usage" },
   { href: "/analytics", label: "Analytics" },
+  { href: "/retros", label: "Retros" },
 ];
 
 interface NavState {

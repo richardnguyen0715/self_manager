@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import {
   Loader2,
@@ -16,11 +17,13 @@ import {
   BarChart2,
   ClipboardCheck,
   RefreshCw,
+  NotebookPen,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { RetroLinkedList, useOpenRetro } from "@/features/retros";
 import type { SprintDetailTab } from "../types";
 import {
   useSprintDetail,
@@ -85,6 +88,8 @@ export function SprintDetail({ sprintId }: SprintDetailProps) {
   const activate = useActivateSprint();
   const updateSprint = useUpdateSprint(sprintId);
   const { openEditDialog, openCompleteDialog } = useSprintUIStore();
+  const router = useRouter();
+  const openRetro = useOpenRetro();
 
   if (isLoading) {
     return (
@@ -153,6 +158,28 @@ export function SprintDetail({ sprintId }: SprintDetailProps) {
 
         {/* Action buttons */}
         <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            disabled={openRetro.isPending}
+            onClick={() =>
+              openRetro.mutate(
+                { kind: "sprint", scope_type: "sprint", scope_id: sprintId },
+                {
+                  onSuccess: (data) => router.push(`/retros/${data.retro.id}`),
+                },
+              )
+            }
+          >
+            {openRetro.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <NotebookPen className="h-3.5 w-3.5" />
+            )}
+            Retro
+          </Button>
+
           <Button
             variant="ghost"
             size="icon"
@@ -278,6 +305,15 @@ export function SprintDetail({ sprintId }: SprintDetailProps) {
       {/* ── Tab content ──────────────────────────────────────────────────── */}
       {activeTab === "overview" && (
         <SprintWorkItemsOverview sprintId={sprintId} sprint={sprint} />
+      )}
+
+      {activeTab === "overview" && (
+        <RetroLinkedList
+          targetType="sprint"
+          targetId={sprintId}
+          title="Retros for this sprint"
+          emptyText="No retros linked to this sprint yet."
+        />
       )}
 
       {activeTab === "planning" && (

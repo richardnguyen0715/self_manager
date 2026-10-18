@@ -143,6 +143,8 @@ export interface Project {
   goal_id: string | null;
   organization_id?: string | null;
   name: string;
+  /** Item-key prefix, 2-5 uppercase letters (work items show as KEY-n). */
+  key?: string | null;
   description: string | null;
   color: string | null;
   deadline: string | null; // YYYY-MM-DD
@@ -881,6 +883,9 @@ export interface WorkItem {
   pinned_fields: string[];     // text[] — added by migration 0010 (Details pinned to card)
   recurrence_rule: string | null;
   completed_at: string | null;
+  /** Human-readable key, e.g. "MML-12" (project key + seq_id). */
+  key?: string;
+  seq_id?: number;
   created_at: string;
   updated_at: string;
   subtasks: WorkItemSubtask[];
@@ -910,6 +915,9 @@ export interface WorkItemListItem {
   position: number;
   subtask_count: number;
   done_subtask_count: number;
+  /** Human-readable key, e.g. "MML-12" (project key + seq_id). */
+  key?: string;
+  seq_id?: number;
   created_at: string;
   updated_at: string;
 }
@@ -1484,6 +1492,8 @@ export const API_ENDPOINTS = {
   // ── Work Items (/api/work-items) ──────────────────────────────────────────
   WORK_ITEMS: "/api/work-items",
   WORK_ITEM_BY_ID: (id: string) => `/api/work-items/${id}`,
+  // GET /api/work-items/by-key/:key — lookup by human key, e.g. MML-12
+  WORK_ITEM_BY_KEY: (key: string) => `/api/work-items/by-key/${encodeURIComponent(key)}`,
   // POST /api/work-items/:id/restore — un-soft-delete
   WORK_ITEM_RESTORE: (id: string) => `/api/work-items/${id}/restore`,
   // DELETE /api/work-items/:id/purge — permanent hard delete

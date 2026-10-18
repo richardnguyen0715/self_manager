@@ -42,8 +42,9 @@ use crate::shared::{
 
 use super::{
     models::{
-        CompleteSprintRequest, CreateSprintRequest, ListSprintsQuery, RetrospectiveResponse,
-        SprintListResponse, SprintResponse, SprintReviewResponse, UpdateSprintRequest,
+        CompleteSprintRequest, CompleteSprintResponse, CreateSprintRequest, ListSprintsQuery,
+        RetrospectiveResponse, SprintListResponse, SprintResponse, SprintReviewResponse,
+        UpdateSprintRequest,
         UpsertRetrospectiveRequest, UpsertReviewRequest, VelocityListResponse, VelocityQuery,
         WorkItemListResponse, WorkItemStatusQuery,
     },
@@ -168,17 +169,22 @@ pub async fn activate_sprint(
 
 /// Complete a sprint and auto-create a sprint review.
 ///
-/// Returns the auto-created [`SprintReviewResponse`].
+/// The request body is optional. Without a body, unfinished items stay in the
+/// sprint (`unfinished = keep`), matching the earlier behaviour.
+///
+/// Returns the auto-created [`SprintReviewResponse`] flattened together with
+/// `moved_count`.
 pub async fn complete_sprint(
     auth: AuthUser,
     State(state): State<AppState>,
     Path(sprint_id): Path<Uuid>,
-    Json(body): Json<CompleteSprintRequest>,
-) -> AppResult<Json<SprintReviewResponse>> {
+    body: Option<Json<CompleteSprintRequest>>,
+) -> AppResult<Json<CompleteSprintResponse>> {
+    let body = body.map(|Json(b)| b).unwrap_or_default();
     body.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
-    let review = service::complete_sprint(&state, auth.user_id, sprint_id, body).await?;
-    Ok(Json(review))
+    let result = service::complete_sprint(&state, auth.user_id, sprint_id, body).await?;
+    Ok(Json(result))
 }
 
 // ── GET /api/sprints/:id/work-items ──────────────────────────────────────────────

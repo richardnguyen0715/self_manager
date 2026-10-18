@@ -14,6 +14,7 @@
 //! and are driven by Apalis — the actual job _enqueueing_ lives here so that
 //! the worker crate can call into this service.
 
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use tracing::instrument;
 use uuid::Uuid;
@@ -57,89 +58,43 @@ impl NotificationService {
         let page_size = query.page_size.clamp(1, 100) as i64;
         let offset = ((query.page.max(1) - 1) as i64) * page_size;
 
+        // Snoozed rows are hidden unless the caller asks for the snoozed view.
+        let visibility = if query.snoozed {
+            "snoozed_until > now()"
+        } else {
+            "(snoozed_until IS NULL OR snoozed_until <= now())"
+        };
+        let unread_clause = if query.unread_only {
+            " AND read = false"
+        } else {
+            ""
+        };
+
         // Total count matching the filter (pre-pagination).
-        let total: i64 = if query.unread_only {
-            sqlx::query_scalar!(
-                r#"SELECT COUNT(*) FROM notifications
-                   WHERE user_id = $1 AND read = false"#,
-                user_id
-            )
+        let count_sql = format!(
+            "SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND {visibility}{unread_clause}"
+        );
+        let total: i64 = sqlx::query_scalar(&count_sql)
+            .bind(user_id)
             .fetch_one(db)
-            .await?
-            .unwrap_or(0)
-        } else {
-            sqlx::query_scalar!(
-                r#"SELECT COUNT(*) FROM notifications WHERE user_id = $1"#,
-                user_id
-            )
-            .fetch_one(db)
-            .await?
-            .unwrap_or(0)
-        };
+            .await?;
 
-        // User-level unread count (always, regardless of filter).
-        let unread_count: i64 = sqlx::query_scalar!(
-            r#"SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND read = false"#,
-            user_id
-        )
-        .fetch_one(db)
-        .await?
-        .unwrap_or(0);
+        // User-level unread count for the badge (never includes snoozed rows).
+        let unread_count = Self::unread_count_value(db, user_id).await?;
 
-        // Page of rows.
-        let rows: Vec<Notification> = if query.unread_only {
-            sqlx::query_as!(
-                Notification,
-                r#"SELECT
-                    id,
-                    user_id,
-                    type AS "notification_type: NotificationType",
-                    title,
-                    body,
-                    entity_id,
-                    entity_table,
-                    read,
-                    scheduled_for,
-                    sent_at,
-                    created_at,
-                    updated_at
-                   FROM notifications
-                   WHERE user_id = $1 AND read = false
-                   ORDER BY created_at DESC
-                   LIMIT $2 OFFSET $3"#,
-                user_id,
-                page_size,
-                offset
-            )
+        // Page of rows: unread first, then newest first.
+        let rows_sql = format!(
+            "SELECT id, user_id, type, title, body, entity_id, entity_table, read, \
+                    scheduled_for, sent_at, created_at, updated_at \
+             FROM notifications WHERE user_id = $1 AND {visibility}{unread_clause} \
+             ORDER BY read ASC, created_at DESC LIMIT $2 OFFSET $3"
+        );
+        let rows: Vec<Notification> = sqlx::query_as(&rows_sql)
+            .bind(user_id)
+            .bind(page_size)
+            .bind(offset)
             .fetch_all(db)
-            .await?
-        } else {
-            sqlx::query_as!(
-                Notification,
-                r#"SELECT
-                    id,
-                    user_id,
-                    type AS "notification_type: NotificationType",
-                    title,
-                    body,
-                    entity_id,
-                    entity_table,
-                    read,
-                    scheduled_for,
-                    sent_at,
-                    created_at,
-                    updated_at
-                   FROM notifications
-                   WHERE user_id = $1
-                   ORDER BY created_at DESC
-                   LIMIT $2 OFFSET $3"#,
-                user_id,
-                page_size,
-                offset
-            )
-            .fetch_all(db)
-            .await?
-        };
+            .await?;
 
         Ok(NotificationListResponse {
             items: rows.into_iter().map(NotificationResponse::from).collect(),
@@ -187,17 +142,66 @@ impl NotificationService {
     /// Return only the unread count for a user (lightweight polling endpoint).
     #[instrument(skip(db), fields(user_id = %user_id))]
     pub async fn unread_count(db: &PgPool, user_id: Uuid) -> Result<UnreadCountResponse, AppError> {
-        let count: i64 = sqlx::query_scalar!(
-            r#"SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND read = false"#,
-            user_id
-        )
-        .fetch_one(db)
-        .await?
-        .unwrap_or(0);
-
         Ok(UnreadCountResponse {
-            unread_count: count,
+            unread_count: Self::unread_count_value(db, user_id).await?,
         })
+    }
+
+    /// Unread, non-snoozed notification count (shared by the badge endpoint and list).
+    async fn unread_count_value(db: &PgPool, user_id: Uuid) -> Result<i64, AppError> {
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM notifications \
+             WHERE user_id = $1 AND read = false \
+               AND (snoozed_until IS NULL OR snoozed_until <= now())",
+        )
+        .bind(user_id)
+        .fetch_one(db)
+        .await?;
+        Ok(count)
+    }
+
+    /// Snooze a notification until `until`. It is hidden from the default list
+    /// and from the unread count until that time passes.
+    #[instrument(skip(db), fields(user_id = %user_id, notification_id = %notification_id))]
+    pub async fn snooze(
+        db: &PgPool,
+        user_id: Uuid,
+        notification_id: Uuid,
+        until: DateTime<Utc>,
+    ) -> Result<NotificationResponse, AppError> {
+        Self::set_snoozed_until(db, user_id, notification_id, Some(until)).await
+    }
+
+    /// Clear a notification's snooze so it returns to the inbox immediately.
+    #[instrument(skip(db), fields(user_id = %user_id, notification_id = %notification_id))]
+    pub async fn unsnooze(
+        db: &PgPool,
+        user_id: Uuid,
+        notification_id: Uuid,
+    ) -> Result<NotificationResponse, AppError> {
+        Self::set_snoozed_until(db, user_id, notification_id, None).await
+    }
+
+    async fn set_snoozed_until(
+        db: &PgPool,
+        user_id: Uuid,
+        notification_id: Uuid,
+        until: Option<DateTime<Utc>>,
+    ) -> Result<NotificationResponse, AppError> {
+        let row = sqlx::query_as::<_, Notification>(
+            "UPDATE notifications SET snoozed_until = $3 \
+             WHERE id = $1 AND user_id = $2 \
+             RETURNING id, user_id, type, title, body, entity_id, entity_table, read, \
+                       scheduled_for, sent_at, created_at, updated_at",
+        )
+        .bind(notification_id)
+        .bind(user_id)
+        .bind(until)
+        .fetch_optional(db)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
+        Ok(NotificationResponse::from(row))
     }
 
     // -----------------------------------------------------------------------

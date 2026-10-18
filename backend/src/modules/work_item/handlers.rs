@@ -104,6 +104,18 @@ pub async fn get_work_item(
     Ok(Json(item))
 }
 
+/// `GET /api/work-items/by-key/:key` — look up an item by its human key (`MML-12`).
+///
+/// Returns `404 Not Found` when no live item of the caller has that key.
+pub async fn get_work_item_by_key(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(key): Path<String>,
+) -> AppResult<Json<WorkItemResponse>> {
+    let item = service::get_work_item_by_key(&state, auth.user_id, &key).await?;
+    Ok(Json(item))
+}
+
 // ── PATCH /api/work-items/:id ──────────────────────────────────────────────────
 
 /// Partially update a work item.

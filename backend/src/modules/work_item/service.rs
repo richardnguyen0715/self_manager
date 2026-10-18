@@ -96,7 +96,7 @@ async fn fetch_work_item_with_subtasks(
     .fetch_all(&state.db)
     .await?;
 
-    Ok(work_item_into_response(item, subtasks))
+    attach_item_key(state, work_item_into_response(item, subtasks)).await
 }
 
 /// Convert a raw [`WorkItem`] row and its subtasks into a [`WorkItemResponse`].
@@ -127,7 +127,38 @@ fn work_item_into_response(item: WorkItem, subtasks: Vec<WorkItemSubtask>) -> Wo
         created_at: item.created_at,
         updated_at: item.updated_at,
         subtasks,
+        key: None,
+        seq_id: None,
     }
+}
+
+/// Fill `key` / `seq_id` on a response from the database.
+///
+/// `key` is `<projects.key or 'WI'>-<seq_id>`; items without a project use `WI`.
+async fn attach_item_key(
+    state: &AppState,
+    mut resp: WorkItemResponse,
+) -> AppResult<WorkItemResponse> {
+    let row = sqlx::query_as::<_, (String, Option<i32>)>(
+        r#"
+        SELECT COALESCE(
+                   (SELECT p.key FROM projects p WHERE p.id = wi.project_id),
+                   'WI'
+               ) AS prefix,
+               wi.seq_id
+          FROM work_items wi
+         WHERE wi.id = $1
+        "#,
+    )
+    .bind(resp.id)
+    .fetch_optional(&state.db)
+    .await?;
+
+    if let Some((prefix, seq_id)) = row {
+        resp.key = seq_id.map(|s| format!("{prefix}-{s}"));
+        resp.seq_id = seq_id;
+    }
+    Ok(resp)
 }
 
 // ── Work Item CRUD ─────────────────────────────────────────────────────────────
@@ -188,6 +219,9 @@ pub async fn list_work_items(
             wi.github_pr,
             COUNT(s.id)                          AS "subtask_count!: i64",
             COUNT(s.id) FILTER (WHERE s.is_done) AS "done_subtask_count!: i64",
+            COALESCE((SELECT p.key FROM projects p WHERE p.id = wi.project_id), 'WI')
+                || '-' || wi.seq_id                 AS "key?",
+            wi.seq_id                               AS "seq_id?",
             wi.created_at,
             wi.updated_at
         FROM work_items wi
@@ -294,6 +328,26 @@ pub async fn create_work_item(
         (None, None) => None,
     };
 
+    // Per-(user, project) sequence number for the human key (`MML-12`).
+    // An advisory xact lock serializes concurrent creates for the same scope
+    // so two inserts cannot compute the same MAX(seq_id) + 1.
+    let mut tx = state.db.begin().await?;
+    sqlx::query(
+        "SELECT pg_advisory_xact_lock(hashtext($1::uuid::text || ':' || COALESCE($2::uuid::text, '')))",
+    )
+    .bind(user_id)
+    .bind(project_id)
+    .execute(&mut *tx)
+    .await?;
+    let seq_id: i32 = sqlx::query_scalar(
+        "SELECT (COALESCE(MAX(seq_id), 0) + 1)::int FROM work_items \
+         WHERE user_id = $1 AND project_id IS NOT DISTINCT FROM $2",
+    )
+    .bind(user_id)
+    .bind(project_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
     let item = sqlx::query_as!(
         WorkItem,
         r#"
@@ -301,7 +355,7 @@ pub async fn create_work_item(
             user_id, project_id, epic_id, sprint_id, type, title, description,
             status, priority, story_points, position,
             start_date, due_date, recurrence_rule,
-            labels, github_repo, github_branch, github_pr
+            labels, github_repo, github_branch, github_pr, seq_id
         )
         VALUES (
             $1, $2, $3, $4,
@@ -309,7 +363,7 @@ pub async fn create_work_item(
             $6, $7,
             ($8::text)::work_item_status,
             ($9::text)::task_priority,
-            $10, $11, $12, $13, $14, $15, $16, $17, $18
+            $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
         )
         RETURNING
             id, user_id, project_id, epic_id, sprint_id,
@@ -343,13 +397,16 @@ pub async fn create_work_item(
         req.github_repo,
         req.github_branch,
         req.github_pr,
+        seq_id,
     )
-    .fetch_one(&state.db)
+    .fetch_one(&mut *tx)
     .await?;
+
+    tx.commit().await?;
 
     record_activity(state, item.id, user_id, "created", None, None).await;
 
-    Ok(work_item_into_response(item, vec![]))
+    attach_item_key(state, work_item_into_response(item, vec![])).await
 }
 
 /// Fetch a single work item with its subtasks, enforcing ownership.
@@ -363,6 +420,58 @@ pub async fn get_work_item(
     user_id: Uuid,
     item_id: Uuid,
 ) -> AppResult<WorkItemResponse> {
+    fetch_work_item_with_subtasks(state, user_id, item_id).await
+}
+
+/// Parse a human key such as `MML-12` into its uppercase prefix and sequence.
+fn parse_item_key(raw: &str) -> Option<(String, i32)> {
+    let (prefix, seq) = raw.trim().rsplit_once('-')?;
+    let prefix = prefix.to_ascii_uppercase();
+    if !(2..=5).contains(&prefix.len()) || !prefix.chars().all(|c| c.is_ascii_uppercase()) {
+        return None;
+    }
+    let seq: i32 = seq.parse().ok().filter(|n| *n > 0)?;
+    Some((prefix, seq))
+}
+
+/// Fetch a work item by its human key (e.g. `MML-12`), scoped to `user_id`.
+///
+/// Items without a project use the `WI` prefix. If a project key and the `WI`
+/// prefix collide, the project's item wins.
+///
+/// # Errors
+///
+/// - [`AppError::Validation`] — the key is not `<2-5 letters>-<number>`.
+/// - [`AppError::NotFound`] — no matching live item for this user.
+/// - [`AppError::Db`] — database failure.
+pub async fn get_work_item_by_key(
+    state: &AppState,
+    user_id: Uuid,
+    raw_key: &str,
+) -> AppResult<WorkItemResponse> {
+    let (prefix, seq) = parse_item_key(raw_key)
+        .ok_or_else(|| AppError::Validation("key must look like MML-12".to_owned()))?;
+
+    let item_id: Uuid = sqlx::query_scalar(
+        r#"
+        SELECT wi.id
+          FROM work_items wi
+          LEFT JOIN projects p ON p.id = wi.project_id
+         WHERE wi.user_id = $1
+           AND wi.deleted_at IS NULL
+           AND wi.seq_id = $3
+           AND COALESCE(p.key, 'WI') = $2
+         ORDER BY (wi.project_id IS NULL), wi.created_at
+         LIMIT 1
+        "#,
+    )
+    .bind(user_id)
+    .bind(prefix)
+    .bind(seq)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
     fetch_work_item_with_subtasks(state, user_id, item_id).await
 }
 
@@ -613,7 +722,7 @@ pub async fn update_work_item(
     .fetch_all(&state.db)
     .await?;
 
-    Ok(work_item_into_response(updated, subtasks))
+    attach_item_key(state, work_item_into_response(updated, subtasks)).await
 }
 
 /// Soft-delete a work item, enforcing ownership.
@@ -823,7 +932,7 @@ pub async fn set_status(
     .fetch_all(&state.db)
     .await?;
 
-    Ok(work_item_into_response(updated, subtasks))
+    attach_item_key(state, work_item_into_response(updated, subtasks)).await
 }
 
 /// Set story points on a work item.
@@ -884,7 +993,7 @@ pub async fn set_points(
     .fetch_all(&state.db)
     .await?;
 
-    Ok(work_item_into_response(updated, subtasks))
+    attach_item_key(state, work_item_into_response(updated, subtasks)).await
 }
 
 // ── bulk operations ────────────────────────────────────────────────────────────
@@ -1280,7 +1389,7 @@ pub async fn move_to_sprint(
     .fetch_all(&state.db)
     .await?;
 
-    Ok(work_item_into_response(updated, subtasks))
+    attach_item_key(state, work_item_into_response(updated, subtasks)).await
 }
 
 /// Move a work item to the backlog (sets `sprint_id = NULL`).
@@ -1338,7 +1447,7 @@ pub async fn move_to_backlog(
     .fetch_all(&state.db)
     .await?;
 
-    Ok(work_item_into_response(updated, subtasks))
+    attach_item_key(state, work_item_into_response(updated, subtasks)).await
 }
 
 // ── Subtasks ───────────────────────────────────────────────────────────────────
@@ -1684,7 +1793,7 @@ pub async fn set_column(
     .fetch_all(&state.db)
     .await?;
 
-    Ok(work_item_into_response(updated, subtasks))
+    attach_item_key(state, work_item_into_response(updated, subtasks)).await
 }
 
 // ── Nested list helpers (called by epic/sprint modules) ───────────────────────
@@ -1742,6 +1851,9 @@ pub async fn list_items_for_sprint(
             wi.github_pr,
             COUNT(s.id)                          AS "subtask_count!: i64",
             COUNT(s.id) FILTER (WHERE s.is_done) AS "done_subtask_count!: i64",
+            COALESCE((SELECT p.key FROM projects p WHERE p.id = wi.project_id), 'WI')
+                || '-' || wi.seq_id                 AS "key?",
+            wi.seq_id                               AS "seq_id?",
             wi.created_at,
             wi.updated_at
         FROM work_items wi
@@ -1828,6 +1940,9 @@ pub async fn list_items_for_epic(
             wi.github_pr,
             COUNT(s.id)                          AS "subtask_count!: i64",
             COUNT(s.id) FILTER (WHERE s.is_done) AS "done_subtask_count!: i64",
+            COALESCE((SELECT p.key FROM projects p WHERE p.id = wi.project_id), 'WI')
+                || '-' || wi.seq_id                 AS "key?",
+            wi.seq_id                               AS "seq_id?",
             wi.created_at,
             wi.updated_at
         FROM work_items wi

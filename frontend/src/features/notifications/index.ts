@@ -18,6 +18,7 @@ export {
   useMarkNotificationRead,
   useMarkAllNotificationsRead,
   useDeleteNotification,
+  useSnoozeNotification,
 } from "./hooks/useNotifications";
 
 export { useBrowserPush } from "./hooks/useBrowserPush";

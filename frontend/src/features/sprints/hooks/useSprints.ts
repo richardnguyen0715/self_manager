@@ -18,7 +18,11 @@ import type {
   AgileListResponse,
   WorkItem,
 } from "@/types";
-import type { SprintFiltersState } from "../types";
+import type {
+  SprintFiltersState,
+  UnfinishedItemsAction,
+  CompleteSprintResult,
+} from "../types";
 
 // ─── Query keys ───────────────────────────────────────────────────────────────
 
@@ -239,21 +243,32 @@ export function useActivateSprint() {
   });
 }
 
-/** Complete sprint — POST /api/sprints/:id/complete { summary? }
- *  Returns flat SprintReview. Auto-creates the review record.
+/** Complete sprint — POST /api/sprints/:id/complete
+ *  Body: { summary?, unfinished?: "backlog" | "next_sprint" | "keep", next_sprint_id? }
+ *  Returns the SprintReview plus moved_count. Auto-creates the review record.
  */
 export function useCompleteSprint() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, summary }: { id: string; summary?: string }) =>
-      api.post<SprintReview>(API_ENDPOINTS.SPRINT_COMPLETE(id), {
+    mutationFn: ({
+      id,
+      summary,
+      unfinished = "keep",
+      nextSprintId,
+    }: {
+      id: string;
+      summary?: string;
+      unfinished?: UnfinishedItemsAction;
+      nextSprintId?: string | null;
+    }) =>
+      api.post<CompleteSprintResult>(API_ENDPOINTS.SPRINT_COMPLETE(id), {
         summary: summary || undefined,
+        unfinished,
+        next_sprint_id: unfinished === "next_sprint" ? nextSprintId : undefined,
       }),
-    onSuccess: (_data, { id }) => {
-      qc.invalidateQueries({ queryKey: sprintFeatureKeys.detail(id) });
-      qc.invalidateQueries({ queryKey: sprintFeatureKeys.active() });
-      qc.invalidateQueries({ queryKey: sprintFeatureKeys.lists() });
-      qc.invalidateQueries({ queryKey: sprintFeatureKeys.review(id) });
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: sprintFeatureKeys.all });
+      qc.invalidateQueries({ queryKey: ["backlog"] });
     },
   });
 }

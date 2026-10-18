@@ -1,4 +1,18 @@
-import type { SprintStatus, WorkItemType, WorkItemStatus, Priority } from "@/types";
+import type {
+  SprintStatus,
+  SprintReview,
+  WorkItemType,
+  WorkItemStatus,
+  Priority,
+} from "@/types";
+
+/** What happens to work items that are not done when a sprint completes. */
+export type UnfinishedItemsAction = "backlog" | "next_sprint" | "keep";
+
+/** Response of POST /api/sprints/:id/complete. */
+export interface CompleteSprintResult extends SprintReview {
+  moved_count: number;
+}
 
 // ─── Sprint form payloads ─────────────────────────────────────────────────────
 

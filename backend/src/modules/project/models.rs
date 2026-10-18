@@ -40,6 +40,8 @@ pub struct Project {
     pub organization_id: Option<Uuid>,
     /// Soft-delete timestamp; `None` for active rows.
     pub deleted_at: Option<DateTime<Utc>>,
+    /// Item-key prefix, 2-5 uppercase letters (e.g. `MML`), unique per user.
+    pub key: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -75,6 +77,8 @@ pub struct ProjectResponse {
     pub organization_id: Option<Uuid>,
     /// Soft-delete timestamp; `None` for active rows (set for Trash views).
     pub deleted_at: Option<DateTime<Utc>>,
+    /// Item-key prefix (e.g. `MML`); work items show as `MML-<seq_id>`.
+    pub key: Option<String>,
     pub progress: ProjectProgress,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -95,6 +99,7 @@ impl ProjectResponse {
             position: project.position,
             organization_id: project.organization_id,
             deleted_at: project.deleted_at,
+            key: project.key,
             progress,
             created_at: project.created_at,
             updated_at: project.updated_at,
@@ -127,6 +132,8 @@ pub struct CreateProjectRequest {
 
     /// Sort order hint; defaults to `0`.
     pub position: Option<i32>,
+    /// Item-key prefix, 2-5 uppercase letters. Derived from the name when omitted.
+    pub key: Option<String>,
 }
 
 /// `PATCH /api/projects/:id` body — every field is optional.
@@ -148,6 +155,8 @@ pub struct UpdateProjectRequest {
     pub status: Option<ProjectStatus>,
 
     pub position: Option<i32>,
+    /// New item-key prefix (2-5 uppercase letters, unique per user).
+    pub key: Option<String>,
 
     /// Assign or unassign the owning organization.
     ///

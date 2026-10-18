@@ -70,6 +70,9 @@ pub async fn list_backlog(
             wi.story_points,
             wi.position,
             wi.due_date,
+            COALESCE((SELECT p.key FROM projects p WHERE p.id = wi.project_id), 'WI')
+                || '-' || wi.seq_id  AS "key?",
+            wi.seq_id                AS "seq_id?",
             wi.created_at,
             wi.updated_at,
             COUNT(s.id)              AS "subtask_count!",

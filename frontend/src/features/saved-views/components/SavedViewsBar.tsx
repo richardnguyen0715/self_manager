@@ -7,7 +7,20 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/stores";
-import { useWorkItemUIStore } from "@/features/workitems/store";
+import {
+  useWorkItemUIStore,
+  useWorkItemDisplayStore,
+  type WorkItemGroupBy,
+  type WorkItemOrderBy,
+  type WorkItemOrderDir,
+} from "@/features/workitems/store";
+
+/** Display options captured by a work-items saved view (not the column toggles). */
+interface WorkItemDisplaySnapshot {
+  groupBy: WorkItemGroupBy;
+  orderBy: WorkItemOrderBy;
+  orderDir: WorkItemOrderDir;
+}
 import {
   useSavedViews,
   useCreateSavedView,
@@ -64,6 +77,17 @@ export function SavedViewsBar({ scope = "work_items" }: SavedViewsBarProps) {
   function applyView(view: SavedView) {
     const next = normalizeSavedViewFilters(view.filters);
     useWorkItemUIStore.setState((s) => ({ filters: { ...s.filters, ...next } }));
+    // Older rows have an empty display blob; then the current display options stay as they are.
+    if (scope === "work_items") {
+      const d = view.display as Partial<WorkItemDisplaySnapshot>;
+      const patch: Partial<WorkItemDisplaySnapshot> = {};
+      if (d.groupBy) patch.groupBy = d.groupBy;
+      if (d.orderBy) patch.orderBy = d.orderBy;
+      if (d.orderDir) patch.orderDir = d.orderDir;
+      if (Object.keys(patch).length > 0) {
+        useWorkItemDisplayStore.getState().setDisplay(patch);
+      }
+    }
   }
 
   function clearToAll() {
@@ -73,8 +97,13 @@ export function SavedViewsBar({ scope = "work_items" }: SavedViewsBarProps) {
   }
 
   function handleSave(name: string) {
+    const d = useWorkItemDisplayStore.getState();
+    const display: Partial<WorkItemDisplaySnapshot> =
+      scope === "work_items"
+        ? { groupBy: d.groupBy, orderBy: d.orderBy, orderDir: d.orderDir }
+        : {};
     createView.mutate(
-      { name, scope, project_id: projectId, filters: current, display: {} },
+      { name, scope, project_id: projectId, filters: current, display },
       { onSuccess: () => setSaveOpen(false) },
     );
   }

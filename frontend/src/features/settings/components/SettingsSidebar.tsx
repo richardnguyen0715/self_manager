@@ -4,6 +4,7 @@ import {
   Bell,
   Palette,
   ShieldCheck,
+  Tag,
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Appearance",
     icon: Palette,
     description: "Theme, colors, layout",
+  },
+  {
+    id: "labels",
+    label: "Labels",
+    icon: Tag,
+    description: "Colours and names for work-item labels",
   },
 ];
 

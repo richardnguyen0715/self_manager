@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { WorkItemFiltersState } from "./types";
 
 // ─── Work Item UI Store ────────────────────────────────────────────────────────
@@ -50,3 +51,39 @@ export const useWorkItemUIStore = create<WorkItemUIState>((set) => ({
 
   resetFilters: () => set({ filters: { ...DEFAULT_FILTERS } }),
 }));
+
+// ─── Work Item Display Options (Plane-style "Display" menu) ───────────────────
+
+export type WorkItemGroupBy = "none" | "status" | "priority" | "type";
+export type WorkItemOrderBy = "created" | "updated" | "priority" | "due_date" | "title";
+export type WorkItemOrderDir = "asc" | "desc";
+
+export interface WorkItemDisplayProperties {
+  status: boolean;
+  priority: boolean;
+  points: boolean;
+  due: boolean;
+}
+
+interface WorkItemDisplayState {
+  groupBy: WorkItemGroupBy;
+  orderBy: WorkItemOrderBy;
+  orderDir: WorkItemOrderDir;
+  properties: WorkItemDisplayProperties;
+
+  setDisplay: (patch: Partial<Omit<WorkItemDisplayState, "setDisplay">>) => void;
+}
+
+/** Persisted to localStorage under `mml_wi_display`. */
+export const useWorkItemDisplayStore = create<WorkItemDisplayState>()(
+  persist(
+    (set) => ({
+      groupBy: "none",
+      orderBy: "created",
+      orderDir: "desc",
+      properties: { status: true, priority: true, points: true, due: true },
+      setDisplay: (patch) => set(patch),
+    }),
+    { name: "mml_wi_display" },
+  ),
+);

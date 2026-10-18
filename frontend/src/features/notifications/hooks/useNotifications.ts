@@ -76,6 +76,7 @@ export function useInfiniteNotifications(
         ...(params.unread_only !== undefined && {
           unread_only: params.unread_only,
         }),
+        ...(params.snoozed && { snoozed: true }),
       }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) => {
@@ -233,6 +234,27 @@ export function useMarkAllNotificationsRead() {
         );
       });
     },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: notificationKeys.lists() });
+      qc.invalidateQueries({ queryKey: notificationKeys.unreadCount() });
+    },
+  });
+}
+
+/**
+ * Snooze a notification until `until`, or clear the snooze when `until` is null.
+ * POST /api/notifications/:id/snooze { until } | POST /api/notifications/:id/unsnooze
+ */
+export function useSnoozeNotification() {
+  const qc = useQueryClient();
+
+  return useMutation<Notification, Error, { id: string; until: Date | null }>({
+    mutationFn: ({ id, until }) =>
+      until
+        ? api.post<Notification>(`/api/notifications/${id}/snooze`, {
+            until: until.toISOString(),
+          })
+        : api.post<Notification>(`/api/notifications/${id}/unsnooze`),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: notificationKeys.lists() });
       qc.invalidateQueries({ queryKey: notificationKeys.unreadCount() });

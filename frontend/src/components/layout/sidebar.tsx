@@ -26,6 +26,7 @@ import {
   FileText,
   Building2,
   Trash2,
+  NotebookPen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -94,6 +95,7 @@ const NAV_SECTIONS: NavSectionDef[] = [
     items: [
       { label: "Usage", href: "/usage", icon: BookOpen, hideable: true },
       { label: "Analytics", href: "/analytics", icon: BarChart3, hideable: true },
+      { label: "Retros", href: "/retros", icon: NotebookPen, hideable: true },
     ],
   },
 ];

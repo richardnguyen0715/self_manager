@@ -12,6 +12,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use chrono::Utc;
 use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
@@ -21,7 +22,7 @@ use crate::shared::{error::AppError, extractors::AuthUser, state::AppState};
 use super::{
     models::{
         CreateNotificationRequest, ListNotificationsQuery, PushSubscribeRequest,
-        PushUnsubscribeRequest, UpdateNotificationRequest,
+        PushUnsubscribeRequest, SnoozeNotificationRequest, UpdateNotificationRequest,
     },
     service::NotificationService,
 };
@@ -126,6 +127,42 @@ pub async fn update_notification(
 
     let result =
         NotificationService::mark_read(&state.db, auth.user_id, notification_id, read).await?;
+    Ok(Json(result))
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/notifications/:id/snooze
+// ---------------------------------------------------------------------------
+
+/// Snooze a notification until the given RFC 3339 timestamp.
+///
+/// `until` must be in the future. Returns `404` when the notification does not
+/// belong to the caller.
+pub async fn snooze_notification(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(notification_id): Path<Uuid>,
+    Json(body): Json<SnoozeNotificationRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    if body.until <= Utc::now() {
+        return Err(AppError::Validation("until must be in the future".to_owned()));
+    }
+    let result =
+        NotificationService::snooze(&state.db, auth.user_id, notification_id, body.until).await?;
+    Ok(Json(result))
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/notifications/:id/unsnooze
+// ---------------------------------------------------------------------------
+
+/// Clear a notification's snooze, returning it to the inbox immediately.
+pub async fn unsnooze_notification(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(notification_id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    let result = NotificationService::unsnooze(&state.db, auth.user_id, notification_id).await?;
     Ok(Json(result))
 }
 

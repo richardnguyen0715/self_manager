@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useEffect, useRef, useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Command } from "cmdk";
 import {
@@ -21,10 +21,17 @@ import {
   ArrowRight,
   BookOpen,
   Keyboard,
+  Hash,
+  NotebookPen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
+import { ApiClientError } from "@/lib/api-error";
+import { API_ENDPOINTS } from "@/types";
+import type { WorkItem } from "@/types";
 import { useUIStore } from "@/stores";
 import { SHORTCUTS_MODAL_ID } from "@/features/shortcuts";
+import { openRetroRequest, todayISO } from "@/features/retros";
 import { useSearchStore } from "../store";
 import { useSearchQuery } from "../hooks/useSearch";
 import { useQuickCreateTask, useQuickCreateHabit } from "../hooks/useQuickCreate";
@@ -219,6 +226,14 @@ export function CommandPalette() {
 
   const isFetching = isTasksFetching || isDocsFetching;
 
+  // Work item key lookup (e.g. "MML-12") — shown as an "Open MML-12" result.
+  const keyMatch = /^[A-Za-z]{2,5}-\d+$/.test(trimmed) ? trimmed.toUpperCase() : null;
+  const [keyLookup, setKeyLookup] = useState<{
+    key: string;
+    status: "loading" | "not_found" | "error";
+  } | null>(null);
+  const activeKeyLookup = keyLookup && keyLookup.key === keyMatch ? keyLookup : null;
+
   // Flatten per-kind arrays from SearchResponse { tasks?, projects?, habits? }
   const results: SearchResult[] = [
     ...(searchData?.tasks ?? []).map((t): SearchResult => ({ ...t, kind: "task" as const })),
@@ -250,6 +265,26 @@ export function CommandPalette() {
   function navigate(href: string) {
     router.push(href);
     handleClose();
+  }
+
+  /** Open (or create) this period's retro, then go to it. Falls back to the list. */
+  function openRetroPeriod(kind: "daily" | "weekly") {
+    handleClose();
+    openRetroRequest({ kind, date: todayISO() })
+      .then((retro) => router.push(`/retros/${retro.retro.id}`))
+      .catch(() => router.push("/retros"));
+  }
+
+  /** Resolve a work item key (MML-12) via the by-key endpoint, then open it. */
+  async function openByKey(key: string) {
+    setKeyLookup({ key, status: "loading" });
+    try {
+      const item = await api.get<WorkItem>(API_ENDPOINTS.WORK_ITEM_BY_KEY(key));
+      navigate(`/work-items/${item.id}`);
+    } catch (err) {
+      const notFound = err instanceof ApiClientError && err.status === 404;
+      setKeyLookup({ key, status: notFound ? "not_found" : "error" });
+    }
   }
 
   // Filter nav items by current input
@@ -337,6 +372,35 @@ export function CommandPalette() {
           {/* Scrollable list */}
           {!quickCreateMode && (
             <Command.List className="max-h-[420px] overflow-y-auto p-1">
+              {/* Work item key lookup, e.g. "MML-12" */}
+              {keyMatch && (
+                <Command.Group heading="Work items">
+                  <Command.Item
+                    value={`open-key-${keyMatch}`}
+                    onSelect={() => {
+                      void openByKey(keyMatch);
+                    }}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-[15px]",
+                      "aria-selected:bg-accent",
+                    )}
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded bg-muted">
+                      <Hash className="h-4 w-4 text-muted-foreground" />
+                    </span>
+                    <span>
+                      Open{" "}
+                      <span className="font-mono">{keyMatch}</span>
+                    </span>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {activeKeyLookup?.status === "loading" && "Looking up…"}
+                      {activeKeyLookup?.status === "not_found" && `No work item ${keyMatch}`}
+                      {activeKeyLookup?.status === "error" && "Lookup failed"}
+                    </span>
+                  </Command.Item>
+                </Command.Group>
+              )}
+
               {/* Quick actions — always shown */}
               <Command.Group heading="Quick actions">
                 <Command.Item
@@ -391,6 +455,34 @@ export function CommandPalette() {
                   <kbd className="ml-auto rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                     ?
                   </kbd>
+                </Command.Item>
+
+                <Command.Item
+                  value="open-todays-check-in retro daily"
+                  onSelect={() => openRetroPeriod("daily")}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-[15px]",
+                    "aria-selected:bg-accent",
+                  )}
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded bg-muted">
+                    <NotebookPen className="h-4 w-4 text-muted-foreground" />
+                  </span>
+                  <span>Open today&apos;s check-in</span>
+                </Command.Item>
+
+                <Command.Item
+                  value="open-this-weeks-review retro weekly"
+                  onSelect={() => openRetroPeriod("weekly")}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-[15px]",
+                    "aria-selected:bg-accent",
+                  )}
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded bg-muted">
+                    <NotebookPen className="h-4 w-4 text-muted-foreground" />
+                  </span>
+                  <span>Open this week&apos;s review</span>
                 </Command.Item>
 
                 {trimmed.length > 0 && (

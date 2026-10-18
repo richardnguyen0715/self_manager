@@ -11,7 +11,7 @@ import { NotificationPreferencesPanel } from "./NotificationPreferencesPanel";
 import { useState } from "react";
 
 export function NotificationsView() {
-  const { activeFilter } = useNotificationsStore();
+  const { activeFilter, inboxView } = useNotificationsStore();
   const [showPreferences, setShowPreferences] = useState(false);
 
   return (
@@ -54,13 +54,16 @@ export function NotificationsView() {
       <Separator />
 
       {/* Active filter heading */}
-      {activeFilter !== "all" && (
+      {(inboxView !== "all" || activeFilter !== "all") && (
         <p className="text-xs font-medium text-muted-foreground">
           Showing:{" "}
           <span className="text-foreground capitalize">
-            {activeFilter === "unread"
-              ? "Unread"
-              : activeFilter.replace(/_/g, " ")}
+            {[
+              inboxView !== "all" ? inboxView : null,
+              activeFilter !== "all" ? activeFilter.replace(/_/g, " ") : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         </p>
       )}

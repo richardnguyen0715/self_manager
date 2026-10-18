@@ -65,4 +65,5 @@ export type SettingsSection =
   | "profile"
   | "account"
   | "notifications"
-  | "appearance";
+  | "appearance"
+  | "labels";

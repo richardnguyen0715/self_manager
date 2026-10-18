@@ -22,6 +22,45 @@ use super::models::{
     ProjectStatus, ReorderProjectsRequest, UpdateProjectRequest,
 };
 
+// ── Item-key helpers ──────────────────────────────────────────────────────────
+
+/// Validate a user-supplied project key: 2-5 uppercase ASCII letters.
+fn validate_project_key(key: &str) -> AppResult<()> {
+    if (2..=5).contains(&key.len()) && key.chars().all(|c| c.is_ascii_uppercase()) {
+        Ok(())
+    } else {
+        Err(AppError::Validation(
+            "key must be 2-5 uppercase letters (A-Z)".to_owned(),
+        ))
+    }
+}
+
+/// Fail with `Conflict` when another project of `user_id` already uses `key`.
+async fn ensure_project_key_free(
+    state: &AppState,
+    user_id: Uuid,
+    key: &str,
+    exclude: Option<Uuid>,
+) -> AppResult<()> {
+    let taken: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM projects \
+         WHERE user_id = $1 AND key = $2 AND ($3::uuid IS NULL OR id <> $3))",
+    )
+    .bind(user_id)
+    .bind(key)
+    .bind(exclude)
+    .fetch_one(&state.db)
+    .await?;
+
+    if taken {
+        Err(AppError::Conflict(format!(
+            "key {key} is already used by another project"
+        )))
+    } else {
+        Ok(())
+    }
+}
+
 // ── Progress helper ───────────────────────────────────────────────────────────
 
 /// Fetch task-count statistics for one project.
@@ -81,6 +120,7 @@ pub async fn list_projects(
             position,
             organization_id,
             deleted_at,
+            key,
             created_at,
             updated_at
         FROM projects
@@ -126,6 +166,7 @@ pub async fn get_project(
             position,
             organization_id,
             deleted_at,
+            key,
             created_at,
             updated_at
         FROM projects
@@ -167,11 +208,26 @@ pub async fn create_project(
         }
     }
 
+    // Item key: validated when supplied, otherwise derived from the name
+    // (unique per user, via the `mml_unique_project_key` SQL function).
+    let key: String = match req.key.as_deref() {
+        Some(k) => {
+            validate_project_key(k)?;
+            ensure_project_key_free(state, user_id, k, None).await?;
+            k.to_owned()
+        }
+        None => sqlx::query_scalar("SELECT mml_unique_project_key($1, $2, NULL)")
+            .bind(user_id)
+            .bind(&req.name)
+            .fetch_one(&state.db)
+            .await?,
+    };
+
     let project = sqlx::query_as!(
         Project,
         r#"
-        INSERT INTO projects (user_id, goal_id, name, description, color, deadline, position)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO projects (user_id, goal_id, name, description, color, deadline, position, key)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING
             id,
             user_id,
@@ -184,6 +240,7 @@ pub async fn create_project(
             position,
             organization_id,
             deleted_at,
+            key,
             created_at,
             updated_at
         "#,
@@ -193,7 +250,8 @@ pub async fn create_project(
         req.description,
         req.color,
         req.deadline,
-        req.position.unwrap_or(0)
+        req.position.unwrap_or(0),
+        key,
     )
     .fetch_one(&state.db)
     .await?;
@@ -229,6 +287,7 @@ pub async fn update_project(
             position,
             organization_id,
             deleted_at,
+            key,
             created_at,
             updated_at
         FROM projects
@@ -287,6 +346,11 @@ pub async fn update_project(
         }
     }
 
+    if let Some(k) = req.key.as_deref() {
+        validate_project_key(k)?;
+        ensure_project_key_free(state, user_id, k, Some(project_id)).await?;
+    }
+
     let project = sqlx::query_as!(
         Project,
         r#"
@@ -299,6 +363,7 @@ pub async fn update_project(
             status          = COALESCE($9, status),
             position        = COALESCE($10, position),
             organization_id = CASE WHEN $11 THEN $12 ELSE organization_id END,
+            key             = COALESCE($13, key),
             updated_at      = now()
         WHERE id = $1 AND user_id = $2
           AND deleted_at IS NULL
@@ -314,6 +379,7 @@ pub async fn update_project(
             position,
             organization_id,
             deleted_at,
+            key,
             created_at,
             updated_at
         "#,
@@ -329,6 +395,7 @@ pub async fn update_project(
         req.position,                        // $10
         req.organization_id.is_some(),       // $11 bool: should we update organization_id?
         req.organization_id.flatten(),       // $12 new organization_id value (may be NULL)
+        req.key.clone(),                     // $13 new item-key prefix (None = unchanged)
     )
     .fetch_one(&state.db)
     .await?;

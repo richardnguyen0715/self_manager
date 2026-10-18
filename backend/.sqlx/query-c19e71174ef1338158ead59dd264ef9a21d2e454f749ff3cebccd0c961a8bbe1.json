@@ -1,0 +1,122 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            wi.id,\n            wi.project_id,\n            wi.epic_id,\n            wi.sprint_id,\n            wi.type::text            AS \"item_type!\",\n            wi.title,\n            wi.status::text          AS \"status!\",\n            wi.priority::text        AS \"priority!\",\n            wi.story_points,\n            wi.position,\n            wi.due_date,\n            COALESCE((SELECT p.key FROM projects p WHERE p.id = wi.project_id), 'WI')\n                || '-' || wi.seq_id  AS \"key?\",\n            wi.seq_id                AS \"seq_id?\",\n            wi.created_at,\n            wi.updated_at,\n            COUNT(s.id)              AS \"subtask_count!\",\n            COUNT(s.id) FILTER (WHERE s.is_done) AS \"done_subtask_count!\"\n        FROM work_items wi\n        LEFT JOIN work_item_subtasks s ON s.work_item_id = wi.id\n        WHERE wi.user_id   = $1\n          AND wi.deleted_at IS NULL\n          AND wi.sprint_id IS NULL\n          AND ($2::uuid IS NULL OR wi.project_id = $2)\n          AND ($3::uuid IS NULL OR wi.epic_id    = $3)\n        GROUP BY wi.id\n        ORDER BY wi.position ASC, wi.created_at ASC\n        LIMIT $4 OFFSET $5\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "project_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "epic_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "sprint_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "item_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "priority!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "story_points",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "position",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "due_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "key?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "seq_id?",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 13,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 15,
+        "name": "subtask_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 16,
+        "name": "done_subtask_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      null,
+      false,
+      null,
+      null,
+      true,
+      false,
+      true,
+      null,
+      true,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "c19e71174ef1338158ead59dd264ef9a21d2e454f749ff3cebccd0c961a8bbe1"
+}

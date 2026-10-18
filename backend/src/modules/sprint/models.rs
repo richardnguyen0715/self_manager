@@ -254,11 +254,41 @@ pub struct UpdateSprintRequest {
     pub project_id: Option<Uuid>,
 }
 
-/// Body for `POST /api/sprints/:id/complete`.
-#[derive(Debug, Deserialize, Validate)]
+/// What to do with work items that are not `done` when a sprint is completed.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UnfinishedItemsAction {
+    /// Leave unfinished items in this sprint (the pre-existing behaviour).
+    #[default]
+    Keep,
+    /// Detach unfinished items from any sprint (move to backlog).
+    Backlog,
+    /// Move unfinished items into `next_sprint_id` (must be a planned sprint).
+    NextSprint,
+}
+
+/// Body for `POST /api/sprints/:id/complete`. The body itself is optional;
+/// when absent every field takes its default (`unfinished = keep`).
+#[derive(Debug, Deserialize, Validate, Default)]
 pub struct CompleteSprintRequest {
     #[validate(length(max = 5000, message = "summary must be ≤ 5 000 characters"))]
     pub summary: Option<String>,
+
+    /// Disposition of unfinished items. Defaults to `keep`.
+    #[serde(default)]
+    pub unfinished: UnfinishedItemsAction,
+
+    /// Required when `unfinished = next_sprint`.
+    pub next_sprint_id: Option<Uuid>,
+}
+
+/// Response for `POST /api/sprints/:id/complete`: the review plus the number
+/// of unfinished items that were moved.
+#[derive(Debug, Serialize)]
+pub struct CompleteSprintResponse {
+    #[serde(flatten)]
+    pub review: SprintReviewResponse,
+    pub moved_count: i64,
 }
 
 /// Body for `PUT /api/sprints/:id/review`.
