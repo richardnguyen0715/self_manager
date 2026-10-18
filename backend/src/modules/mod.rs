@@ -26,6 +26,7 @@ pub mod page;
 pub mod project;
 pub mod realtime;
 pub mod retrospective;
+pub mod saved_view;
 pub mod review;
 pub mod search;
 pub mod settings;

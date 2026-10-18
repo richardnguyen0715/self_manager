@@ -419,6 +419,56 @@ pub struct MoveToSprintRequest {
     pub position: Option<i32>,
 }
 
+/// Action for `POST /api/work-items/bulk`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BulkAction {
+    /// Apply [`BulkPatch`] to every selected item.
+    Update,
+    /// Soft-delete every selected item.
+    Delete,
+}
+
+/// Field changes for a bulk `update`. Absent fields are left untouched.
+#[derive(Debug, Default, Deserialize)]
+pub struct BulkPatch {
+    pub status: Option<WorkItemStatus>,
+    pub priority: Option<WorkItemPriority>,
+    #[serde(rename = "type")]
+    pub item_type: Option<WorkItemType>,
+    /// Move to this sprint (must belong to the authenticated user).
+    pub sprint_id: Option<Uuid>,
+    /// `true` moves the items to the backlog (`sprint_id = NULL`).
+    #[serde(default)]
+    pub clear_sprint: bool,
+    /// Must be 1, 3, 5 or 8 when present.
+    pub story_points: Option<i32>,
+    /// `true` clears story points (unestimated).
+    #[serde(default)]
+    pub clear_story_points: bool,
+    #[serde(default)]
+    pub add_labels: Vec<String>,
+    #[serde(default)]
+    pub remove_labels: Vec<String>,
+}
+
+/// Body for `POST /api/work-items/bulk`.
+#[derive(Debug, Deserialize, Validate)]
+pub struct BulkWorkItemRequest {
+    #[validate(length(min = 1, max = 200, message = "ids must contain 1–200 items"))]
+    pub ids: Vec<Uuid>,
+    pub action: BulkAction,
+    /// Required when `action` is `update`; ignored for `delete`.
+    pub patch: Option<BulkPatch>,
+}
+
+/// Response for `POST /api/work-items/bulk`.
+#[derive(Debug, Serialize)]
+pub struct BulkWorkItemResponse {
+    /// Number of work items actually changed (owned, not trashed).
+    pub updated: u64,
+}
+
 /// Body for `PATCH /api/work-items/:id/backlog`.
 #[derive(Debug, Deserialize)]
 pub struct MoveToBacklogRequest {

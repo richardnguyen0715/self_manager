@@ -6,6 +6,7 @@ import { Sidebar } from "./sidebar";
 import { Header } from "./header";
 import { useUIStore } from "@/stores";
 import { CommandPalette } from "@/features/search";
+import { ShortcutsDialog, useGlobalHotkeys } from "@/features/shortcuts";
 import { cn } from "@/lib/utils";
 
 interface AppShellProps {
@@ -16,6 +17,9 @@ interface AppShellProps {
 export function AppShell({ children, title }: AppShellProps) {
   const { openCommandPalette, mobileNavOpen, closeMobileNav } = useUIStore();
   const pathname = usePathname();
+
+  // Plane-style chord shortcuts (G then B, N then W, ?) + shortcuts dialog
+  useGlobalHotkeys();
 
   // Global keyboard shortcut Ctrl+K / Cmd+K for command palette
   // Also handle Escape to close mobile drawer
@@ -78,6 +82,7 @@ export function AppShell({ children, title }: AppShellProps) {
 
       {/* Command palette — portal-rendered, driven by useUIStore */}
       <CommandPalette />
+      <ShortcutsDialog />
     </div>
   );
 }

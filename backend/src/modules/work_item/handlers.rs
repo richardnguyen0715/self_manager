@@ -21,7 +21,7 @@ use crate::shared::{
 
 use super::{
     models::{
-        ActivityEntry,
+        ActivityEntry, BulkWorkItemRequest, BulkWorkItemResponse,
         Attachment, CreateCommentRequest, CreateLinkRequest, CreateSubtaskRequest,
         CreateWebLinkRequest, CreateWorkItemRequest, ListWorkItemsQuery, MoveToBacklogRequest,
         MoveToSprintRequest, SetColumnRequest, SetPointsRequest, SetStatusRequest,
@@ -55,6 +55,22 @@ pub async fn list_work_items(
 ) -> AppResult<Json<WorkItemListResponse>> {
     let list = service::list_work_items(&state, auth.user_id, &query).await?;
     Ok(Json(list))
+}
+
+// ── POST /api/work-items/bulk ──────────────────────────────────────────────────
+
+/// Apply a bulk `update` or `delete` to up to 200 owned work items.
+///
+/// Returns `200 OK` with `{ "updated": n }`. Runs in one transaction.
+pub async fn bulk_work_items(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Json(body): Json<BulkWorkItemRequest>,
+) -> AppResult<Json<BulkWorkItemResponse>> {
+    body.validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    let res = service::bulk_work_items(&state, auth.user_id, body).await?;
+    Ok(Json(res))
 }
 
 // ── POST /api/work-items ───────────────────────────────────────────────────────

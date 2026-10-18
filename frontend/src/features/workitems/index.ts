@@ -20,6 +20,7 @@ export {
   useDeleteWorkItem,
   useSetWorkItemStatus,
   useSetWorkItemPoints,
+  useBulkUpdateWorkItems,
   useCreateWorkItemSubtask,
   useUpdateWorkItemSubtask,
   useDeleteWorkItemSubtask,

@@ -11,6 +11,7 @@ import {
   useUpdateAppearancePrefs,
 } from "../hooks/useAppearancePrefs";
 import { useAppearanceStore } from "../settings.store";
+import { useNavStore, HIDEABLE_NAV_ITEMS } from "@/stores/nav.store";
 import { SettingsSectionHeader } from "./SettingsSectionHeader";
 
 // ─── Theme selector ────────────────────────────────────────────────────────────
@@ -160,6 +161,10 @@ export function AppearanceSection() {
   const showCompletedTasks = useAppearanceStore((s) => s.showCompletedTasks);
   const weekStartsOn = useAppearanceStore((s) => s.weekStartsOn);
 
+  // Sidebar visibility (local only, not synced to the server)
+  const hiddenNavItems = useNavStore((s) => s.hiddenNavItems);
+  const setNavItemHidden = useNavStore((s) => s.setNavItemHidden);
+
   useThemeEffect();
 
   const mutate = (payload: Parameters<typeof update.mutate>[0]) => {
@@ -285,6 +290,29 @@ export function AppearanceSection() {
               onChange={(day) => mutate({ week_starts_on: day })}
               disabled={disabled}
             />
+          </CardContent>
+        </Card>
+
+        {/* Sidebar visibility */}
+        <Card>
+          <CardContent className="pt-6 space-y-5">
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold">Sidebar</h3>
+              <p className="text-xs text-muted-foreground">
+                Hide menu items you don&apos;t use. Dashboard, Organizations,
+                Projects, Trash and Settings always stay visible.
+              </p>
+            </div>
+
+            {HIDEABLE_NAV_ITEMS.map((item) => (
+              <ToggleRow
+                key={item.href}
+                id={`nav-${item.href.slice(1)}`}
+                label={item.label}
+                checked={!hiddenNavItems.includes(item.href)}
+                onCheckedChange={(visible) => setNavItemHidden(item.href, !visible)}
+              />
+            ))}
           </CardContent>
         </Card>
 

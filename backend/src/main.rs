@@ -99,6 +99,8 @@ async fn main() -> anyhow::Result<()> {
         .nest("/backlog",       modules::backlog::router())
         // ── Board columns (dynamic board) ─────────────────────────────────────
         .nest("/board-columns", modules::board_column::router())
+        // ── Saved views (work-item filter presets) ────────────────────────────
+        .nest("/saved-views", modules::saved_view::router())
         // ── Docs ──────────────────────────────────────────────────────────────
         .nest("/spaces",    modules::space::router())
         .nest(

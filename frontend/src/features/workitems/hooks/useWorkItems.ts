@@ -26,6 +26,8 @@ import type {
   CreateWorkItemSubtaskPayload,
   UpdateWorkItemSubtaskPayload,
   WorkItemFiltersState,
+  BulkWorkItemPayload,
+  BulkWorkItemResult,
   WorkItemLink,
   AddWorkItemLinkPayload,
   WorkItemWebLink,
@@ -162,6 +164,28 @@ export function useDeleteWorkItem() {
     onSuccess: (_data, id) => {
       qc.removeQueries({ queryKey: workItemKeys.detail(id) });
       qc.invalidateQueries({ queryKey: workItemKeys.lists() });
+    },
+  });
+}
+
+/**
+ * POST /api/work-items/bulk — { ids, action: "update" | "delete", patch? } → { updated }.
+ * Invalidates all work-item queries plus sprint/backlog lists (sprint membership and
+ * status counts may change).
+ */
+export function useBulkUpdateWorkItems() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: BulkWorkItemPayload) =>
+      api.post<BulkWorkItemResult>(
+        `${API_ENDPOINTS.WORK_ITEMS}/bulk`,
+        payload,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: workItemKeys.all });
+      qc.invalidateQueries({ queryKey: ["sprints"] });
+      qc.invalidateQueries({ queryKey: ["sprints-feature"] });
+      qc.invalidateQueries({ queryKey: ["backlog"] });
     },
   });
 }

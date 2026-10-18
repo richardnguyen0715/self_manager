@@ -47,7 +47,10 @@ export function SprintDashboardSection() {
             progressPct={sprintProgressPct}
           />
         ) : (
-          <NoActiveSprintCard />
+          // Span the full row when there is no burndown beside it
+          <div className="md:col-span-2">
+            <NoActiveSprintCard />
+          </div>
         )}
 
         {activeSprint && (

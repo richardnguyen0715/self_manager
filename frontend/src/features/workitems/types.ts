@@ -92,6 +92,29 @@ export interface WorkItemAttachment {
 
 // ─── Filter state ─────────────────────────────────────────────────────────────
 
+/** Body for POST /api/work-items/bulk — mirrors BulkPatch on the backend. */
+export interface BulkWorkItemPatch {
+  status?: WorkItemStatus;
+  priority?: Priority;
+  type?: WorkItemType;
+  sprint_id?: string;
+  clear_sprint?: boolean;
+  story_points?: number;
+  clear_story_points?: boolean;
+  add_labels?: string[];
+  remove_labels?: string[];
+}
+
+export interface BulkWorkItemPayload {
+  ids: string[];
+  action: "update" | "delete";
+  patch?: BulkWorkItemPatch;
+}
+
+export interface BulkWorkItemResult {
+  updated: number;
+}
+
 export interface WorkItemFiltersState {
   sprint_id?: string;
   epic_id?: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { format, isPast, isToday } from "date-fns";
 import {
@@ -13,6 +13,8 @@ import {
   Calendar,
   Trash2,
   MoreHorizontal,
+  ChevronDown,
+  Tag,
 } from "lucide-react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -25,10 +27,17 @@ import type {
   WorkItemType,
   WorkItemStatus,
   Priority,
+  Sprint,
 } from "@/types";
 import { WORK_ITEM_TYPES } from "@/types";
 import { WORK_ITEM_TYPE_META } from "../work-item-type-config";
-import { useWorkItems, useDeleteWorkItem } from "../hooks/useWorkItems";
+import {
+  useWorkItems,
+  useDeleteWorkItem,
+  useBulkUpdateWorkItems,
+} from "../hooks/useWorkItems";
+import type { BulkWorkItemPatch, BulkWorkItemPayload } from "../types";
+import { useSprintsList } from "@/features/sprints/hooks/useSprints";
 import { useWorkItemUIStore } from "../store";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useProjectStore } from "@/stores";
@@ -36,6 +45,7 @@ import { WorkItemStatusBadge } from "./WorkItemStatusBadge";
 import { WorkItemTypeBadge } from "./WorkItemTypeBadge";
 import { WorkItemPriorityBadge } from "./WorkItemPriorityBadge";
 import { CreateWorkItemDialog } from "./CreateWorkItemDialog";
+import { SavedViewsBar } from "@/features/saved-views/components/SavedViewsBar";
 
 // ─── Filter bar selects ────────────────────────────────────────────────────────
 
@@ -147,9 +157,224 @@ function SkeletonRow() {
   );
 }
 
-// ─── Row ──────────────────────────────────────────────────────────────────────
+// ─── Bulk actions ─────────────────────────────────────────────────────────────
 
-function WorkItemRow({ item }: { item: WorkItemListItem }) {
+const BACKLOG_CHOICE = "__backlog__";
+
+/** Dropdown used by the bulk action bar. Options are plain value/label pairs. */
+function BulkMenu({
+  label,
+  options,
+  disabled,
+  onSelect,
+}: {
+  label: string;
+  options: { value: string; label: string }[];
+  disabled?: boolean;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <DropdownMenuPrimitive.Root>
+      <DropdownMenuPrimitive.Trigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={disabled}
+          className="h-8 gap-1"
+        >
+          {label}
+          <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+        </Button>
+      </DropdownMenuPrimitive.Trigger>
+      <DropdownMenuPrimitive.Portal>
+        <DropdownMenuPrimitive.Content
+          side="top"
+          align="center"
+          sideOffset={8}
+          className="z-50 max-h-72 min-w-[10rem] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+        >
+          {options.length === 0 && (
+            <div className="px-2 py-1.5 text-sm text-muted-foreground">
+              Nothing to choose
+            </div>
+          )}
+          {options.map((o) => (
+            <DropdownMenuPrimitive.Item
+              key={o.value}
+              onSelect={() => onSelect(o.value)}
+              className="flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent focus:text-accent-foreground"
+            >
+              {o.label}
+            </DropdownMenuPrimitive.Item>
+          ))}
+        </DropdownMenuPrimitive.Content>
+      </DropdownMenuPrimitive.Portal>
+    </DropdownMenuPrimitive.Root>
+  );
+}
+
+/** Floating bar shown while one or more rows are selected. */
+function BulkActionBar({
+  count,
+  disabled,
+  error,
+  sprints,
+  onPatch,
+  onDelete,
+  onClear,
+}: {
+  count: number;
+  disabled: boolean;
+  error: string | null;
+  sprints: Sprint[];
+  onPatch: (patch: BulkWorkItemPatch) => void;
+  onDelete: () => void;
+  onClear: () => void;
+}) {
+  const [labelOpen, setLabelOpen] = useState(false);
+  const [labelDraft, setLabelDraft] = useState("");
+
+  function closeLabel() {
+    setLabelOpen(false);
+    setLabelDraft("");
+  }
+
+  function submitLabel(e: React.FormEvent) {
+    e.preventDefault();
+    const label = labelDraft.trim();
+    if (!label) return;
+    onPatch({ add_labels: [label] });
+    closeLabel();
+  }
+
+  const statusChoices = STATUS_OPTIONS.filter((o) => o.value !== "all");
+  const typeChoices = TYPE_OPTIONS.filter((o) => o.value !== "all");
+  const priorityChoices = PRIORITY_OPTIONS.filter((o) => o.value !== "all");
+
+  return (
+    <div
+      role="toolbar"
+      aria-label="Bulk actions"
+      className="fixed bottom-6 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-lg border bg-popover px-3 py-2 text-popover-foreground shadow-lg"
+    >
+      <span className="text-sm font-medium tabular-nums">{count} selected</span>
+      <span className="h-5 w-px bg-border" aria-hidden />
+
+      <BulkMenu
+        label="Status"
+        disabled={disabled}
+        options={statusChoices}
+        onSelect={(v) => onPatch({ status: v as WorkItemStatus })}
+      />
+      <BulkMenu
+        label="Priority"
+        disabled={disabled}
+        options={priorityChoices}
+        onSelect={(v) => onPatch({ priority: v as Priority })}
+      />
+      <BulkMenu
+        label="Type"
+        disabled={disabled}
+        options={typeChoices}
+        onSelect={(v) => onPatch({ type: v as WorkItemType })}
+      />
+      <BulkMenu
+        label="Move to sprint"
+        disabled={disabled}
+        options={[
+          { value: BACKLOG_CHOICE, label: "Backlog (no sprint)" },
+          ...sprints.map((s) => ({ value: s.id, label: s.name })),
+        ]}
+        onSelect={(v) =>
+          v === BACKLOG_CHOICE
+            ? onPatch({ clear_sprint: true })
+            : onPatch({ sprint_id: v })
+        }
+      />
+
+      {labelOpen ? (
+        <form onSubmit={submitLabel} className="flex items-center gap-1">
+          <Input
+            autoFocus
+            value={labelDraft}
+            onChange={(e) => setLabelDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                closeLabel();
+              }
+            }}
+            placeholder="Label name"
+            maxLength={50}
+            className="h-8 w-36 text-sm"
+          />
+          <Button
+            type="submit"
+            size="sm"
+            className="h-8"
+            disabled={disabled || !labelDraft.trim()}
+          >
+            Add
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8"
+            onClick={closeLabel}
+          >
+            Cancel
+          </Button>
+        </form>
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5"
+          disabled={disabled}
+          onClick={() => setLabelOpen(true)}
+        >
+          <Tag className="h-3.5 w-3.5" />
+          Add label
+        </Button>
+      )}
+
+      <Button
+        variant="destructive"
+        size="sm"
+        className="h-8 gap-1.5"
+        disabled={disabled}
+        onClick={onDelete}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        Delete
+      </Button>
+      <Button variant="ghost" size="sm" className="h-8" onClick={onClear}>
+        Clear
+      </Button>
+
+      {error && (
+        <p role="alert" className="basis-full text-xs text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Row──────────────────────────────────────────────────────────────────────
+
+function WorkItemRow({
+  item,
+  index,
+  selected,
+  onToggleSelect,
+}: {
+  item: WorkItemListItem;
+  index: number;
+  selected: boolean;
+  onToggleSelect: (index: number, shiftKey: boolean) => void;
+}) {
   const deleteItem = useDeleteWorkItem();
   const confirm = useConfirm();
 
@@ -182,7 +407,22 @@ function WorkItemRow({ item }: { item: WorkItemListItem }) {
   }
 
   return (
-    <div className="group relative flex items-center gap-3 px-4 py-3 hover:bg-accent/40 transition-colors border-b border-border/50 last:border-0">
+    <div
+      className={cn(
+        "group relative flex items-center gap-3 px-4 py-3 hover:bg-accent/40 transition-colors border-b border-border/50 last:border-0",
+        selected && "bg-accent/30",
+      )}
+    >
+      {/* Row selection (shift-click selects a range) */}
+      <input
+        type="checkbox"
+        aria-label={`Select ${item.title}`}
+        checked={selected}
+        onChange={() => {}}
+        onClick={(e) => onToggleSelect(index, e.shiftKey)}
+        className="h-4 w-4 shrink-0 cursor-pointer accent-primary"
+      />
+
       {/* Type icon */}
       <WorkItemTypeBadge type={item.type} className="shrink-0" />
 
@@ -296,8 +536,124 @@ export function WorkItemList() {
     project_id: currentProjectId ?? undefined,
   });
 
-  const items: WorkItemListItem[] = data?.data ?? [];
+  const items = useMemo<WorkItemListItem[]>(() => data?.data ?? [], [data]);
   const total = data?.total ?? 0;
+
+  // ── Bulk selection ──────────────────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const anchorRef = useRef<number | null>(null);
+  const headerCheckRef = useRef<HTMLInputElement>(null);
+  const bulk = useBulkUpdateWorkItems();
+  const confirm = useConfirm();
+  const { data: sprintData } = useSprintsList(
+    { project_id: currentProjectId },
+    { limit: 100 },
+  );
+  const activeSprints = (sprintData?.data ?? []).filter(
+    (s) => s.status !== "completed",
+  );
+
+  // Drop selections that are no longer visible (filter/search/refetch changes).
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const visible = new Set(items.map((i) => i.id));
+      const next = new Set([...prev].filter((id) => visible.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [items]);
+
+  const selectedCount = selectedIds.size;
+  const allVisibleSelected =
+    items.length > 0 && items.every((i) => selectedIds.has(i.id));
+
+  useEffect(() => {
+    if (headerCheckRef.current) {
+      headerCheckRef.current.indeterminate =
+        selectedCount > 0 && !allVisibleSelected;
+    }
+  }, [selectedCount, allVisibleSelected]);
+
+  // Escape clears the selection (ignored while typing or when a dialog/menu is open).
+  useEffect(() => {
+    if (selectedCount === 0) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) {
+        return;
+      }
+      if (document.querySelector('[role="dialog"], [role="menu"]')) return;
+      setSelectedIds(new Set());
+      setBulkError(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedCount]);
+
+  function toggleRow(index: number, shiftKey: boolean) {
+    const anchor = anchorRef.current;
+    if (shiftKey && anchor !== null && anchor < items.length) {
+      const lo = Math.min(anchor, index);
+      const hi = Math.max(anchor, index);
+      const rangeIds = items.slice(lo, hi + 1).map((i) => i.id);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        rangeIds.forEach((id) => next.add(id));
+        return next;
+      });
+    } else {
+      const id = items[index].id;
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    }
+    anchorRef.current = index;
+  }
+
+  function toggleAllVisible() {
+    setSelectedIds(
+      allVisibleSelected ? new Set() : new Set(items.map((i) => i.id)),
+    );
+    anchorRef.current = null;
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+    setBulkError(null);
+    anchorRef.current = null;
+  }
+
+  function runBulk(payload: BulkWorkItemPayload, onDone?: () => void) {
+    setBulkError(null);
+    bulk.mutate(payload, {
+      onSuccess: () => onDone?.(),
+      onError: (err) =>
+        setBulkError(err instanceof Error ? err.message : "Bulk action failed"),
+    });
+  }
+
+  function applyPatch(patch: BulkWorkItemPatch) {
+    runBulk({ ids: Array.from(selectedIds), action: "update", patch });
+  }
+
+  async function handleBulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (
+      !(await confirm({
+        title: `Delete ${ids.length} work item${ids.length === 1 ? "" : "s"}?`,
+        description: "They will be moved to the trash.",
+        confirmText: "Delete",
+        destructive: true,
+      }))
+    )
+      return;
+    runBulk({ ids, action: "delete" }, clearSelection);
+  }
 
   const hasActiveFilters =
     filters.status !== "all" ||
@@ -337,6 +693,9 @@ export function WorkItemList() {
           <span className="sm:hidden">New</span>
         </Button>
       </div>
+
+      {/* Saved views */}
+      <SavedViewsBar />
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -396,7 +755,14 @@ export function WorkItemList() {
       {/* Table header */}
       {!isLoading && !isError && items.length > 0 && (
         <div className="flex items-center gap-3 px-4 py-1.5 text-xs font-medium text-muted-foreground border-b border-border bg-muted/30 rounded-t-md">
-          <span className="w-4 shrink-0" />
+          <input
+            ref={headerCheckRef}
+            type="checkbox"
+            aria-label="Select all visible work items"
+            checked={allVisibleSelected}
+            onChange={toggleAllVisible}
+            className="h-4 w-4 shrink-0 cursor-pointer accent-primary"
+          />
           <span className="flex-1">Title</span>
           <span className="w-20 hidden sm:block">Status</span>
           <span className="w-8 hidden md:block text-center">Pri.</span>
@@ -431,13 +797,32 @@ export function WorkItemList() {
         ) : (
           <ScrollArea className="flex-1">
             <div className="py-1">
-              {items.map((item) => (
-                <WorkItemRow key={item.id} item={item} />
+              {items.map((item, index) => (
+                <WorkItemRow
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  selected={selectedIds.has(item.id)}
+                  onToggleSelect={toggleRow}
+                />
               ))}
             </div>
           </ScrollArea>
         )}
       </div>
+
+      {/* Bulk action bar */}
+      {selectedCount > 0 && (
+        <BulkActionBar
+          count={selectedCount}
+          disabled={bulk.isPending}
+          error={bulkError}
+          sprints={activeSprints}
+          onPatch={applyPatch}
+          onDelete={handleBulkDelete}
+          onClear={clearSelection}
+        />
+      )}
 
       {/* Create dialog */}
       <CreateWorkItemDialog />

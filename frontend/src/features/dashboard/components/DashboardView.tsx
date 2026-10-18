@@ -2,6 +2,7 @@
 
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
 import { DashboardGreeting } from "./DashboardGreeting";
+import { GetStartedCard } from "./GetStartedCard";
 import { StatCards } from "./StatCards";
 import { StatCardsSkeleton } from "./StatCardsSkeleton";
 import { TodayPanel } from "./TodayPanel";
@@ -17,6 +18,9 @@ export function DashboardView() {
     <div className="flex flex-col gap-6 animate-fade-in">
       {/* Greeting row */}
       <DashboardGreeting />
+
+      {/* Onboarding checklist — only for empty workspaces */}
+      <GetStartedCard />
 
       {/* ── Sprint-centric section ─────────────────────────────────────── */}
       <SprintDashboardSection />

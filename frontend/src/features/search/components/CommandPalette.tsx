@@ -20,9 +20,11 @@ import {
   X,
   ArrowRight,
   BookOpen,
+  Keyboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores";
+import { SHORTCUTS_MODAL_ID } from "@/features/shortcuts";
 import { useSearchStore } from "../store";
 import { useSearchQuery } from "../hooks/useSearch";
 import { useQuickCreateTask, useQuickCreateHabit } from "../hooks/useQuickCreate";
@@ -190,7 +192,7 @@ export function CommandPalette() {
   const router = useRouter();
 
   // Global UI state
-  const { commandPaletteOpen, closeCommandPalette } = useUIStore();
+  const { commandPaletteOpen, closeCommandPalette, openModal } = useUIStore();
 
   // Search-feature state
   const {
@@ -368,6 +370,26 @@ export function CommandPalette() {
                   <span>Create habit</span>
                   <kbd className="ml-auto rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                     H
+                  </kbd>
+                </Command.Item>
+
+                <Command.Item
+                  value="keyboard-shortcuts"
+                  onSelect={() => {
+                    handleClose();
+                    openModal(SHORTCUTS_MODAL_ID);
+                  }}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-[15px]",
+                    "aria-selected:bg-accent",
+                  )}
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded bg-muted">
+                    <Keyboard className="h-4 w-4 text-muted-foreground" />
+                  </span>
+                  <span>Keyboard shortcuts</span>
+                  <kbd className="ml-auto rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                    ?
                   </kbd>
                 </Command.Item>
 

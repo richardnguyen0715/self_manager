@@ -12,6 +12,7 @@ import {
   Target,
   BarChart3,
   Settings,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Zap,
@@ -32,35 +33,73 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUIStore } from "@/stores";
+import { useNavStore } from "@/stores/nav.store";
 import { ProjectSwitcher } from "@/components/ui/project-switcher";
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  /** Can be hidden via Settings > Appearance > Sidebar. */
+  hideable?: boolean;
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  // ── Agile ────────────────────────────────────────────────────────────────
-  { label: "Backlog", href: "/backlog", icon: ListTodo },
-  { label: "Board", href: "/board", icon: SquareKanban },
-  { label: "Sprints", href: "/sprints", icon: Rocket },
-  { label: "Work Items", href: "/work-items", icon: Trello },
-  // ── Personal ─────────────────────────────────────────────────────────────
-  { label: "Calendar", href: "/calendar", icon: Calendar },
-  { label: "Time Blocking", href: "/timeblocking", icon: Clock },
-  { label: "Habits", href: "/habits", icon: Repeat2 },
-  { label: "Focus", href: "/focus", icon: Timer },
-  { label: "Hierarchy", href: "/hierarchy", icon: Network },
-  { label: "Docs", href: "/docs", icon: FileText },
-  { label: "Goals", href: "/goals", icon: Target },
-  { label: "Analytics", href: "/analytics", icon: BarChart3 },
-  // ── Management ───────────────────────────────────────────────────────────
-  { label: "Trash", href: "/trash", icon: Trash2 },
+interface NavSectionDef {
+  id: string;
+  label: string;
+  items: NavItem[];
+}
+
+const NAV_SECTIONS: NavSectionDef[] = [
+  {
+    id: "workspace",
+    label: "Workspace",
+    items: [
+      { label: "Organizations", href: "/organizations", icon: Building2 },
+      { label: "Projects", href: "/projects", icon: FolderOpen },
+    ],
+  },
+  {
+    id: "planning",
+    label: "Planning",
+    items: [
+      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { label: "Backlog", href: "/backlog", icon: ListTodo, hideable: true },
+      { label: "Board", href: "/board", icon: SquareKanban, hideable: true },
+      { label: "Sprints", href: "/sprints", icon: Rocket, hideable: true },
+      { label: "Work Items", href: "/work-items", icon: Trello, hideable: true },
+      { label: "Hierarchy", href: "/hierarchy", icon: Network, hideable: true },
+      { label: "Goals", href: "/goals", icon: Target, hideable: true },
+    ],
+  },
+  {
+    id: "life",
+    label: "Life",
+    items: [
+      { label: "Life Calendar", href: "/life", icon: CalendarHeart, hideable: true },
+      { label: "Calendar", href: "/calendar", icon: Calendar, hideable: true },
+      { label: "Time Blocking", href: "/timeblocking", icon: Clock, hideable: true },
+      { label: "Habits", href: "/habits", icon: Repeat2, hideable: true },
+      { label: "Focus", href: "/focus", icon: Timer, hideable: true },
+    ],
+  },
+  {
+    id: "knowledge",
+    label: "Knowledge",
+    items: [{ label: "Docs", href: "/docs", icon: FileText, hideable: true }],
+  },
+  {
+    id: "insights",
+    label: "Insights",
+    items: [
+      { label: "Usage", href: "/usage", icon: BookOpen, hideable: true },
+      { label: "Analytics", href: "/analytics", icon: BarChart3, hideable: true },
+    ],
+  },
 ];
 
 const BOTTOM_ITEMS: NavItem[] = [
+  { label: "Trash", href: "/trash", icon: Trash2 },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -77,6 +116,9 @@ interface SidebarProps {
 export function Sidebar({ variant = "desktop" }: SidebarProps) {
   const pathname = usePathname();
   const { sidebarOpen, toggleSidebar, closeMobileNav } = useUIStore();
+  const hiddenNavItems = useNavStore((s) => s.hiddenNavItems);
+  const collapsedSections = useNavStore((s) => s.collapsedSections);
+  const toggleSectionCollapsed = useNavStore((s) => s.toggleSectionCollapsed);
 
   // Mobile drawer is always expanded; desktop respects sidebarOpen toggle.
   const collapsed = variant === "desktop" && !sidebarOpen;
@@ -119,56 +161,54 @@ export function Sidebar({ variant = "desktop" }: SidebarProps) {
 
       <Separator />
 
-      {/* Top-level links — not scoped to the selected project */}
-      <div className="px-2 py-2 flex flex-col gap-1">
-        <NavLink
-          item={{ label: "Organizations", href: "/organizations", icon: Building2 }}
-          isActive={pathname.startsWith("/organizations")}
-          collapsed={collapsed}
-          onNavClick={handleNavClick}
-        />
-        <NavLink
-          item={{ label: "Projects", href: "/projects", icon: FolderOpen }}
-          isActive={pathname.startsWith("/projects")}
-          collapsed={collapsed}
-          onNavClick={handleNavClick}
-        />
-        {/* Life Calendar — personal, Notion-style, independent of any project */}
-        <NavLink
-          item={{ label: "Life Calendar", href: "/life", icon: CalendarHeart }}
-          isActive={pathname.startsWith("/life")}
-          collapsed={collapsed}
-          onNavClick={handleNavClick}
-        />
-        {/* Usage — how to use every feature */}
-        <NavLink
-          item={{ label: "Usage", href: "/usage", icon: BookOpen }}
-          isActive={pathname.startsWith("/usage")}
-          collapsed={collapsed}
-          onNavClick={handleNavClick}
-        />
-      </div>
-
-      <Separator />
-
-      {/* Nav */}
+      {/* Grouped nav — collapsible sections, hidden items skipped */}
       <ScrollArea className="flex-1 px-2 py-3">
-        <nav className="flex flex-col gap-1">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              isActive={pathname.startsWith(item.href)}
-              collapsed={collapsed}
-              onNavClick={handleNavClick}
-            />
-          ))}
+        <nav className="flex flex-col gap-3">
+          {NAV_SECTIONS.map((section) => {
+            const items = section.items.filter(
+              (item) => !(item.hideable && hiddenNavItems.includes(item.href)),
+            );
+            if (items.length === 0) return null;
+            // Icon-only mode always shows every item and hides the labels.
+            const sectionCollapsed = !collapsed && Boolean(collapsedSections[section.id]);
+
+            return (
+              <div key={section.id} className="flex flex-col gap-1">
+                {!collapsed && (
+                  <button
+                    type="button"
+                    onClick={() => toggleSectionCollapsed(section.id)}
+                    aria-expanded={!sectionCollapsed}
+                    className="flex items-center justify-between px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-sidebar-foreground"
+                  >
+                    {section.label}
+                    <ChevronDown
+                      className={cn(
+                        "h-3 w-3 transition-transform",
+                        sectionCollapsed && "-rotate-90",
+                      )}
+                    />
+                  </button>
+                )}
+                {!sectionCollapsed &&
+                  items.map((item) => (
+                    <NavLink
+                      key={item.href}
+                      item={item}
+                      isActive={pathname.startsWith(item.href)}
+                      collapsed={collapsed}
+                      onNavClick={handleNavClick}
+                    />
+                  ))}
+              </div>
+            );
+          })}
         </nav>
       </ScrollArea>
 
       <Separator />
 
-      {/* Bottom items */}
+      {/* Bottom items: Trash, Settings */}
       <div className="px-2 py-3">
         <nav className="flex flex-col gap-1">
           {BOTTOM_ITEMS.map((item) => (

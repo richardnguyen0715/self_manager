@@ -5,6 +5,7 @@
 //! ```text
 //! GET    /api/work-items                              list_work_items
 //! POST   /api/work-items                              create_work_item
+//! POST   /api/work-items/bulk                         bulk_work_items (update | delete)
 //! GET    /api/work-items/:id                          get_work_item
 //! PATCH  /api/work-items/:id                          update_work_item
 //! DELETE /api/work-items/:id                          delete_work_item (soft)
@@ -53,6 +54,8 @@ pub fn router() -> Router<AppState> {
     Router::new()
         // Collection
         .route("/", get(handlers::list_work_items).post(handlers::create_work_item))
+        // Bulk update / soft-delete (static segment; does not clash with `/:id`)
+        .route("/bulk", post(handlers::bulk_work_items))
         // Item CRUD
         .route(
             "/:id",

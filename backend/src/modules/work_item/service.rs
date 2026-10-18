@@ -887,6 +887,282 @@ pub async fn set_points(
     Ok(work_item_into_response(updated, subtasks))
 }
 
+// ── bulk operations ────────────────────────────────────────────────────────────
+
+/// Columns read under `FOR UPDATE` so a bulk update can compute each row's new
+/// state (completed_at, labels, activity diffs) from its current values.
+#[derive(Debug, sqlx::FromRow)]
+struct BulkSnapshot {
+    id: Uuid,
+    sprint_id: Option<Uuid>,
+    status: String,
+    priority: String,
+    story_points: Option<i32>,
+    labels: Vec<String>,
+    completed_at: Option<chrono::DateTime<Utc>>,
+}
+
+/// Trim labels, drop empties and duplicates while keeping first-seen order.
+fn normalize_labels(raw: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for label in raw {
+        let t = label.trim();
+        if !t.is_empty() && !out.iter().any(|x| x == t) {
+            out.push(t.to_owned());
+        }
+    }
+    out
+}
+
+/// Insert one `work_item_activity` row inside an open transaction when the
+/// value actually changed (mirrors [`record_change`], but transactional).
+async fn tx_record_change(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    work_item_id: Uuid,
+    user_id: Uuid,
+    field: &str,
+    old: Option<String>,
+    new: Option<String>,
+) -> AppResult<()> {
+    if old == new {
+        return Ok(());
+    }
+    sqlx::query(
+        "INSERT INTO work_item_activity \
+         (id, work_item_id, user_id, field, old_value, new_value) \
+         VALUES ($1, $2, $3, $4, $5, $6)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(work_item_id)
+    .bind(user_id)
+    .bind(field)
+    .bind(old)
+    .bind(new)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+/// Apply a bulk `update` or `delete` to the caller's selected work items.
+///
+/// Only rows owned by `user_id` and not soft-deleted are touched. The whole
+/// operation runs in a single transaction. Mirrors the single-item semantics:
+/// `completed_at` follows status transitions, activity rows are written for
+/// status / priority / story_points / sprint changes, and
+/// [`DomainEvent::WorkItemCompleted`] is emitted for each item that becomes done.
+///
+/// # Errors
+///
+/// - [`AppError::Validation`] — empty patch, conflicting sprint flags, or
+///   invalid story points.
+/// - [`AppError::NotFoundMsg`] — target sprint not found / not owned.
+/// - [`AppError::Db`] — database failure.
+pub async fn bulk_work_items(
+    state: &AppState,
+    user_id: Uuid,
+    req: super::models::BulkWorkItemRequest,
+) -> AppResult<super::models::BulkWorkItemResponse> {
+    use super::models::{BulkAction, BulkWorkItemResponse};
+
+    let mut ids = req.ids;
+    ids.sort_unstable();
+    ids.dedup();
+
+    match req.action {
+        BulkAction::Delete => {
+            let mut tx = state.db.begin().await?;
+            let result = sqlx::query(
+                "UPDATE work_items SET deleted_at = now(), updated_at = now() \
+                 WHERE user_id = $1 AND id = ANY($2) AND deleted_at IS NULL",
+            )
+            .bind(user_id)
+            .bind(&ids)
+            .execute(&mut *tx)
+            .await?;
+            tx.commit().await?;
+            Ok(BulkWorkItemResponse {
+                updated: result.rows_affected(),
+            })
+        }
+        BulkAction::Update => {
+            let patch = req.patch.ok_or_else(|| {
+                AppError::Validation("patch is required for action 'update'".to_owned())
+            })?;
+            bulk_update_items(state, user_id, &ids, patch).await
+        }
+    }
+}
+
+async fn bulk_update_items(
+    state: &AppState,
+    user_id: Uuid,
+    ids: &[Uuid],
+    patch: super::models::BulkPatch,
+) -> AppResult<super::models::BulkWorkItemResponse> {
+    use super::models::BulkWorkItemResponse;
+
+    validate_story_points(patch.story_points)?;
+    if patch.sprint_id.is_some() && patch.clear_sprint {
+        return Err(AppError::Validation(
+            "sprint_id and clear_sprint are mutually exclusive".to_owned(),
+        ));
+    }
+    if patch.story_points.is_some() && patch.clear_story_points {
+        return Err(AppError::Validation(
+            "story_points and clear_story_points are mutually exclusive".to_owned(),
+        ));
+    }
+
+    let add_labels = normalize_labels(&patch.add_labels);
+    let remove_labels = normalize_labels(&patch.remove_labels);
+    let has_change = patch.status.is_some()
+        || patch.priority.is_some()
+        || patch.item_type.is_some()
+        || patch.sprint_id.is_some()
+        || patch.clear_sprint
+        || patch.story_points.is_some()
+        || patch.clear_story_points
+        || !add_labels.is_empty()
+        || !remove_labels.is_empty();
+    if !has_change {
+        return Err(AppError::Validation(
+            "patch must change at least one field".to_owned(),
+        ));
+    }
+
+    if let Some(sprint_id) = patch.sprint_id {
+        let exists = sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM sprints WHERE id = $1 AND user_id = $2",
+        )
+        .bind(sprint_id)
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await?;
+        if exists.is_none() {
+            return Err(AppError::NotFoundMsg("sprint not found".to_owned()));
+        }
+    }
+
+    let mut tx = state.db.begin().await?;
+
+    let snapshots = sqlx::query_as::<_, BulkSnapshot>(
+        "SELECT id, sprint_id, status::text AS status, priority::text AS priority, \
+                story_points, labels, completed_at \
+         FROM work_items \
+         WHERE user_id = $1 AND id = ANY($2) AND deleted_at IS NULL \
+         FOR UPDATE",
+    )
+    .bind(user_id)
+    .bind(ids)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    let mut completed_ids: Vec<(Uuid, Option<Uuid>)> = Vec::new();
+
+    for cur in &snapshots {
+        let new_status = patch
+            .status
+            .as_ref()
+            .map(|s| s.as_str())
+            .unwrap_or(cur.status.as_str())
+            .to_owned();
+        let new_priority = patch
+            .priority
+            .as_ref()
+            .map(|p| p.as_str())
+            .unwrap_or(cur.priority.as_str())
+            .to_owned();
+        let new_type = patch.item_type.as_ref().map(|t| t.as_str().to_owned());
+        let new_sprint_id = if patch.clear_sprint {
+            None
+        } else {
+            patch.sprint_id.or(cur.sprint_id)
+        };
+        let new_story_points = if patch.clear_story_points {
+            None
+        } else {
+            patch.story_points.or(cur.story_points)
+        };
+        let mut new_labels = cur.labels.clone();
+        new_labels.retain(|l| !remove_labels.contains(l));
+        for label in &add_labels {
+            if !new_labels.contains(label) {
+                new_labels.push(label.clone());
+            }
+        }
+        let status_changed = new_status != cur.status;
+
+        // Same rule as set_status / update_work_item.
+        let new_completed_at = if new_status == "done" && cur.status != "done" {
+            Some(Utc::now())
+        } else if new_status != "done" {
+            None
+        } else {
+            cur.completed_at
+        };
+
+        sqlx::query(
+            r#"
+            UPDATE work_items wi
+            SET
+                status       = ($3::text)::work_item_status,
+                priority     = ($4::text)::task_priority,
+                type         = COALESCE(($5::text)::work_item_type, wi.type),
+                sprint_id    = $6,
+                story_points = $7,
+                labels       = $8,
+                completed_at = $9,
+                column_id    = CASE WHEN $10::bool THEN COALESCE(
+                    (SELECT bc.id FROM board_columns bc
+                     WHERE bc.user_id = $2
+                       AND bc.mapped_status = ($3::text)::work_item_status
+                       AND (bc.project_id IS NOT DISTINCT FROM wi.project_id)
+                     ORDER BY bc.position ASC
+                     LIMIT 1),
+                    wi.column_id)
+                    ELSE wi.column_id END,
+                updated_at   = now()
+            WHERE wi.id = $1 AND wi.user_id = $2 AND wi.deleted_at IS NULL
+            "#,
+        )
+        .bind(cur.id)
+        .bind(user_id)
+        .bind(&new_status)
+        .bind(&new_priority)
+        .bind(new_type)
+        .bind(new_sprint_id)
+        .bind(new_story_points)
+        .bind(&new_labels)
+        .bind(new_completed_at)
+        .bind(status_changed)
+        .execute(&mut *tx)
+        .await?;
+
+        if cur.status != "done" && new_status == "done" {
+            completed_ids.push((cur.id, new_sprint_id));
+        }
+
+        tx_record_change(&mut tx, cur.id, user_id, "status", Some(cur.status.clone()), Some(new_status.clone())).await?;
+        tx_record_change(&mut tx, cur.id, user_id, "priority", Some(cur.priority.clone()), Some(new_priority.clone())).await?;
+        tx_record_change(&mut tx, cur.id, user_id, "story_points", cur.story_points.map(|p| p.to_string()), new_story_points.map(|p| p.to_string())).await?;
+        tx_record_change(&mut tx, cur.id, user_id, "sprint", cur.sprint_id.map(|i| i.to_string()), new_sprint_id.map(|i| i.to_string())).await?;
+    }
+
+    tx.commit().await?;
+
+    for (work_item_id, sprint_id) in completed_ids {
+        let _ = state.events.send(DomainEvent::WorkItemCompleted {
+            work_item_id,
+            user_id,
+            sprint_id,
+        });
+    }
+
+    Ok(BulkWorkItemResponse {
+        updated: snapshots.len() as u64,
+    })
+}
+
 /// Move a work item to a sprint.
 ///
 /// Validates sprint ownership and, when the sprint has `capacity_points > 0`,
