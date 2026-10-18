@@ -1,5 +1,6 @@
 "use client";
 
+import { useLayoutEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -115,8 +116,31 @@ interface SidebarProps {
   variant?: "desktop" | "mobile";
 }
 
+// Every page wraps itself in <AppShell>, so the sidebar remounts on each route
+// change and would reset its scroll to the top. Remember the position here.
+let savedNavScrollTop = 0;
+
 export function Sidebar({ variant = "desktop" }: SidebarProps) {
   const pathname = usePathname();
+  const navScrollRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const viewport = navScrollRef.current?.querySelector<HTMLElement>(
+      "[data-radix-scroll-area-viewport]",
+    );
+    if (!viewport) return;
+    viewport.scrollTop = savedNavScrollTop;
+    // Direct load / deep link: make sure the active item is visible.
+    viewport
+      .querySelector<HTMLElement>('a[aria-current="page"]')
+      ?.scrollIntoView({ block: "nearest" });
+    const onScroll = () => {
+      savedNavScrollTop = viewport.scrollTop;
+    };
+    viewport.addEventListener("scroll", onScroll, { passive: true });
+    return () => viewport.removeEventListener("scroll", onScroll);
+  }, []);
+
   const { sidebarOpen, toggleSidebar, closeMobileNav } = useUIStore();
   const hiddenNavItems = useNavStore((s) => s.hiddenNavItems);
   const collapsedSections = useNavStore((s) => s.collapsedSections);
@@ -164,7 +188,7 @@ export function Sidebar({ variant = "desktop" }: SidebarProps) {
       <Separator />
 
       {/* Grouped nav — collapsible sections, hidden items skipped */}
-      <ScrollArea className="flex-1 px-2 py-3">
+      <ScrollArea ref={navScrollRef} className="flex-1 px-2 py-3">
         <nav className="flex flex-col gap-3">
           {NAV_SECTIONS.map((section) => {
             const items = section.items.filter(
@@ -259,6 +283,7 @@ function NavLink({ item, isActive, collapsed, onNavClick }: NavLinkProps) {
     <Link
       href={item.href}
       onClick={onNavClick}
+      aria-current={isActive ? "page" : undefined}
       className={cn(
         "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
         "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
