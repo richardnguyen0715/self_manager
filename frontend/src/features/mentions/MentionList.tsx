@@ -54,8 +54,8 @@ function sortByTypeOrder(items: MentionSearchResult[]): MentionSearchResult[] {
  * Popup list for the @ picker. Owns its own search (react-query, 150 ms
  * debounce) so the suggestion plugin only needs the query text.
  *
- * Keys: ArrowUp/ArrowDown move, Enter selects, Tab / Shift+Tab cycle the
- * type filter pills. Escape is handled by the suggestion wrapper.
+ * Keys: ArrowUp/ArrowDown move, Enter selects, ArrowLeft/ArrowRight (or
+ * Shift+Tab / Tab) cycle the type filter pills. Escape is handled by the suggestion wrapper.
  */
 export const MentionList = forwardRef<MentionListHandle, MentionListProps>(
   function MentionList({ query, command }, ref) {
@@ -96,8 +96,9 @@ export const MentionList = forwardRef<MentionListHandle, MentionListProps>(
           command(item);
           return true;
         }
-        if (event.key === "Tab") {
-          const step = event.shiftKey ? -1 : 1;
+        if (event.key === "Tab" || event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          const step =
+            event.key === "ArrowLeft" || (event.key === "Tab" && event.shiftKey) ? -1 : 1;
           setFilterIndex((i) => (i + step + MENTION_FILTERS.length) % MENTION_FILTERS.length);
           return true;
         }
@@ -130,6 +131,9 @@ export const MentionList = forwardRef<MentionListHandle, MentionListProps>(
               type="button"
               role="tab"
               aria-selected={i === filterIndex}
+              ref={(el) => {
+                if (el && i === filterIndex) el.scrollIntoView({ block: "nearest", inline: "nearest" });
+              }}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => setFilterIndex(i)}
               className={cn(
