@@ -18,6 +18,7 @@ use super::{
 const MAX_NAME_LEN: usize = 120;
 const MAX_TITLE_LEN: usize = 200;
 const MAX_TEXT_LEN: usize = 20_000;
+const MAX_NOTES_LEN: usize = 100_000;
 const MAX_ACTION_LEN: usize = 500;
 const MAX_SECTIONS: usize = 30;
 const MAX_SECTION_KEY_LEN: usize = 40;
@@ -29,7 +30,7 @@ const ACTION_COLS: &str =
 const ENTRY_COLS: &str = "id, section_id, position, body, rating, mood, checked";
 const SECTION_COLS: &str = "id, position, key, title, prompt, input_type, auto_source";
 const RECORD_COLS: &str = "template_id, period_start, period_end, scope_type, scope_id, status, \
-     summary, snapshot, started_at, created_at, updated_at";
+     summary, notes, snapshot, started_at, created_at, updated_at";
 const TEMPLATE_COLS: &str =
     "id, user_id, name, kind, description, is_builtin, created_at, updated_at";
 
@@ -409,6 +410,7 @@ pub async fn detail(state: &AppState, user_id: Uuid, retro_id: Uuid) -> AppResul
             summary,
             template_id: rec.template_id,
             summary_text: rec.summary,
+            notes: rec.notes,
             snapshot: rec.snapshot,
             started_at: rec.started_at,
             created_at: rec.created_at,
@@ -812,12 +814,18 @@ pub async fn update(
         None => (false, None),
     };
 
+    let (notes_set, notes_val) = match req.notes {
+        Some(n) => (true, clean_optional_text("notes", n, MAX_NOTES_LEN)?),
+        None => (false, None),
+    };
+
     let result = sqlx::query(
         "UPDATE retros SET \
             title = COALESCE($3::text, title), \
             summary = CASE WHEN $4::bool THEN $5::text ELSE summary END, \
             rating = CASE WHEN $6::bool THEN $7::smallint ELSE rating END, \
             mood = CASE WHEN $8::bool THEN $9::smallint ELSE mood END, \
+            notes = CASE WHEN $10::bool THEN $11::text ELSE notes END, \
             updated_at = now() \
          WHERE id = $1 AND user_id = $2",
     )
@@ -830,6 +838,8 @@ pub async fn update(
     .bind(rating_val)
     .bind(mood_set)
     .bind(mood_val)
+    .bind(notes_set)
+    .bind(notes_val)
     .execute(&state.db)
     .await?;
     if result.rows_affected() == 0 {

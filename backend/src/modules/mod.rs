@@ -23,6 +23,7 @@ pub mod goal;
 pub mod habit;
 pub mod initiative;
 pub mod label;
+pub mod mention;
 pub mod notification;
 pub mod organization;
 pub mod page;

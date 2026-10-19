@@ -13,6 +13,7 @@ import { LinkIcon, Loader2, AlertCircle, FileText } from "lucide-react";
 import { usePageBacklinks } from "@/features/docs";
 import type { PageBacklink } from "@/types";
 import { cn } from "@/lib/utils";
+import { BacklinksList } from "@/features/mentions";
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -102,6 +103,9 @@ export function BacklinksPanel({ pageId, spaceId, className }: BacklinksPanelPro
           ))}
         </div>
       )}
+
+      {/* Entity mentions (work items, retros, ...) that point at this page */}
+      <BacklinksList targetType="doc" targetId={pageId} />
     </div>
   );
 }

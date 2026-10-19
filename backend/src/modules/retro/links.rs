@@ -33,8 +33,12 @@ pub async fn lookup(
     // (title, subtitle) per target type; `href` is derived below.
     let sql = match target_type {
         "work_item" => {
-            "SELECT title, status::text FROM work_items \
-             WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL"
+            "SELECT wi.title, concat_ws(' · ', \
+                 CASE WHEN wi.seq_id IS NOT NULL \
+                      THEN COALESCE(p.key, 'WI') || '-' || wi.seq_id::text END, \
+                 wi.status::text) \
+             FROM work_items wi LEFT JOIN projects p ON p.id = wi.project_id \
+             WHERE wi.id = $1 AND wi.user_id = $2 AND wi.deleted_at IS NULL"
         }
         "sprint" => "SELECT name, status::text FROM sprints WHERE id = $1 AND user_id = $2",
         "project" => {

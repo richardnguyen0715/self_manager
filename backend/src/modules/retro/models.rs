@@ -126,6 +126,7 @@ pub struct RetroRecord {
     pub scope_id: Option<Uuid>,
     pub status: String,
     pub summary: Option<String>,
+    pub notes: Option<String>,
     pub snapshot: JsonValue,
     pub started_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
@@ -139,6 +140,8 @@ pub struct RetroHead {
     pub template_id: Option<Uuid>,
     #[serde(rename = "summary")]
     pub summary_text: Option<String>,
+    /// Free-form rich notes (HTML). `null` when never written.
+    pub notes: Option<String>,
     pub snapshot: JsonValue,
     pub started_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
@@ -202,6 +205,9 @@ pub struct PatchRetroRequest {
     pub title: Option<String>,
     #[serde(default, deserialize_with = "double_option")]
     pub summary: Option<Option<String>>,
+    /// Free-form notes (HTML). `Some("")` clears; max 100000 chars.
+    #[serde(default, deserialize_with = "double_option")]
+    pub notes: Option<Option<String>>,
     #[serde(default, deserialize_with = "double_option")]
     pub rating: Option<Option<i16>>,
     #[serde(default, deserialize_with = "double_option")]

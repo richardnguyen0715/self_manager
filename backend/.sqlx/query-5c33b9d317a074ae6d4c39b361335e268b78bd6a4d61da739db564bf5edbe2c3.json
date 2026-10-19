@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            id,\n            user_id,\n            goal_id,\n            name,\n            description,\n            color,\n            deadline,\n            status  AS \"status: ProjectStatus\",\n            position,\n            organization_id,\n            deleted_at,\n            key,\n            created_at,\n            updated_at\n        FROM projects\n        WHERE user_id = $1\n          AND deleted_at IS NOT NULL\n        ORDER BY deleted_at DESC\n        ",
+  "query": "\n        INSERT INTO projects (user_id, goal_id, name, description, color, deadline, position, key, estimate_system)\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9::text, 'fibonacci'))\n        RETURNING\n            id,\n            user_id,\n            goal_id,\n            name,\n            description,\n            color,\n            deadline,\n            status  AS \"status: ProjectStatus\",\n            position,\n            organization_id,\n            deleted_at,\n            key,\n            estimate_system,\n            created_at,\n            updated_at\n        ",
   "describe": {
     "columns": [
       {
@@ -76,18 +76,31 @@
       },
       {
         "ordinal": 12,
+        "name": "estimate_system",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 13,
+        "ordinal": 14,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Date",
+        "Int4",
+        "Text",
+        "Text"
       ]
     },
     "nullable": [
@@ -104,8 +117,9 @@
       true,
       true,
       false,
+      false,
       false
     ]
   },
-  "hash": "f52d94555cc74e8eafd34e9ba36539a8ad59640dbe4f1ed04aa1a5c3b7894d96"
+  "hash": "5c33b9d317a074ae6d4c39b361335e268b78bd6a4d61da739db564bf5edbe2c3"
 }

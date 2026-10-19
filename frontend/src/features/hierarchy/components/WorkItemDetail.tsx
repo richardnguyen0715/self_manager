@@ -40,6 +40,7 @@ import { PriorityBadge } from "./PriorityBadge";
 import { WorkItemTypeBadge } from "./WorkItemTypeBadge";
 import { PropertiesPanel } from "@/features/custom-properties";
 import { EstimateBadge } from "@/features/estimate";
+import { BacklinksList } from "@/features/mentions";
 
 // ─── Status dropdown ───────────────────────────────────────────────────────────
 
@@ -738,6 +739,7 @@ export function WorkItemDetail({ workItemId, onClose }: WorkItemDetailProps) {
                   Add a description...
                 </p>
               )}
+              <BacklinksList targetType="work_item" targetId={workItem.id} />
             </div>
 
             {/* Custom properties (renders nothing without a project or properties) */}

@@ -37,7 +37,6 @@ import { TableCell } from "@tiptap/extension-table-cell";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
-import Mention from "@tiptap/extension-mention";
 import CharacterCount from "@tiptap/extension-character-count";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import Highlight from "@tiptap/extension-highlight";
@@ -60,7 +59,6 @@ import { Bookmark } from "./extensions/Bookmark";
 import { Embed } from "./extensions/Embed";
 import { DatabaseEmbed } from "./extensions/DatabaseEmbed";
 import { PageMention } from "./extensions/PageMention";
-import type { PageMentionAttrs } from "./extensions/PageMention";
 import { NodeDelete } from "./extensions/NodeDelete";
 import { BlockSelection } from "./extensions/BlockSelection";
 
@@ -80,8 +78,6 @@ import type { SlashMenuHandle, SlashCommandItem } from "./SlashMenu";
 import { SlashMenu, buildSlashItems } from "./SlashMenu";
 
 // ── Page mention list ───────────────────────────────────────────────────────
-import { PageMentionList } from "./PageMentionList";
-import type { PageMentionListHandle } from "./PageMentionList";
 
 // ── Toolbar + template picker ───────────────────────────────────────────────
 import { Toolbar } from "./Toolbar";
@@ -91,10 +87,11 @@ import { TemplatesPicker } from "./TemplatesPicker";
 import { UrlDialog } from "./UrlDialog";
 
 // ── Hooks + types ───────────────────────────────────────────────────────────
-import { useUploadPageImage, useSearchPages, usePageTree } from "@/features/docs";
+import { useUploadPageImage } from "@/features/docs";
 import { usePeekStore } from "@/features/docs/store/usePeekStore";
-import type { TipTapDoc, PageSearchResult, PageTreeNode } from "@/types";
+import type { TipTapDoc } from "@/types";
 import { cn } from "@/lib/utils";
+import { EntityMention, MentionSuggestion, useMentionSync } from "@/features/mentions";
 
 // ── Lowlight (all languages bundled) ────────────────────────────────────────
 const lowlight = createLowlight(all);
@@ -216,103 +213,6 @@ function buildSlashSuggestion(
   };
 }
 
-// ── @page mention suggestion builder ────────────────────────────────────────
-
-function buildPageMentionSuggestion(
-  getSearchResults: (q: string) => PageSearchResult[],
-  isLoading: (q: string) => boolean,
-  onSelect: (attrs: PageMentionAttrs) => void,
-) {
-  return {
-    char: "@",
-    startOfLine: false,
-    command({
-      editor,
-      range,
-      props,
-    }: {
-      editor: TipTapEditor;
-      range: Range;
-      props: PageSearchResult;
-    }) {
-      // Delete the @ + query text, then insert the pageMention node
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .insertPageMention({ pageId: props.id, label: props.title })
-        .run();
-      onSelect({ pageId: props.id, label: props.title });
-    },
-    items({ query }: { query: string }): PageSearchResult[] {
-      return getSearchResults(query);
-    },
-    render() {
-      let rootEl: ReturnType<typeof createRoot> | null = null;
-      let popupInstance: ReturnType<typeof tippy> | null = null;
-      let listHandle: PageMentionListHandle | null = null;
-
-      return {
-        onStart(suggProps: SuggestionProps<PageSearchResult, PageSearchResult>) {
-          const container = document.createElement("div");
-          rootEl = createRoot(container);
-          rootEl.render(
-            <PageMentionList
-              ref={(r) => { listHandle = r; }}
-              items={suggProps.items}
-              loading={isLoading(suggProps.query ?? "")}
-              command={(item) => suggProps.command(item)}
-            />,
-          );
-
-          popupInstance = tippy("body", {
-            getReferenceClientRect: (suggProps.clientRect ?? (() => new DOMRect())) as () => DOMRect,
-            appendTo: () => document.body,
-            content: container,
-            showOnCreate: true,
-            interactive: true,
-            trigger: "manual",
-            placement: "bottom-start",
-            maxWidth: "none",
-          });
-        },
-
-        onUpdate(suggProps: SuggestionProps<PageSearchResult, PageSearchResult>) {
-          if (rootEl) {
-            rootEl.render(
-              <PageMentionList
-                ref={(r) => { listHandle = r; }}
-                items={suggProps.items}
-                loading={isLoading(suggProps.query ?? "")}
-                command={(item) => suggProps.command(item)}
-              />,
-            );
-          }
-          if (popupInstance?.[0]) {
-            popupInstance[0].setProps({
-              getReferenceClientRect: (suggProps.clientRect ?? (() => new DOMRect())) as () => DOMRect,
-            });
-          }
-        },
-
-        onKeyDown(kd: SuggestionKeyDownProps) {
-          if (kd.event.key === "Escape") {
-            popupInstance?.[0]?.hide();
-            return true;
-          }
-          return listHandle?.onKeyDown(kd) ?? false;
-        },
-
-        onExit() {
-          popupInstance?.[0]?.destroy();
-          rootEl?.unmount();
-        },
-      };
-    },
-  };
-}
-
 // ── Doc helpers ───────────────────────────────────────────────────────────────
 
 function normalizeDoc(doc: TipTapDoc): TipTapDoc {
@@ -381,45 +281,6 @@ export function DocEditor({
   const [templatePickerOpen, setTemplatePickerOpen] = useState(
     showTemplatePicker && !hasContent(value),
   );
-
-  // ── @page mention query ────────────────────────────────────────────────────
-  const [mentionQuery, setMentionQuery] = useState("");
-
-  // When query is non-empty: call the search endpoint scoped to the space.
-  // Guard: only enable when q has content (the endpoint requires a non-empty q).
-  const isQueryEmpty = mentionQuery.trim().length === 0;
-  const { data: searchResults, isFetching: searchLoading } = useSearchPages(
-    mentionQuery,
-    spaceId,
-  );
-
-  // When query is empty: show all pages in the current space from the page tree.
-  const { data: pageTree, isFetching: treeLoading } = usePageTree(spaceId ?? "");
-
-  // Flatten a PageTreeNode tree into a flat list of PageSearchResult-shaped items.
-  function flattenTree(nodes: PageTreeNode[]): PageSearchResult[] {
-    const result: PageSearchResult[] = [];
-    const visit = (n: PageTreeNode) => {
-      result.push({ id: n.id, space_id: n.space_id, title: n.title, kind: n.kind, icon: n.icon, snippet: null });
-      n.children.forEach(visit);
-    };
-    nodes.forEach(visit);
-    return result;
-  }
-
-  // Combine: empty query → page tree; non-empty query → search results.
-  const mentionResults: PageSearchResult[] = isQueryEmpty
-    ? flattenTree(pageTree ?? [])
-    : (searchResults ?? []);
-  const mentionLoading = isQueryEmpty ? treeLoading : searchLoading;
-
-  // Stable refs so suggestion config closures always get fresh values
-  const mentionResultsRef = useRef<PageSearchResult[]>([]);
-  const mentionLoadingRef = useRef(false);
-  useEffect(() => {
-    mentionResultsRef.current = mentionResults;
-    mentionLoadingRef.current = mentionLoading;
-  }, [mentionResults, mentionLoading]);
 
   // ── Image URL dialog state ────────────────────────────────────────────────
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
@@ -545,6 +406,7 @@ export function DocEditor({
         },
       }),
       PageMention,
+      EntityMention,
       // ── Existing custom nodes ──────────────────────────────────────────
       InfoPanel.extend({
         addNodeView() {
@@ -576,31 +438,19 @@ export function DocEditor({
       NodeDelete,
       // ── Multi-block selection (gutter drag + decorations) ─────────────
       BlockSelection,
-      // ── @page mention suggestion ──────────────────────────────────────
-      Extension.create({
-        name: "pageMentionSuggestion",
-        addOptions() {
-          return {
-            suggestion: buildPageMentionSuggestion(
-              (q) => {
-                setMentionQuery(q);
-                return mentionResultsRef.current;
-              },
-              () => mentionLoadingRef.current,
-              () => {
-                // No extra client action needed; backlinks synced on content save
-              },
-            ),
-          };
-        },
-        addProseMirrorPlugins() {
-          return [
-            Suggestion({
-              editor: this.editor,
-              pluginKey: new PluginKey("pageMentionSuggestion"),
-              ...this.options.suggestion,
-            }),
-          ];
+      // ── @ mention picker (all object types) ───────────────────────────
+      // Docs keep inserting the legacy `pageMention` node so page_links /
+      // backlinks continue to work; every other type becomes an entityMention.
+      MentionSuggestion.configure({
+        onSelect: (item, editor, range) => {
+          if (item.type !== "doc") return false;
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertPageMention({ pageId: item.id, label: item.title })
+            .run();
+          return true;
         },
       }),
       // ── Slash command ─────────────────────────────────────────────────
@@ -654,6 +504,8 @@ export function DocEditor({
       },
     },
   });
+
+  useMentionSync(editor, { type: "doc", id: pageId });
 
   // Sync externally changed value (e.g. version restore). Never re-set content
   // while the user is typing — setContent resets the cursor to the end, which

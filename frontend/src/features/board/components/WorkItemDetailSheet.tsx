@@ -37,6 +37,7 @@ import {
   DescriptionPreview,
   TiptapDescriptionEditor,
 } from "@/features/workitems/components/TiptapDescriptionEditor";
+import { BacklinksList } from "@/features/mentions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -1012,6 +1013,7 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
                       setEditingDescription(false);
                     }}
                     onCancel={() => setEditingDescription(false)}
+                    sourceId={workItem.id}
                   />
                 ) : (
                   <div
@@ -1021,6 +1023,7 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
                     <DescriptionPreview value={workItem.description} />
                   </div>
                 )}
+                <BacklinksList targetType="work_item" targetId={workItem.id} />
               </div>
 
               {/* Custom properties (renders nothing without a project or properties) */}

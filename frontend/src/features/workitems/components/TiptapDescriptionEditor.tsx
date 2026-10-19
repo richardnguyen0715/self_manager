@@ -15,6 +15,11 @@ import {
   Quote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  EntityMention,
+  MentionSuggestion,
+  useMentionSync,
+} from "@/features/mentions";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -300,6 +305,8 @@ export interface TiptapDescriptionEditorProps {
   onSave: (html: string) => void;
   onCancel: () => void;
   autoFocus?: boolean;
+  /** Work item id; when set, @mentions inside the description are synced to it. */
+  sourceId?: string;
 }
 
 /**
@@ -312,12 +319,15 @@ export function TiptapDescriptionEditor({
   onSave,
   onCancel,
   autoFocus = true,
+  sourceId,
 }: TiptapDescriptionEditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
       }),
+      EntityMention,
+      MentionSuggestion,
     ],
     content: descriptionToHtml(value),
     autofocus: autoFocus ? "end" : false,
@@ -332,6 +342,8 @@ export function TiptapDescriptionEditor({
     // Avoids SSR hydration mismatch warnings in Next.js App Router.
     immediatelyRender: false,
   });
+
+  useMentionSync(editor, { type: "work_item", id: sourceId });
 
   // Keep content in sync if the underlying value changes while not editing.
   useEffect(() => {

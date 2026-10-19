@@ -106,6 +106,8 @@ async fn main() -> anyhow::Result<()> {
         .nest("/saved-views", modules::saved_view::router())
         // ── Retros (periodic reviews & retrospectives) ────────────────────────
         .nest("/retros", modules::retro::router())
+        // ── Mentions (@ tags, backlinks) ─────────────────────────────────────
+        .nest("/mentions", modules::mention::router())
         // ── Docs ──────────────────────────────────────────────────────────────
         .nest("/spaces",    modules::space::router())
         .nest(

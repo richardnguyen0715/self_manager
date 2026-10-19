@@ -156,6 +156,8 @@ export interface RetroSnapshot {
 export interface RetroDetailHeader extends RetroSummary {
   template_id: string | null;
   summary: string | null;
+  /** Free-form rich notes, stored as Tiptap HTML. */
+  notes: string | null;
   snapshot: RetroSnapshot | null;
   started_at: string;
   created_at: string;
@@ -261,6 +263,7 @@ export interface OpenRetroPayload {
 export interface UpdateRetroPayload {
   title?: string;
   summary?: string | null;
+  notes?: string | null;
   rating?: number | null;
   mood?: number | null;
 }

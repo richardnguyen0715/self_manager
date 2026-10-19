@@ -67,6 +67,8 @@ import {
   TiptapDescriptionEditor,
   DescriptionPreview,
 } from "./TiptapDescriptionEditor";
+import { BacklinksList } from "@/features/mentions";
+import { PropertiesPanel } from "@/features/custom-properties";
 import { WORK_ITEM_STATUS_CONFIG } from "./WorkItemStatusBadge";
 import { PRIORITY_CONFIG } from "./WorkItemPriorityBadge";
 import type { WorkItemStatus, WorkItemSubtask, WorkItemActivity } from "@/types";
@@ -1002,6 +1004,7 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
                   value={descriptionDraft}
                   onSave={handleDescriptionSave}
                   onCancel={() => setEditingDescription(false)}
+                  sourceId={workItem.id}
                 />
               ) : (
                 <div
@@ -1023,7 +1026,14 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
                   <DescriptionPreview value={workItem.description} />
                 </div>
               )}
+              <BacklinksList targetType="work_item" targetId={workItem.id} />
             </div>
+
+            {/* Custom properties (renders nothing without a project or properties) */}
+            <PropertiesPanel
+              workItemId={workItem.id}
+              projectId={workItem.project_id}
+            />
 
             <Separator />
 

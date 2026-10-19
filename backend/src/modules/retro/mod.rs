@@ -4,7 +4,7 @@
 //! Mounted at `/api/retros` by `main.rs`.
 
 mod handlers;
-mod links;
+pub mod links;
 pub mod models;
 mod routes;
 mod service;

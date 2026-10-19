@@ -37,7 +37,9 @@ import {
   useAutosave,
 } from "./SectionCards";
 import { LinkedObjects } from "./LinkedObjects";
+import { NotesCard } from "./NotesCard";
 import { SnapshotBlock } from "./SnapshotBlock";
+import { BacklinksList } from "@/features/mentions";
 
 interface RetroEditorProps {
   retroId: string;
@@ -227,6 +229,13 @@ function RetroEditorBody({ detail }: { detail: RetroDetail }) {
             <p className="text-sm text-muted-foreground">This retro has no sections.</p>
           ) : null}
 
+          <NotesCard
+            key={`notes-${retro.id}`}
+            retroId={retro.id}
+            notes={retro.notes}
+            onSave={(notes) => update.mutateAsync({ notes })}
+          />
+
           <section className="space-y-2">
             <h2 className="text-base font-semibold">Summary</h2>
             <AutosaveTextarea
@@ -238,6 +247,8 @@ function RetroEditorBody({ detail }: { detail: RetroDetail }) {
               onSave={(summary) => update.mutate({ summary })}
             />
           </section>
+
+          <BacklinksList targetType="retro" targetId={retro.id} />
         </main>
 
         {/* ── Side panels ──────────────────────────────────────────────── */}
