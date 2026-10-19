@@ -5,6 +5,7 @@
  * Matches the Jira backlog row: type icon | title | status pill | story pts | due date | actions.
  */
 
+import { EstimateBadge } from "@/features/estimate";
 import { format, isPast, isToday } from "date-fns";
 import {
   MoreHorizontal,
@@ -185,7 +186,7 @@ export function WorkItemRow({
       {/* Story points — hidden below md to match column header */}
       {item.story_points != null ? (
         <Badge variant="outline" className="text-xs tabular-nums shrink-0 hidden md:inline-flex">
-          {item.story_points} pt
+          <EstimateBadge projectId={item.project_id} value={item.story_points} />
         </Badge>
       ) : (
         <span className="hidden md:inline text-xs text-muted-foreground w-8 text-center">—</span>

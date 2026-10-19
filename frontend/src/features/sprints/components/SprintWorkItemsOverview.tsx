@@ -1,5 +1,6 @@
 "use client";
 
+import { EstimateBadge } from "@/features/estimate";
 import { useState } from "react";
 import { format } from "date-fns";
 import {
@@ -197,7 +198,7 @@ export function SprintWorkItemsOverview({
                           : "border-primary/30 bg-primary/5 text-primary",
                       )}
                     >
-                      {item.story_points ?? "?"}
+                      {item.story_points == null ? "?" : <EstimateBadge projectId={item.project_id} value={item.story_points} />}
                     </span>
                   </td>
                   <td className="px-2 py-2.5">

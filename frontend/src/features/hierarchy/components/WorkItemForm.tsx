@@ -21,6 +21,8 @@ import { WORK_ITEM_TYPES } from "@/types";
 import { WORK_ITEM_TYPE_META } from "@/features/workitems/work-item-type-config";
 import { useCreateWorkItem, useUpdateWorkItem } from "../hooks/useHierarchy";
 import { InlineSelect } from "./InlineSelect";
+import { EstimatePicker, useEstimateSystemIdForProject } from "@/features/estimate";
+import { useProjectStore } from "@/stores";
 
 // ─── Schema ────────────────────────────────────────────────────────────────────
 
@@ -41,9 +43,9 @@ const schema = z.object({
   priority: z.enum(["critical", "high", "medium", "low"] as const),
   story_points: z.coerce
     .number()
-    .refine((v) => [1, 3, 5, 8].includes(v) || v === 0, {
-      message: "Must be 1, 3, 5, or 8",
-    })
+    .int()
+    .min(1)
+    .max(1000)
     .nullable()
     .optional(),
   due_date: z.string().nullable().optional(),
@@ -72,14 +74,6 @@ const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
   { value: "low", label: "Low" },
 ];
 
-const POINTS_OPTIONS: { value: string; label: string }[] = [
-  { value: "0", label: "Unestimated" },
-  { value: "1", label: "1 pt" },
-  { value: "3", label: "3 pts" },
-  { value: "5", label: "5 pts" },
-  { value: "8", label: "8 pts" },
-];
-
 // ─── Props ─────────────────────────────────────────────────────────────────────
 
 interface WorkItemFormProps {
@@ -98,6 +92,10 @@ export function WorkItemForm({
   workItem,
 }: WorkItemFormProps) {
   const isEdit = Boolean(workItem);
+  const { currentProjectId } = useProjectStore();
+  const estimateSystemId = useEstimateSystemIdForProject(
+    workItem ? workItem.project_id : currentProjectId,
+  );
   const createWorkItem = useCreateWorkItem();
   const updateWorkItem = useUpdateWorkItem();
 
@@ -266,19 +264,17 @@ export function WorkItemForm({
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="wi-points">Story Points</Label>
                 <Controller
-                  control={control}
-                  name="story_points"
-                  render={({ field }) => (
-                    <InlineSelect<string>
-                      id="wi-points"
-                      value={String(field.value ?? 0)}
-                      onChange={(v) =>
-                        field.onChange(v === "0" ? null : Number(v))
-                      }
-                      options={POINTS_OPTIONS}
-                    />
-                  )}
-                />
+  control={control}
+  name="story_points"
+  render={({ field }) => (
+    <EstimatePicker
+      id="wi-points"
+      systemId={estimateSystemId}
+      value={field.value}
+      onChange={field.onChange}
+    />
+  )}
+/>
                 {errors.story_points && (
                   <p className="text-xs text-destructive">
                     {errors.story_points.message}

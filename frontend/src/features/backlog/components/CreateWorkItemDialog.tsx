@@ -32,6 +32,7 @@ import { WORK_ITEM_TYPE_META } from "@/features/workitems/work-item-type-config"
 import { useCreateWorkItem } from "@/features/agile";
 import { useBacklogStore } from "../store/useBacklogStore";
 import { useProjectStore } from "@/stores";
+import { EstimatePicker, useEstimateSystemIdForProject } from "@/features/estimate";
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -47,7 +48,8 @@ const schema = z.object({
   story_points: z.coerce
     .number()
     .int()
-    .refine((v) => [1, 3, 5, 8].includes(v), { message: "Must be 1, 3, 5, or 8" })
+    .min(1)
+    .max(1000)
     .nullable()
     .optional(),
   epic_id: z.string().optional().nullable(),
@@ -149,14 +151,6 @@ const STATUS_OPTS: { value: WorkItemStatus; label: string }[] = [
   { value: "done", label: "Done" },
 ];
 
-const POINTS_OPTS: { value: string; label: string }[] = [
-  { value: "__none__", label: "Unestimated" },
-  { value: "1", label: "1 pt" },
-  { value: "3", label: "3 pts" },
-  { value: "5", label: "5 pts" },
-  { value: "8", label: "8 pts" },
-];
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface CreateWorkItemDialogProps {
@@ -170,6 +164,7 @@ export function CreateWorkItemDialog({
 }: CreateWorkItemDialogProps) {
   const { dialog, closeDialog } = useBacklogStore();
   const { currentProjectId } = useProjectStore();
+  const estimateSystemId = useEstimateSystemIdForProject(currentProjectId);
   const isOpen = dialog.kind === "create_item";
   const prefillSprintId =
     dialog.kind === "create_item" ? dialog.sprint_id : undefined;
@@ -355,19 +350,17 @@ export function CreateWorkItemDialog({
                 Story points
               </Label>
               <Controller
-                control={control}
-                name="story_points"
-                render={({ field }) => (
-                  <InlineSelect<string>
-                    id="wi-points"
-                    value={field.value != null ? String(field.value) : "__none__"}
-                    onChange={(v) =>
-                      field.onChange(v === "__none__" ? null : Number(v))
-                    }
-                    options={POINTS_OPTS}
-                  />
-                )}
-              />
+  control={control}
+  name="story_points"
+  render={({ field }) => (
+    <EstimatePicker
+      id="wi-points"
+      systemId={estimateSystemId}
+      value={field.value}
+      onChange={field.onChange}
+    />
+  )}
+/>
               {errors.story_points && (
                 <p className="text-xs text-destructive">
                   {errors.story_points.message}

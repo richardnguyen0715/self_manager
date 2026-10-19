@@ -1,5 +1,6 @@
 "use client";
 
+import { EstimateBadge } from "@/features/estimate";
 import {
   ChevronRight,
   Plus,
@@ -64,7 +65,7 @@ function WorkItemRow({ item }: { item: WorkItemListItem }) {
         <WorkItemStatusBadge status={item.status} />
       </td>
       <td className="py-2 px-2 text-xs text-muted-foreground tabular-nums hidden md:table-cell">
-        {item.story_points != null ? `${item.story_points}pt` : "—"}
+        <EstimateBadge projectId={item.project_id} value={item.story_points} />
       </td>
       <td className="py-2 pr-4 text-xs text-muted-foreground tabular-nums hidden sm:table-cell">
         {item.due_date

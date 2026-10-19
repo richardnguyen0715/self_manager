@@ -86,6 +86,8 @@ async fn main() -> anyhow::Result<()> {
         .nest("/calendar",      modules::calendar::router())
         .nest("/calendar-types", modules::calendar_type::router())
         .nest("/labels",        modules::label::router())
+        .nest("/custom-properties", modules::custom_property::router())
+        .nest("/estimate-systems", modules::estimate::router())
         .nest("/timeblocks",    modules::timeblock::router())
         .nest("/analytics",     modules::analytics::router())
         .nest("/notifications", modules::notification::router())

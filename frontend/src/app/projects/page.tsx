@@ -12,7 +12,9 @@ import {
   AlertTriangle,
   Building2,
   NotebookPen,
+  ListChecks,
 } from "lucide-react";
+import { ProjectPropertiesManager } from "@/features/custom-properties";
 import {
   useProjects,
   useCreateProject,
@@ -20,6 +22,10 @@ import {
   useDeleteProject,
 } from "@/features/tasks/hooks/useProjects";
 import { useOrganizations } from "@/features/organization/hooks/useOrganizations";
+import {
+  useEstimateSystems,
+  DEFAULT_ESTIMATE_SYSTEM_ID,
+} from "@/features/estimate";
 import { useProjectStore } from "@/stores";
 import { api } from "@/lib/api";
 import { API_ENDPOINTS } from "@/types";
@@ -51,6 +57,7 @@ type ProjectPatch = {
   deadline?: string | null;
   organization_id?: string | null;
   key?: string | null;
+  estimate_system?: string;
 };
 
 const NO_ORG = "__none__";
@@ -58,6 +65,7 @@ const NO_ORG = "__none__";
 export default function ProjectsPage() {
   const { data: projects, isLoading } = useProjects();
   const { data: organizations } = useOrganizations();
+  const { data: estimateSystems } = useEstimateSystems();
   const createMut = useCreateProject();
   const updateMut = useUpdateProject();
   const deleteMut = useDeleteProject();
@@ -75,12 +83,19 @@ export default function ProjectsPage() {
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
+  const [propertiesProject, setPropertiesProject] = useState<Project | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [organizationId, setOrganizationId] = useState<string>(NO_ORG);
   const [itemKey, setItemKey] = useState("");
   const [itemKeyError, setItemKeyError] = useState<string | null>(null);
+  const [estimateSystem, setEstimateSystem] = useState<string>(
+    DEFAULT_ESTIMATE_SYSTEM_ID,
+  );
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
+  const selectedEstimate = estimateSystems?.find(
+    (s) => s.id === estimateSystem,
+  );
 
   // Counts for the delete confirmation, fetched only when a target is set.
   const { data: counts, isLoading: countsLoading } = useQuery({
@@ -146,6 +161,7 @@ export default function ProjectsPage() {
     setOrganizationId(NO_ORG);
     setItemKey("");
     setItemKeyError(null);
+    setEstimateSystem(DEFAULT_ESTIMATE_SYSTEM_ID);
     setOpen(true);
   }
   function openEdit(p: Project) {
@@ -155,6 +171,7 @@ export default function ProjectsPage() {
     setOrganizationId(p.organization_id ?? NO_ORG);
     setItemKey(p.key ?? "");
     setItemKeyError(null);
+    setEstimateSystem(p.estimate_system ?? DEFAULT_ESTIMATE_SYSTEM_ID);
     setOpen(true);
   }
   function submit() {
@@ -170,6 +187,7 @@ export default function ProjectsPage() {
       name: n,
       description: description.trim() || null,
       organization_id: organizationId === NO_ORG ? null : organizationId,
+      estimate_system: estimateSystem,
       // Blank key on create = derive from the name on the server.
       // On edit, send only a changed key.
       ...(k && k !== (editing?.key ?? "") ? { key: k } : {}),
@@ -332,6 +350,16 @@ export default function ProjectsPage() {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
+                      onClick={() => setPropertiesProject(p)}
+                      aria-label="Custom properties"
+                      title="Custom properties"
+                    >
+                      <ListChecks className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
                       onClick={() => openEdit(p)}
                       aria-label="Edit project"
                     >
@@ -420,6 +448,34 @@ export default function ProjectsPage() {
                 ))}
               </select>
             </div>
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="project-estimate-system"
+                className="text-xs font-medium text-muted-foreground"
+              >
+                Estimate system
+              </label>
+              <select
+                id="project-estimate-system"
+                value={estimateSystem}
+                onChange={(e) => setEstimateSystem(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus:ring-1 focus:ring-ring"
+              >
+                {(estimateSystems ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+              {selectedEstimate?.description && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedEstimate.description}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Existing estimates are not converted.
+              </p>
+            </div>
           </div>
           {(createMut.error || updateMut.error) && (
             <p className="text-xs text-destructive">
@@ -444,6 +500,32 @@ export default function ProjectsPage() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom properties of one project */}
+      <Dialog
+        open={!!propertiesProject}
+        onOpenChange={(o) => !o && setPropertiesProject(null)}
+      >
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Custom properties
+              {propertiesProject && (
+                <span className="font-normal text-muted-foreground">
+                  {" "}· {propertiesProject.name}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Extra fields shown on every work item in this project. Values are
+            set on each work item.
+          </p>
+          {propertiesProject && (
+            <ProjectPropertiesManager projectId={propertiesProject.id} />
+          )}
         </DialogContent>
       </Dialog>
 

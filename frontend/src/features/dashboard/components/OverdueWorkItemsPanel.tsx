@@ -1,5 +1,6 @@
 "use client";
 
+import { EstimateBadge } from "@/features/estimate";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { AlertCircle, ArrowRight, CircleDot } from "lucide-react";
@@ -79,7 +80,7 @@ function OverdueWorkItemRow({ item }: OverdueWorkItemRowProps) {
           )}
           {item.story_points != null && (
             <span className="text-[10px] text-muted-foreground tabular-nums">
-              {item.story_points} pts
+              <EstimateBadge projectId={item.project_id} value={item.story_points} />
             </span>
           )}
         </div>

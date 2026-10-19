@@ -55,6 +55,7 @@ import {
 } from "@/features/agile";
 import { useEpics } from "@/features/agile/hooks/useEpics";
 import { useSprintsList } from "@/features/sprints/hooks/useSprints";
+import { EstimatePicker, useEstimateSystemIdForProject } from "@/features/estimate";
 import {
   useWorkItemComments,
   useWorkItemActivity,
@@ -77,6 +78,7 @@ import { WORK_ITEM_TYPE_META } from "@/features/workitems/work-item-type-config"
 import { useAuthStore } from "@/stores";
 import { useQueryClient } from "@tanstack/react-query";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { PropertiesPanel } from "@/features/custom-properties";
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -138,10 +140,6 @@ const PRIORITY_LABELS: Record<Priority, string> = {
   medium: "Medium",
   low: "Low",
 };
-
-// ─── Story point options ──────────────────────────────────────────────────────
-
-const STORY_POINTS = [null, 1, 3, 5, 8] as const;
 
 // ─── Activity tabs ────────────────────────────────────────────────────────────
 
@@ -772,6 +770,7 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
   const { data: workItem, isLoading, isError } = useWorkItem(workItemId);
   const setStatus = useSetWorkItemStatus(workItemId);
   const setPoints = useSetWorkItemPoints(workItemId);
+  const estimateSystemId = useEstimateSystemIdForProject(workItem?.project_id);
   const updateItem = useUpdateWorkItem(workItemId);
   const createSubtask = useCreateWorkItemSubtask(workItemId);
 
@@ -1023,6 +1022,12 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
                   </div>
                 )}
               </div>
+
+              {/* Custom properties (renders nothing without a project or properties) */}
+              <PropertiesPanel
+                workItemId={workItem.id}
+                projectId={workItem.project_id}
+              />
 
               <Separator />
 
@@ -1557,56 +1562,26 @@ export function WorkItemDetailSheet({ sprintId: _sprintId }: WorkItemDetailSheet
                 </DropdownMenuPrimitive.Root>
               </DetailRow>
 
-              {/* Story point estimate */}
+              {/* Story point estimate — scale of the item's project estimate system */}
               <DetailRow label="Story points" fieldKey="story_points">
-                <DropdownMenuPrimitive.Root>
-                  <DropdownMenuPrimitive.Trigger asChild>
-                    <button
-                      type="button"
-                      className="flex items-center gap-1.5 text-sm hover:text-primary transition-colors"
-                    >
-                      {workItem.story_points != null ? (
-                        <Badge variant="outline" className="h-5 px-1.5 text-xs">
-                          {workItem.story_points}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">Unestimated</span>
-                      )}
-                      <ChevronDown className="h-3 w-3 opacity-50" />
-                    </button>
-                  </DropdownMenuPrimitive.Trigger>
-                  <DropdownMenuPrimitive.Portal>
-                    <DropdownMenuPrimitive.Content
-                      align="start"
-                      sideOffset={4}
-                      className="z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 shadow-md"
-                    >
-                      {STORY_POINTS.map((pt) => (
-                        <DropdownMenuPrimitive.Item
-                          key={pt ?? "null"}
-                          onSelect={() =>
-                            setPoints.mutate(
-                              { story_points: pt ?? null },
-                              {
-                                onSuccess: () => {
-                                  qc.invalidateQueries({
-                                    queryKey: boardKeys.all,
-                                  });
-                                },
-                              },
-                            )
-                          }
-                          className="flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent"
-                        >
-                          {pt == null ? "Unestimated" : pt}
-                          {workItem.story_points === pt && (
-                            <Check className="h-3 w-3 ml-auto" />
-                          )}
-                        </DropdownMenuPrimitive.Item>
-                      ))}
-                    </DropdownMenuPrimitive.Content>
-                  </DropdownMenuPrimitive.Portal>
-                </DropdownMenuPrimitive.Root>
+                <EstimatePicker
+                  compact
+                  systemId={estimateSystemId}
+                  value={workItem.story_points}
+                  disabled={setPoints.isPending}
+                  onChange={(pt) =>
+                    setPoints.mutate(
+                      { story_points: pt },
+                      {
+                        onSuccess: () => {
+                          qc.invalidateQueries({
+                            queryKey: boardKeys.all,
+                          });
+                        },
+                      },
+                    )
+                  }
+                />
               </DetailRow>
 
               {/* GitHub repo — inline text input */}

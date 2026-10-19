@@ -1,5 +1,6 @@
 "use client";
 
+import { EstimateBadge } from "@/features/estimate";
 import { Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -127,7 +128,7 @@ function BoardCard({ item }: { item: WorkItemListItem }) {
       <div className="flex items-center gap-2 flex-wrap">
         {item.story_points != null && (
           <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-            {item.story_points}
+            <EstimateBadge projectId={item.project_id} value={item.story_points} />
           </Badge>
         )}
         {item.due_date && (

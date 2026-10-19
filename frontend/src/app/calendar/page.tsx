@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { AppShell } from "@/components/layout/app-shell";
-import { TaskCalendarView } from "@/features/task-calendar";
+import { CalendarHub } from "@/features/calendar-hub";
 
 export const metadata: Metadata = {
   title: "Calendar",
   description:
-    "Your project task timeline — view, create, edit, and reschedule tasks across day, week, and month views.",
+    "One calendar for events, time blocks and project tasks — switch between them across day, week, and month views.",
 };
 
 export default function CalendarPage() {
   return (
     <AppShell title="Calendar">
-      <TaskCalendarView />
+      <Suspense fallback={null}>
+        <CalendarHub />
+      </Suspense>
     </AppShell>
   );
 }

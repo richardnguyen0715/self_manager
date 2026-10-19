@@ -14,7 +14,6 @@ export const HIDEABLE_NAV_ITEMS: { href: string; label: string }[] = [
   { href: "/work-items", label: "Work Items" },
   { href: "/hierarchy", label: "Hierarchy" },
   { href: "/goals", label: "Goals" },
-  { href: "/life", label: "Life Calendar" },
   { href: "/calendar", label: "Calendar" },
   { href: "/timeblocking", label: "Time Blocking" },
   { href: "/habits", label: "Habits" },

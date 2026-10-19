@@ -19,6 +19,8 @@ use crate::shared::{
     state::AppState,
 };
 
+use crate::modules::estimate::service as estimate;
+
 use super::models::{
     ActivityEntry,
     Attachment, AttachmentRow, CreateCommentRequest, CreateLinkRequest, CreateSubtaskRequest,
@@ -38,16 +40,6 @@ fn clamp_limit(raw: Option<i64>) -> i64 {
 #[inline]
 fn clamp_offset(raw: Option<i64>) -> i64 {
     raw.unwrap_or(0).max(0)
-}
-
-/// Validate that `story_points` is one of {1, 3, 5, 8} or `None`.
-fn validate_story_points(points: Option<i32>) -> AppResult<()> {
-    match points {
-        None | Some(1) | Some(3) | Some(5) | Some(8) => Ok(()),
-        Some(v) => Err(AppError::Validation(format!(
-            "story_points must be 1, 3, 5, 8, or null; got {v}"
-        ))),
-    }
 }
 
 /// Fetch the full `WorkItemResponse` (with subtasks) for a given `id` owned
@@ -281,7 +273,7 @@ pub async fn list_work_items(
 
 /// Create a new work item for the authenticated user.
 ///
-/// Validates story points (must be 1, 3, 5, 8, or `None`) and returns
+/// Validates story points against the project's estimate system and returns
 /// the full item with an empty subtasks list.
 ///
 /// # Errors
@@ -293,8 +285,6 @@ pub async fn create_work_item(
     user_id: Uuid,
     req: CreateWorkItemRequest,
 ) -> AppResult<WorkItemResponse> {
-    validate_story_points(req.story_points)?;
-
     let item_type = req
         .item_type
         .as_ref()
@@ -327,6 +317,9 @@ pub async fn create_work_item(
         .flatten(),
         (None, None) => None,
     };
+
+    let estimate_system = estimate::system_for_project(state, user_id, project_id).await?;
+    estimate::check_points(&estimate_system, req.story_points, None)?;
 
     // Per-(user, project) sequence number for the human key (`MML-12`).
     // An advisory xact lock serializes concurrent creates for the same scope
@@ -490,8 +483,6 @@ pub async fn update_work_item(
     item_id: Uuid,
     req: UpdateWorkItemRequest,
 ) -> AppResult<WorkItemResponse> {
-    validate_story_points(req.story_points)?;
-
     // Fetch current row for coalescing.
     let current = sqlx::query_as!(
         WorkItem,
@@ -518,6 +509,10 @@ pub async fn update_work_item(
     .fetch_optional(&state.db)
     .await?
     .ok_or(AppError::NotFound)?;
+
+    let estimate_system =
+        estimate::system_for_project(state, user_id, current.project_id).await?;
+    estimate::check_points(&estimate_system, req.story_points, current.story_points)?;
 
     let new_title = req
         .title
@@ -937,7 +932,8 @@ pub async fn set_status(
 
 /// Set story points on a work item.
 ///
-/// Accepts 1, 3, 5, 8, or `null` (unestimated). Any other value returns 422.
+/// Accepts a value of the item's project estimate system, or `null`
+/// (unestimated). Any other value returns 422.
 ///
 /// # Errors
 ///
@@ -950,7 +946,18 @@ pub async fn set_points(
     item_id: Uuid,
     req: SetPointsRequest,
 ) -> AppResult<WorkItemResponse> {
-    validate_story_points(req.story_points)?;
+    let (project_id, current_points): (Option<Uuid>, Option<i32>) = sqlx::query_as(
+        "SELECT project_id, story_points FROM work_items \
+         WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL",
+    )
+    .bind(item_id)
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    let estimate_system = estimate::system_for_project(state, user_id, project_id).await?;
+    estimate::check_points(&estimate_system, req.story_points, current_points)?;
 
     let updated = sqlx::query_as!(
         WorkItem,
@@ -1009,6 +1016,8 @@ struct BulkSnapshot {
     story_points: Option<i32>,
     labels: Vec<String>,
     completed_at: Option<chrono::DateTime<Utc>>,
+    /// Estimate system of the row's project (`fibonacci` when none).
+    estimate_system: String,
 }
 
 /// Trim labels, drop empties and duplicates while keeping first-seen order.
@@ -1110,7 +1119,6 @@ async fn bulk_update_items(
 ) -> AppResult<super::models::BulkWorkItemResponse> {
     use super::models::BulkWorkItemResponse;
 
-    validate_story_points(patch.story_points)?;
     if patch.sprint_id.is_some() && patch.clear_sprint {
         return Err(AppError::Validation(
             "sprint_id and clear_sprint are mutually exclusive".to_owned(),
@@ -1156,7 +1164,10 @@ async fn bulk_update_items(
 
     let snapshots = sqlx::query_as::<_, BulkSnapshot>(
         "SELECT id, sprint_id, status::text AS status, priority::text AS priority, \
-                story_points, labels, completed_at \
+                story_points, labels, completed_at, \
+                COALESCE((SELECT p.estimate_system FROM projects p \
+                          WHERE p.id = work_items.project_id AND p.user_id = $1), \
+                         'fibonacci') AS estimate_system \
          FROM work_items \
          WHERE user_id = $1 AND id = ANY($2) AND deleted_at IS NULL \
          FOR UPDATE",
@@ -1169,6 +1180,8 @@ async fn bulk_update_items(
     let mut completed_ids: Vec<(Uuid, Option<Uuid>)> = Vec::new();
 
     for cur in &snapshots {
+        estimate::check_points(&cur.estimate_system, patch.story_points, cur.story_points)?;
+
         let new_status = patch
             .status
             .as_ref()

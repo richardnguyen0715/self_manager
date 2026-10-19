@@ -1,5 +1,6 @@
 "use client";
 
+import { EstimateBadge } from "@/features/estimate";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { format, isPast, isToday } from "date-fns";
@@ -845,7 +846,7 @@ function WorkItemRow({
       {/* Story points */}
       {properties.points && (
         <span className="text-xs tabular-nums text-muted-foreground w-8 text-center shrink-0 hidden md:block">
-          {item.story_points != null ? item.story_points : "—"}
+          <EstimateBadge projectId={item.project_id} value={item.story_points} />
         </span>
       )}
 

@@ -148,6 +148,8 @@ export interface Project {
   description: string | null;
   color: string | null;
   deadline: string | null; // YYYY-MM-DD
+  /** Estimate system id (fibonacci | linear | tshirt | hours | none). */
+  estimate_system: string;
   status: ProjectStatus;
   position: number;
   progress: ProjectProgress;

@@ -126,8 +126,8 @@ const GROUPS: Group[] = [
     sections: [
       {
         icon: CalendarHeart,
-        title: "Life Calendar",
-        blurb: "A Notion-style personal calendar for events and time blocks.",
+        title: "Calendar — events & time blocks",
+        blurb: "One Calendar page, two modes: personal events/time blocks and your project tasks. Switch with the toggle at the top.",
         steps: [
           "Switch Day / Week / Month; toggle Sun/Mon as the first day of the week.",
           "Click-and-drag on an empty slot to create an event; drag an event to reschedule it.",
@@ -138,8 +138,8 @@ const GROUPS: Group[] = [
       },
       {
         icon: Calendar,
-        title: "Calendar (project task timeline)",
-        blurb: "Your project tasks laid out by due date.",
+        title: "Calendar — Tasks mode",
+        blurb: "The Tasks toggle shows your project tasks laid out by due date.",
         steps: [
           "Create on empty space, click a task to edit, or drag to reschedule its due date.",
           "Unscheduled tasks sit in the side panel — drag them onto a day.",

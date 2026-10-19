@@ -1,5 +1,6 @@
 "use client";
 
+import { EstimateBadge } from "@/features/estimate";
 import { useState } from "react";
 import { Loader2, AlertCircle, Plus } from "lucide-react";
 import Link from "next/link";
@@ -146,7 +147,7 @@ export function WorkItemsListView() {
                     <PriorityBadge priority={item.priority as Priority} />
                   </td>
                   <td className="px-4 py-3 text-xs tabular-nums text-muted-foreground">
-                    {item.story_points != null ? item.story_points : "—"}
+                    <EstimateBadge projectId={item.project_id} value={item.story_points} />
                   </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                     {item.due_date

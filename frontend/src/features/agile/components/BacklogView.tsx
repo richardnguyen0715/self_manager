@@ -1,5 +1,6 @@
 "use client";
 
+import { EstimateBadge } from "@/features/estimate";
 import { useState } from "react";
 import { Loader2, AlertCircle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -81,7 +82,7 @@ export function BacklogView() {
                 <WorkItemStatusBadge status={item.status} />
                 {item.story_points != null && (
                   <Badge variant="outline" className="text-xs tabular-nums">
-                    {item.story_points} pts
+                    <EstimateBadge projectId={item.project_id} value={item.story_points} />
                   </Badge>
                 )}
                 {item.due_date && (
@@ -168,7 +169,7 @@ function SprintSection({ sprintId, sprintName, status, capacityPoints, plannedPo
               <WorkItemStatusBadge status={item.status} />
               {item.story_points != null && (
                 <Badge variant="outline" className="text-xs tabular-nums">
-                  {item.story_points} pts
+                  <EstimateBadge projectId={item.project_id} value={item.story_points} />
                 </Badge>
               )}
               {item.due_date && (

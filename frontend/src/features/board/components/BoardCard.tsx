@@ -1,5 +1,6 @@
 "use client";
 
+import { EstimateBadge } from "@/features/estimate";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useQueryClient } from "@tanstack/react-query";
@@ -281,7 +282,7 @@ export function BoardCard({
               variant="outline"
               className="h-4 px-1.5 text-[10px] font-medium shrink-0"
             >
-              {item.story_points}
+              <EstimateBadge projectId={item.project_id} value={item.story_points} />
             </Badge>
           )}
         </div>

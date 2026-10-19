@@ -25,6 +25,7 @@ import { WORK_ITEM_TYPE_META } from "../work-item-type-config";
 import { useCreateWorkItem } from "../hooks/useWorkItems";
 import { useWorkItemUIStore } from "../store";
 import { useProjectStore } from "@/stores";
+import { EstimatePicker, useEstimateSystemIdForProject } from "@/features/estimate";
 import type { CreateWorkItemPayload } from "../types";
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -137,19 +138,12 @@ const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
   { value: "low", label: "Low" },
 ];
 
-const POINTS_OPTIONS: { value: string; label: string }[] = [
-  { value: "__none__", label: "Unestimated" },
-  { value: "1", label: "1" },
-  { value: "3", label: "3" },
-  { value: "5", label: "5" },
-  { value: "8", label: "8" },
-];
-
 // ─── Dialog ───────────────────────────────────────────────────────────────────
 
 export function CreateWorkItemDialog() {
   const { isCreateDialogOpen, closeCreateDialog } = useWorkItemUIStore();
   const { currentProjectId } = useProjectStore();
+  const estimateSystemId = useEstimateSystemIdForProject(currentProjectId);
   const createMutation = useCreateWorkItem();
 
   const {
@@ -303,21 +297,17 @@ export function CreateWorkItemDialog() {
             <div className="space-y-1.5">
               <Label htmlFor="wi-points">Story points</Label>
               <Controller
-                control={control}
-                name="story_points"
-                render={({ field }) => (
-                  <InlineSelect<string>
-                    id="wi-points"
-                    value={
-                      field.value == null ? "__none__" : String(field.value)
-                    }
-                    onChange={(v) =>
-                      field.onChange(v === "__none__" ? null : Number(v))
-                    }
-                    options={POINTS_OPTIONS}
-                  />
-                )}
-              />
+  control={control}
+  name="story_points"
+  render={({ field }) => (
+    <EstimatePicker
+      id="wi-points"
+      systemId={estimateSystemId}
+      value={field.value}
+      onChange={field.onChange}
+    />
+  )}
+/>
             </div>
           </div>
 

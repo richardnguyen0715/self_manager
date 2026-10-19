@@ -38,6 +38,8 @@ import {
 import { WorkItemStatusBadge, WORK_ITEM_STATUS_OPTIONS } from "./WorkItemStatusBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { WorkItemTypeBadge } from "./WorkItemTypeBadge";
+import { PropertiesPanel } from "@/features/custom-properties";
+import { EstimateBadge } from "@/features/estimate";
 
 // ─── Status dropdown ───────────────────────────────────────────────────────────
 
@@ -458,7 +460,7 @@ function DetailsRail({
       content:
         workItem.story_points != null ? (
           <Badge variant="outline" className="text-xs">
-            {workItem.story_points} {workItem.story_points === 1 ? "pt" : "pts"}
+            <EstimateBadge projectId={workItem.project_id} value={workItem.story_points} />
           </Badge>
         ) : (
           <span className="text-sm text-muted-foreground">None</span>
@@ -737,6 +739,12 @@ export function WorkItemDetail({ workItemId, onClose }: WorkItemDetailProps) {
                 </p>
               )}
             </div>
+
+            {/* Custom properties (renders nothing without a project or properties) */}
+            <PropertiesPanel
+              workItemId={workItem.id}
+              projectId={workItem.project_id}
+            />
 
             <Separator />
 

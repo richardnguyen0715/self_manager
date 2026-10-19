@@ -42,6 +42,8 @@ pub struct Project {
     pub deleted_at: Option<DateTime<Utc>>,
     /// Item-key prefix, 2-5 uppercase letters (e.g. `MML`), unique per user.
     pub key: Option<String>,
+    /// Estimate system id (`fibonacci`, `linear`, `tshirt`, `hours`, `none`).
+    pub estimate_system: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -79,6 +81,8 @@ pub struct ProjectResponse {
     pub deleted_at: Option<DateTime<Utc>>,
     /// Item-key prefix (e.g. `MML`); work items show as `MML-<seq_id>`.
     pub key: Option<String>,
+    /// Estimate system id; defines the allowed `story_points` values.
+    pub estimate_system: String,
     pub progress: ProjectProgress,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -100,6 +104,7 @@ impl ProjectResponse {
             organization_id: project.organization_id,
             deleted_at: project.deleted_at,
             key: project.key,
+            estimate_system: project.estimate_system,
             progress,
             created_at: project.created_at,
             updated_at: project.updated_at,
@@ -134,6 +139,8 @@ pub struct CreateProjectRequest {
     pub position: Option<i32>,
     /// Item-key prefix, 2-5 uppercase letters. Derived from the name when omitted.
     pub key: Option<String>,
+    /// Estimate system id; defaults to `fibonacci` when omitted.
+    pub estimate_system: Option<String>,
 }
 
 /// `PATCH /api/projects/:id` body — every field is optional.
@@ -157,6 +164,10 @@ pub struct UpdateProjectRequest {
     pub position: Option<i32>,
     /// New item-key prefix (2-5 uppercase letters, unique per user).
     pub key: Option<String>,
+
+    /// New estimate system id (`fibonacci`, `linear`, `tshirt`, `hours`, `none`).
+    /// Existing stored values are not converted.
+    pub estimate_system: Option<String>,
 
     /// Assign or unassign the owning organization.
     ///

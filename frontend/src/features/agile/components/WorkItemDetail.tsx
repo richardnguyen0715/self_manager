@@ -31,6 +31,7 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import {
   useWorkItem,
   useSetWorkItemStatus,
+  useSetWorkItemPoints,
   useCreateWorkItemSubtask,
   useUpdateWorkItemSubtask,
   useDeleteWorkItemSubtask,
@@ -39,6 +40,7 @@ import {
   useSprint,
 } from "@/features/agile";
 import { WorkItemTypeBadge } from "./WorkItemTypeBadge";
+import { EstimatePicker, useEstimateSystemIdForProject } from "@/features/estimate";
 import type { WorkItemStatus, WorkItemSubtask } from "@/types";
 import { useAuthStore } from "@/stores";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -92,10 +94,6 @@ const PRIORITY_COLORS: Record<string, string> = {
   medium: "text-yellow-600 dark:text-yellow-600",
   low: "text-blue-600 dark:text-blue-400",
 };
-
-// ─── Story point options ──────────────────────────────────────────────────────
-
-const STORY_POINTS = [null, 1, 3, 5, 8] as const;
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -230,6 +228,8 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
 
   const { data: workItem, isLoading, isError } = useWorkItem(workItemId);
   const setStatus = useSetWorkItemStatus(workItemId);
+  const setPoints = useSetWorkItemPoints(workItemId);
+  const estimateSystemId = useEstimateSystemIdForProject(workItem?.project_id);
   const updateItem = useUpdateWorkItem(workItemId);
   const createSubtask = useCreateWorkItemSubtask(workItemId);
 
@@ -803,43 +803,16 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
 
               {/* Story points */}
               <DetailRow label="Story points">
-                <DropdownMenuPrimitive.Root>
-                  <DropdownMenuPrimitive.Trigger asChild>
-                    <button
-                      type="button"
-                      className="flex items-center gap-1.5 text-sm hover:text-primary transition-colors"
-                    >
-                      <Tag className="h-3.5 w-3.5 text-muted-foreground" />
-                      {workItem.story_points != null
-                        ? workItem.story_points
-                        : "Unestimated"}
-                      <ChevronDown className="h-3 w-3 opacity-50" />
-                    </button>
-                  </DropdownMenuPrimitive.Trigger>
-                  <DropdownMenuPrimitive.Portal>
-                    <DropdownMenuPrimitive.Content
-                      align="start"
-                      sideOffset={4}
-                      className="z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 shadow-md"
-                    >
-                      {STORY_POINTS.map((pt) => (
-                        <DropdownMenuPrimitive.Item
-                          key={pt ?? "null"}
-                          onSelect={() => {
-                            // parent component can wire useSetWorkItemPoints here
-                            // kept as placeholder — full implementation in screen agents
-                          }}
-                          className="flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent"
-                        >
-                          {pt == null ? "Unestimated" : pt}
-                          {workItem.story_points === pt && (
-                            <Check className="h-3 w-3 ml-auto" />
-                          )}
-                        </DropdownMenuPrimitive.Item>
-                      ))}
-                    </DropdownMenuPrimitive.Content>
-                  </DropdownMenuPrimitive.Portal>
-                </DropdownMenuPrimitive.Root>
+                <div className="flex items-center gap-1.5">
+                  <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+                  <EstimatePicker
+                    compact
+                    systemId={estimateSystemId}
+                    value={workItem.story_points}
+                    disabled={setPoints.isPending}
+                    onChange={(pt) => setPoints.mutate({ story_points: pt })}
+                  />
+                </div>
               </DetailRow>
 
               {/* Reporter */}

@@ -28,6 +28,8 @@ export interface ProjectPayload {
   organization_id?: string | null;
   /** Item-key prefix, 2-5 uppercase letters. */
   key?: string | null;
+  /** Estimate system id; server default is fibonacci. */
+  estimate_system?: string;
 }
 
 /** POST /api/projects */

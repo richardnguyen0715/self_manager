@@ -78,6 +78,7 @@ import { useSprintsList } from "@/features/sprints/hooks/useSprints";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ItemKeyChip } from "@/components/ui/item-key-chip";
 import { LabelsField } from "@/features/labels";
+import { EstimatePicker, useEstimateSystemIdForProject } from "@/features/estimate";
 
 const NEXT_PUBLIC_API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -92,8 +93,6 @@ const STATUSES = Object.entries(WORK_ITEM_STATUS_CONFIG).map(
     dotClass: cfg.dotClass,
   }),
 );
-
-const STORY_POINTS = [null, 1, 3, 5, 8] as const;
 
 // ─── Linked work item picker ───────────────────────────────────────────────────
 
@@ -686,6 +685,7 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
   const { data: workItem, isLoading, isError } = useWorkItem(workItemId);
   const setStatus = useSetWorkItemStatus(workItemId);
   const setPoints = useSetWorkItemPoints(workItemId);
+  const estimateSystemId = useEstimateSystemIdForProject(workItem?.project_id);
   const updateItem = useUpdateWorkItem(workItemId);
   const deleteItem = useDeleteWorkItem();
   const { data: activityData } = useWorkItemActivity(workItemId);
@@ -1744,45 +1744,15 @@ export function WorkItemDetail({ workItemId }: WorkItemDetailProps) {
                 </DropdownMenuPrimitive.Root>
               </DetailRow>
 
-              {/* Story points — inline editable dropdown */}
+              {/* Story points — scale of the item's project estimate system */}
               <DetailRow label="Story points">
-                <DropdownMenuPrimitive.Root>
-                  <DropdownMenuPrimitive.Trigger asChild>
-                    <button
-                      type="button"
-                      className="flex items-center gap-1.5 hover:text-primary transition-colors"
-                    >
-                      <span className="tabular-nums">
-                        {workItem.story_points != null
-                          ? workItem.story_points
-                          : "None"}
-                      </span>
-                      <ChevronDown className="h-3 w-3 opacity-50" />
-                    </button>
-                  </DropdownMenuPrimitive.Trigger>
-                  <DropdownMenuPrimitive.Portal>
-                    <DropdownMenuPrimitive.Content
-                      align="start"
-                      sideOffset={4}
-                      className="z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
-                    >
-                      {STORY_POINTS.map((pt) => (
-                        <DropdownMenuPrimitive.Item
-                          key={pt ?? "null"}
-                          onSelect={() =>
-                            setPoints.mutate({ story_points: pt })
-                          }
-                          className="flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent"
-                        >
-                          {pt == null ? "None" : pt}
-                          {workItem.story_points === pt && (
-                            <Check className="h-3 w-3 ml-auto" />
-                          )}
-                        </DropdownMenuPrimitive.Item>
-                      ))}
-                    </DropdownMenuPrimitive.Content>
-                  </DropdownMenuPrimitive.Portal>
-                </DropdownMenuPrimitive.Root>
+                <EstimatePicker
+                  compact
+                  systemId={estimateSystemId}
+                  value={workItem.story_points}
+                  disabled={setPoints.isPending}
+                  onChange={(pt) => setPoints.mutate({ story_points: pt })}
+                />
               </DetailRow>
 
               {/* GitHub repo — inline text input */}

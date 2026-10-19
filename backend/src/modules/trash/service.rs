@@ -154,6 +154,7 @@ async fn fetch_deleted_projects(
             organization_id,
             deleted_at,
             key,
+            estimate_system,
             created_at,
             updated_at
         FROM projects

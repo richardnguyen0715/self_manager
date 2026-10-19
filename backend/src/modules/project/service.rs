@@ -61,6 +61,17 @@ async fn ensure_project_key_free(
     }
 }
 
+/// Fail with `Validation` (422) when `id` is not a known estimate system.
+fn validate_estimate_system(id: &str) -> AppResult<()> {
+    if crate::modules::estimate::service::is_known_system(id) {
+        Ok(())
+    } else {
+        Err(AppError::Validation(format!(
+            "estimate_system must be one of fibonacci, linear, tshirt, hours, none; got {id}"
+        )))
+    }
+}
+
 // ── Progress helper ───────────────────────────────────────────────────────────
 
 /// Fetch task-count statistics for one project.
@@ -121,6 +132,7 @@ pub async fn list_projects(
             organization_id,
             deleted_at,
             key,
+            estimate_system,
             created_at,
             updated_at
         FROM projects
@@ -167,6 +179,7 @@ pub async fn get_project(
             organization_id,
             deleted_at,
             key,
+            estimate_system,
             created_at,
             updated_at
         FROM projects
@@ -223,11 +236,19 @@ pub async fn create_project(
             .await?,
     };
 
+    let estimate_system = match req.estimate_system.as_deref() {
+        Some(id) => {
+            validate_estimate_system(id)?;
+            Some(id.to_owned())
+        }
+        None => None,
+    };
+
     let project = sqlx::query_as!(
         Project,
         r#"
-        INSERT INTO projects (user_id, goal_id, name, description, color, deadline, position, key)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO projects (user_id, goal_id, name, description, color, deadline, position, key, estimate_system)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9::text, 'fibonacci'))
         RETURNING
             id,
             user_id,
@@ -241,6 +262,7 @@ pub async fn create_project(
             organization_id,
             deleted_at,
             key,
+            estimate_system,
             created_at,
             updated_at
         "#,
@@ -252,6 +274,7 @@ pub async fn create_project(
         req.deadline,
         req.position.unwrap_or(0),
         key,
+        estimate_system,
     )
     .fetch_one(&state.db)
     .await?;
@@ -288,6 +311,7 @@ pub async fn update_project(
             organization_id,
             deleted_at,
             key,
+            estimate_system,
             created_at,
             updated_at
         FROM projects
@@ -351,6 +375,10 @@ pub async fn update_project(
         ensure_project_key_free(state, user_id, k, Some(project_id)).await?;
     }
 
+    if let Some(id) = req.estimate_system.as_deref() {
+        validate_estimate_system(id)?;
+    }
+
     let project = sqlx::query_as!(
         Project,
         r#"
@@ -364,6 +392,7 @@ pub async fn update_project(
             position        = COALESCE($10, position),
             organization_id = CASE WHEN $11 THEN $12 ELSE organization_id END,
             key             = COALESCE($13, key),
+            estimate_system = COALESCE($14, estimate_system),
             updated_at      = now()
         WHERE id = $1 AND user_id = $2
           AND deleted_at IS NULL
@@ -380,6 +409,7 @@ pub async fn update_project(
             organization_id,
             deleted_at,
             key,
+            estimate_system,
             created_at,
             updated_at
         "#,
@@ -396,6 +426,7 @@ pub async fn update_project(
         req.organization_id.is_some(),       // $11 bool: should we update organization_id?
         req.organization_id.flatten(),       // $12 new organization_id value (may be NULL)
         req.key.clone(),                     // $13 new item-key prefix (None = unchanged)
+        req.estimate_system.clone(),         // $14 new estimate system (None = unchanged)
     )
     .fetch_one(&state.db)
     .await?;

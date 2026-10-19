@@ -22,7 +22,6 @@ import {
   SquareKanban,
   Network,
   FolderOpen,
-  CalendarHeart,
   BookOpen,
   FileText,
   Building2,
@@ -78,7 +77,6 @@ const NAV_SECTIONS: NavSectionDef[] = [
     id: "life",
     label: "Life",
     items: [
-      { label: "Life Calendar", href: "/life", icon: CalendarHeart, hideable: true },
       { label: "Calendar", href: "/calendar", icon: Calendar, hideable: true },
       { label: "Time Blocking", href: "/timeblocking", icon: Clock, hideable: true },
       { label: "Habits", href: "/habits", icon: Repeat2, hideable: true },

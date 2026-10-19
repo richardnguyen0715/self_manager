@@ -1,5 +1,6 @@
 "use client";
 
+import { EstimateBadge } from "@/features/estimate";
 import { format } from "date-fns";
 import {
   ArrowRight,
@@ -16,7 +17,13 @@ import { WorkItemTypeBadge } from "@/features/agile/components/WorkItemTypeBadge
 
 // ─── Story point pill ─────────────────────────────────────────────────────────
 
-function PointsPill({ pts }: { pts: number | null }) {
+function PointsPill({
+  pts,
+  projectId,
+}: {
+  pts: number | null;
+  projectId?: string | null;
+}) {
   return (
     <span
       className={cn(
@@ -26,7 +33,7 @@ function PointsPill({ pts }: { pts: number | null }) {
           : "border-primary/30 bg-primary/5 text-primary",
       )}
     >
-      {pts ?? "?"}
+      {pts == null ? "?" : <EstimateBadge projectId={projectId} value={pts} />}
     </span>
   );
 }
@@ -63,7 +70,7 @@ export function BacklogItemRow({
         </div>
       </div>
 
-      <PointsPill pts={item.story_points} />
+      <PointsPill pts={item.story_points} projectId={item.project_id} />
 
       <Button
         variant="ghost"
@@ -126,7 +133,7 @@ export function SprintItemRow({
         </div>
       </div>
 
-      <PointsPill pts={item.story_points} />
+      <PointsPill pts={item.story_points} projectId={item.project_id} />
 
       <Button
         variant="ghost"

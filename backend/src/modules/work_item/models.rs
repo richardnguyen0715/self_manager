@@ -414,7 +414,7 @@ pub struct SetStatusRequest {
 /// Body for `PATCH /api/work-items/:id/points`.
 #[derive(Debug, Deserialize)]
 pub struct SetPointsRequest {
-    /// Must be 1, 3, 5, 8, or null (unestimated).
+    /// Must be a value of the project's estimate system, or null (unestimated).
     pub story_points: Option<i32>,
 }
 
