@@ -26,6 +26,10 @@ export const RETRO_ENDPOINTS = {
   ENTRIES: (retroId: string) => `${BASE}/${retroId}/entries`,
   ENTRY_BY_ID: (entryId: string) => `${BASE}/entries/${entryId}`,
 
+  // Sections
+  SECTION_BY_ID: (retroId: string, sectionId: string) =>
+    `${BASE}/${retroId}/sections/${sectionId}`,
+
   // Links
   LINKS: (retroId: string) => `${BASE}/${retroId}/links`,
   LINK_BY_ID: (linkId: string) => `${BASE}/links/${linkId}`,

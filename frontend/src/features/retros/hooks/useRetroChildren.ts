@@ -23,6 +23,7 @@ import type {
   RetroActionWithRetro,
   RetroDetail,
   RetroEntry,
+  RetroSection,
   UpdateRetroActionPayload,
   UpdateRetroEntryPayload,
 } from "../types";
@@ -47,6 +48,23 @@ function removeEntryFromCache(qc: QC, retroId: string, entryId: string) {
   qc.setQueryData<RetroDetail>(retroKeys.detail(retroId), (old) =>
     old ? { ...old, entries: old.entries.filter((e) => e.id !== entryId) } : old,
   );
+}
+
+// ─── Sections ─────────────────────────────────────────────────────────────────
+
+/** PATCH /api/retros/:id/sections/:section_id — sets the section's rich note. */
+export function useUpdateRetroSectionNotes(retroId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sectionId, notes }: { sectionId: string; notes: string }) =>
+      api.patch<RetroSection>(RETRO_ENDPOINTS.SECTION_BY_ID(retroId, sectionId), { notes }),
+    onSuccess: (section) =>
+      qc.setQueryData<RetroDetail>(retroKeys.detail(retroId), (old) =>
+        old
+          ? { ...old, sections: old.sections.map((s) => (s.id === section.id ? section : s)) }
+          : old,
+      ),
+  });
 }
 
 // ─── Entries ──────────────────────────────────────────────────────────────────

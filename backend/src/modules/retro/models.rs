@@ -55,6 +55,17 @@ pub struct SectionDto {
     pub prompt: Option<String>,
     pub input_type: String,
     pub auto_source: Option<String>,
+    /// Free-form rich-text note (HTML). Only present on retro sections;
+    /// template-section queries do not select it.
+    #[sqlx(default)]
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PatchSectionRequest {
+    /// HTML note; `null` or an empty string clears it. Max 100000 chars.
+    #[serde(default)]
+    pub notes: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

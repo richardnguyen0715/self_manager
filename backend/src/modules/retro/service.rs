@@ -388,7 +388,7 @@ pub async fn detail(state: &AppState, user_id: Uuid, retro_id: Uuid) -> AppResul
     .ok_or(AppError::NotFound)?;
 
     let sections = sqlx::query_as::<_, SectionDto>(&format!(
-        "SELECT {SECTION_COLS} FROM retro_sections WHERE retro_id = $1 ORDER BY position, key"
+        "SELECT {SECTION_COLS}, notes FROM retro_sections WHERE retro_id = $1 ORDER BY position, key"
     ))
     .bind(retro_id)
     .fetch_all(&state.db)
@@ -975,6 +975,30 @@ pub async fn create_entry(
     .fetch_one(&state.db)
     .await?;
     Ok(entry)
+}
+
+/// Sets (or clears) the free-form note of one section of the user's retro.
+pub async fn update_section_notes(
+    state: &AppState,
+    user_id: Uuid,
+    retro_id: Uuid,
+    section_id: Uuid,
+    req: PatchSectionRequest,
+) -> AppResult<SectionDto> {
+    let notes = clean_optional_text("notes", req.notes, MAX_NOTES_LEN)?;
+    sqlx::query_as::<_, SectionDto>(
+        "UPDATE retro_sections s SET notes = $4 \
+         FROM retros r \
+         WHERE s.id = $1 AND s.retro_id = $2 AND r.id = s.retro_id AND r.user_id = $3 \
+         RETURNING s.id, s.position, s.key, s.title, s.prompt, s.input_type, s.auto_source, s.notes",
+    )
+    .bind(section_id)
+    .bind(retro_id)
+    .bind(user_id)
+    .bind(notes)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 pub async fn update_entry(

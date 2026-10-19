@@ -39,10 +39,14 @@ export interface NotesCardProps {
   notes: string | null;
   /** Persists the notes; resolves when the save has completed. */
   onSave: (notes: string) => Promise<unknown>;
+  /** Heading text; defaults to "Notes". */
+  title?: string;
+  /** Smaller variant used under a section's cards. */
+  compact?: boolean;
 }
 
 /** Free-form rich notes box for a retro. Autosaves; `@` mentions sync to the retro. */
-export function NotesCard({ retroId, notes, onSave }: NotesCardProps) {
+export function NotesCard({ retroId, notes, onSave, title = "Notes", compact }: NotesCardProps) {
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
   const onSaveRef = useRef(onSave);
@@ -91,7 +95,10 @@ export function NotesCard({ retroId, notes, onSave }: NotesCardProps) {
     content: notes ?? "",
     editorProps: {
       attributes: {
-        class: "min-h-[10rem] px-4 py-3 text-sm outline-none",
+        class: cn(
+          compact ? "min-h-[5rem] px-3 py-2" : "min-h-[10rem] px-4 py-3",
+          "text-sm outline-none",
+        ),
       },
     },
     onUpdate: ({ editor: ed }) => {
@@ -114,18 +121,24 @@ export function NotesCard({ retroId, notes, onSave }: NotesCardProps) {
   return (
     <section className="space-y-2">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold">Notes</h2>
+        {compact ? (
+          <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
+        ) : (
+          <h2 className="text-base font-semibold">{title}</h2>
+        )}
         <SaveIndicator state={saveState} />
       </div>
       <div className="rounded-md border border-input bg-background shadow-sm transition-colors focus-within:ring-1 focus-within:ring-ring">
         {editor ? <Toolbar editor={editor} /> : null}
         <EditorContent editor={editor} />
       </div>
-      <p className="text-[11px] text-muted-foreground">
-        Rich text for this retro. Paste a URL to link it, or type{" "}
-        <code className="rounded bg-muted px-1">@</code> to mention a task, doc,
-        sprint and more.
-      </p>
+      {compact ? null : (
+        <p className="text-[11px] text-muted-foreground">
+          Rich text for this retro. Paste a URL to link it, or type{" "}
+          <code className="rounded bg-muted px-1">@</code> to mention a task, doc,
+          sprint and more.
+        </p>
+      )}
     </section>
   );
 }

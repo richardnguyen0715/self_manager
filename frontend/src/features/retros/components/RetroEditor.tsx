@@ -38,6 +38,7 @@ import {
 } from "./SectionCards";
 import { LinkedObjects } from "./LinkedObjects";
 import { NotesCard } from "./NotesCard";
+import { useUpdateRetroSectionNotes } from "../hooks/useRetroChildren";
 import {
   collectHtmlMentionRefs,
   collectTextMentionRefs,
@@ -99,9 +100,10 @@ function RetroEditorBody({ detail }: { detail: RetroDetail }) {
   const mentionTargets = useMemo(
     () => [
       ...collectHtmlMentionRefs(retro.notes),
+      ...sections.flatMap((sec) => collectHtmlMentionRefs(sec.notes)),
       ...entries.flatMap((e) => collectTextMentionRefs(e.body ?? "")),
     ],
-    [retro.notes, entries],
+    [retro.notes, sections, entries],
   );
   useMentionSyncTargets({ type: "retro", id: retro.id }, mentionTargets);
 
@@ -361,7 +363,26 @@ function SectionBlock({
       </div>
 
       {renderBody(retro, section, sectionEntries)}
+
+      {section.input_type === "cards" || section.input_type === "checklist" ? (
+        <SectionNote retroId={retro.id} section={section} />
+      ) : null}
     </section>
+  );
+}
+
+/** Free-form rich note under a section's cards (separate from the cards). */
+function SectionNote({ retroId, section }: { retroId: string; section: RetroSection }) {
+  const update = useUpdateRetroSectionNotes(retroId);
+  return (
+    <NotesCard
+      key={`note-${section.id}`}
+      retroId={retroId}
+      notes={section.notes ?? null}
+      title={`${section.title} — note`}
+      compact
+      onSave={(notes) => update.mutateAsync({ sectionId: section.id, notes })}
+    />
   );
 }
 

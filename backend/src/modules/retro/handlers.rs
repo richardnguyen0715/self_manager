@@ -16,7 +16,8 @@ use super::{
         ActionDto, ActionWithRetro, ActionsQuery, ByTargetQuery, CreateActionRequest,
         CreateEntryRequest, CreateLinkRequest, CreateTemplateRequest, EntryDto, LinkResolved,
         ListRetrosQuery, OpenRetroRequest, PatchActionRequest, PatchEntryRequest,
-        PatchRetroRequest, RetroDetail, RetroPage, RetroSummary, TemplateDto, TrendPoint,
+        PatchRetroRequest, PatchSectionRequest, RetroDetail, RetroPage, RetroSummary, SectionDto,
+        TemplateDto, TrendPoint,
         TrendsQuery, UpdateTemplateRequest,
     },
     service,
@@ -156,6 +157,17 @@ pub async fn create_entry(
 ) -> AppResult<(StatusCode, Json<EntryDto>)> {
     let entry = service::create_entry(&state, auth.user_id, id, body).await?;
     Ok((StatusCode::CREATED, Json(entry)))
+}
+
+pub async fn update_section(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path((retro_id, section_id)): Path<(Uuid, Uuid)>,
+    Json(body): Json<PatchSectionRequest>,
+) -> AppResult<Json<SectionDto>> {
+    Ok(Json(
+        service::update_section_notes(&state, auth.user_id, retro_id, section_id, body).await?,
+    ))
 }
 
 pub async fn update_entry(

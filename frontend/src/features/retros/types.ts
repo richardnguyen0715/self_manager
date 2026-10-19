@@ -172,6 +172,8 @@ export interface RetroSection {
   prompt: string | null;
   input_type: RetroInputType;
   auto_source: RetroAutoSource | null;
+  /** Free-form rich note under the section (Tiptap HTML). */
+  notes?: string | null;
 }
 
 export interface RetroEntry {

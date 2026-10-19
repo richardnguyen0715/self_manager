@@ -51,6 +51,7 @@ pub fn router() -> Router<AppState> {
         .route("/:id/refresh-snapshot", post(handlers::refresh_snapshot))
         .route("/:id/complete", post(handlers::complete_retro))
         .route("/:id/reopen", post(handlers::reopen_retro))
+        .route("/:id/sections/:section_id", patch(handlers::update_section))
         .route("/:id/entries", post(handlers::create_entry))
         .route("/:id/links", post(handlers::create_link))
         .route("/:id/actions", post(handlers::create_action))
