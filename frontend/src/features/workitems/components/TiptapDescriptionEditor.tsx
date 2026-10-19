@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   EntityMention,
+  MentionHtml,
   MentionSuggestion,
   useMentionSync,
 } from "@/features/mentions";
@@ -176,15 +177,11 @@ export function DescriptionPreview({
     );
   }
   return (
-    <div
-      // Reuse the editor's `.ProseMirror` content styles (headings, lists,
-      // quotes, code) so the read-only preview matches the editor. The
-      // `prose` classes are kept harmlessly but the project has no typography
-      // plugin, so `.ProseMirror` is what actually styles the markup.
-      className={cn("ProseMirror", PROSE_CLASS, className)}
-      // Content is authored by the single app user; safe to render.
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    // Reuse the editor's `.ProseMirror` content styles (headings, lists,
+    // quotes, code) so the read-only preview matches the editor. The
+    // `prose` classes are kept harmlessly but the project has no typography
+    // plugin, so `.ProseMirror` is what actually styles the markup.
+    <MentionHtml html={html} className={cn("ProseMirror", PROSE_CLASS, className)} />
   );
 }
 

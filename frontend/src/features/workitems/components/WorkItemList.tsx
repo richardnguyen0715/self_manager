@@ -1,5 +1,7 @@
 "use client";
 
+import { useListPropertyColumns, PropertyValueChip } from "@/features/custom-properties";
+import type { ListPropertyCell } from "@/features/custom-properties";
 import { EstimateBadge } from "@/features/estimate";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -352,13 +354,22 @@ function InlineOptionPicker<T extends string>({
 }
 
 /** "Display" button + panel: group by, order by (with direction), properties. */
-function DisplayMenu() {
+function DisplayMenu({ propertyColumns }: { propertyColumns: [string, string][] }) {
   const groupBy = useWorkItemDisplayStore((s) => s.groupBy);
   const orderBy = useWorkItemDisplayStore((s) => s.orderBy);
   const orderDir = useWorkItemDisplayStore((s) => s.orderDir);
   const properties = useWorkItemDisplayStore((s) => s.properties);
+  const customProps = useWorkItemDisplayStore((s) => s.customProps);
   const setDisplay = useWorkItemDisplayStore((s) => s.setDisplay);
   const [open, setOpen] = useState(false);
+
+  function toggleCustomProp(key: string) {
+    setDisplay({
+      customProps: customProps.includes(key)
+        ? customProps.filter((k) => k !== key)
+        : [...customProps, key],
+    });
+  }
 
   function toggleProperty(key: keyof WorkItemDisplayProperties) {
     setDisplay({ properties: { ...properties, [key]: !properties[key] } });
@@ -434,6 +445,26 @@ function DisplayMenu() {
                     )}
                   >
                     {p.label}
+                  </button>
+                );
+              })}
+              {propertyColumns.map(([key, label]) => {
+                const on = customProps.includes(key);
+                return (
+                  <button
+                    key={`cp:${key}`}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => toggleCustomProp(key)}
+                    title="Custom property"
+                    className={cn(
+                      "h-7 rounded-full border border-dashed px-3 text-xs font-medium transition-colors",
+                      on
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {label}
                   </button>
                 );
               })}
@@ -718,12 +749,15 @@ function WorkItemRow({
   selected,
   onToggleSelect,
   properties,
+  customCells,
 }: {
   item: WorkItemListItem;
   index: number;
   selected: boolean;
   onToggleSelect: (index: number, shiftKey: boolean) => void;
   properties: WorkItemDisplayProperties;
+  /** One entry per selected custom-property column (null = n/a for this project). */
+  customCells: (ListPropertyCell | null)[];
 }) {
   const deleteItem = useDeleteWorkItem();
   const setStatus = useSetWorkItemStatus(item.id);
@@ -871,6 +905,18 @@ function WorkItemRow({
         </span>
       )}
 
+      {/* Custom property columns */}
+      {customCells.map((cell, i) => (
+        <span
+          key={i}
+          className="hidden w-24 shrink-0 items-center overflow-hidden lg:flex"
+        >
+          {cell ? (
+            <PropertyValueChip property={cell.property} value={cell.value} />
+          ) : null}
+        </span>
+      ))}
+
       {/* Actions menu (hover) */}
       <DropdownMenuPrimitive.Root>
         <DropdownMenuPrimitive.Trigger asChild>
@@ -929,6 +975,7 @@ export function WorkItemList() {
   const orderBy = useWorkItemDisplayStore((s) => s.orderBy);
   const orderDir = useWorkItemDisplayStore((s) => s.orderDir);
   const properties = useWorkItemDisplayStore((s) => s.properties);
+  const customProps = useWorkItemDisplayStore((s) => s.customProps);
 
   const { data, isLoading, isError, error, isFetching } = useWorkItems({
     status: filters.status !== "all" ? filters.status : undefined,
@@ -946,6 +993,10 @@ export function WorkItemList() {
     [rawItems, orderBy, orderDir],
   );
   const groups = useMemo(() => groupItems(items, groupBy), [items, groupBy]);
+
+  // Custom-property columns (properties are per project; match by name).
+  const propertyData = useListPropertyColumns(items.map((i) => i.project_id));
+  const shownColumns = propertyData.columns.filter(([key]) => customProps.includes(key));
   const indexById = useMemo(
     () => new Map(items.map((i, n) => [i.id, n])),
     [items],
@@ -1204,7 +1255,7 @@ export function WorkItemList() {
         )}
 
         <div className="ml-auto">
-          <DisplayMenu />
+          <DisplayMenu propertyColumns={propertyData.columns} />
         </div>
       </div>
 
@@ -1234,6 +1285,11 @@ export function WorkItemList() {
           {properties.due && (
             <span className="w-14 text-right hidden sm:block">Due</span>
           )}
+          {shownColumns.map(([key, label]) => (
+            <span key={key} className="hidden w-24 shrink-0 truncate lg:block">
+              {label}
+            </span>
+          ))}
           <span className="w-7 shrink-0" />
         </div>
       )}
@@ -1293,6 +1349,9 @@ export function WorkItemList() {
                           selected={selectedIds.has(item.id)}
                           onToggleSelect={toggleRow}
                           properties={properties}
+                          customCells={shownColumns.map(([key]) =>
+                            propertyData.cell(item.id, item.project_id, key),
+                          )}
                         />
                       ))}
                   </div>

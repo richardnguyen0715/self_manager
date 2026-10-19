@@ -21,7 +21,6 @@ import { cn } from "@/lib/utils";
 import {
   EntityMention,
   MentionSuggestion,
-  useMentionSync,
 } from "@/features/mentions";
 
 const AUTOSAVE_DELAY_MS = 800;
@@ -104,7 +103,6 @@ export function NotesCard({ retroId, notes, onSave }: NotesCardProps) {
     immediatelyRender: false,
   });
 
-  useMentionSync(editor, { type: "retro", id: retroId });
 
   // Flush a pending save when the card unmounts (e.g. navigating away).
   useEffect(() => {

@@ -70,6 +70,8 @@ interface WorkItemDisplayState {
   orderBy: WorkItemOrderBy;
   orderDir: WorkItemOrderDir;
   properties: WorkItemDisplayProperties;
+  /** Lowercase names of custom properties shown as list columns. */
+  customProps: string[];
 
   setDisplay: (patch: Partial<Omit<WorkItemDisplayState, "setDisplay">>) => void;
 }
@@ -82,6 +84,7 @@ export const useWorkItemDisplayStore = create<WorkItemDisplayState>()(
       orderBy: "created",
       orderDir: "desc",
       properties: { status: true, priority: true, points: true, due: true },
+      customProps: [],
       setDisplay: (patch) => set(patch),
     }),
     { name: "mml_wi_display" },

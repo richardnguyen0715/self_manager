@@ -5,7 +5,7 @@ export { MentionSuggestion } from "./MentionSuggestion";
 export type { MentionSuggestionOptions } from "./MentionSuggestion";
 
 // Hooks
-export { useMentionSync, useMentionSearch, useMentionBacklinks, mentionKeys } from "./hooks";
+export { useMentionSync, useMentionSyncTargets, useMentionSearch, useMentionBacklinks, mentionKeys } from "./hooks";
 
 // Components
 export { BacklinksList } from "./BacklinksList";
@@ -22,3 +22,15 @@ export type {
   MentionRef,
 } from "./types";
 export { MENTION_TYPE_META, MENTION_TYPES, MENTION_FILTERS } from "./types";
+
+export { MentionChip } from "./MentionChip";
+export { MentionText } from "./MentionText";
+export { MentionHtml } from "./MentionHtml";
+export { MentionTextarea } from "./MentionTextarea";
+export {
+  mentionToken,
+  hasMentionToken,
+  parseMentionText,
+  collectTextMentionRefs,
+  collectHtmlMentionRefs,
+} from "./text";

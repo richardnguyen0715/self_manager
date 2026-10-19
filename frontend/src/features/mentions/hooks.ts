@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Editor } from "@tiptap/core";
 import {
@@ -216,4 +216,51 @@ export function useMentionSync(editor: Editor | null, source: MentionSource): vo
       flush();
     };
   }, [editor, sourceType, sourceId, queryClient]);
+}
+
+/**
+ * Like `useMentionSync`, for sources whose mentions are not in a single
+ * Tiptap editor (e.g. a retro: notes HTML + card text). The caller passes the
+ * full target list; a PUT is sent (debounced) only when the set changes.
+ */
+export function useMentionSyncTargets(source: MentionSource, targets: MentionRef[]): void {
+  const queryClient = useQueryClient();
+  const sourceType = source.type;
+  const sourceId = source.id;
+  const key = JSON.stringify(
+    Array.from(
+      new Map(
+        targets
+          .filter((t) => !(t.type === sourceType && t.id === sourceId))
+          .map((t) => [refKey(t), t]),
+      ).values(),
+    ).sort((a, b) => refKey(a).localeCompare(refKey(b))),
+  );
+  const lastKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!sourceId) return;
+    // First run only records the baseline: opening a page never writes.
+    if (lastKeyRef.current === null) {
+      lastKeyRef.current = key;
+      return;
+    }
+    if (lastKeyRef.current === key) return;
+    const timer = setTimeout(() => {
+      const next = key;
+      syncMentions({
+        source_type: sourceType,
+        source_id: sourceId,
+        targets: JSON.parse(next) as MentionRef[],
+      })
+        .then(() => {
+          lastKeyRef.current = next;
+          void queryClient.invalidateQueries({ queryKey: mentionKeys.all });
+        })
+        .catch(() => {
+          /* retried on the next change */
+        });
+    }, SYNC_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [key, sourceType, sourceId, queryClient]);
 }

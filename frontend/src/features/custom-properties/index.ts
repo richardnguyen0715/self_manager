@@ -14,7 +14,9 @@ export {
   useUpdateCustomProperty,
   useDeleteCustomProperty,
   useSetPropertyValue,
+  useListPropertyColumns,
 } from "./hooks";
+export type { ListPropertyCell } from "./hooks";
 
 // ─── API ───────────────────────────────────────────────────────────────────────
 export { CUSTOM_PROPERTY_ENDPOINTS } from "./api";

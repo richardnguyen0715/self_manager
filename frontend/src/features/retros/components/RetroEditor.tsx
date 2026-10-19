@@ -38,6 +38,11 @@ import {
 } from "./SectionCards";
 import { LinkedObjects } from "./LinkedObjects";
 import { NotesCard } from "./NotesCard";
+import {
+  collectHtmlMentionRefs,
+  collectTextMentionRefs,
+  useMentionSyncTargets,
+} from "@/features/mentions";
 import { SnapshotBlock } from "./SnapshotBlock";
 import { BacklinksList } from "@/features/mentions";
 
@@ -89,6 +94,16 @@ function RetroEditorBody({ detail }: { detail: RetroDetail }) {
 
   const isDraft = retro.status === "draft";
   const busy = update.isPending || complete.isPending || reopen.isPending;
+
+  // One sync owner for the whole retro: notes HTML + every card's text.
+  const mentionTargets = useMemo(
+    () => [
+      ...collectHtmlMentionRefs(retro.notes),
+      ...entries.flatMap((e) => collectTextMentionRefs(e.body ?? "")),
+    ],
+    [retro.notes, entries],
+  );
+  useMentionSyncTargets({ type: "retro", id: retro.id }, mentionTargets);
 
   const orderedSections = useMemo(
     () => [...sections].sort((a, b) => a.position - b.position),

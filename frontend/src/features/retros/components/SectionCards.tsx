@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Plus, Star, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { MentionText, MentionTextarea, hasMentionToken } from "@/features/mentions";
 import {
   useCreateRetroEntry,
   useDeleteRetroEntry,
@@ -86,30 +87,61 @@ export function AutosaveTextarea({
   const [value, setValue] = useState(initialValue);
   const { schedule, flush } = useAutosave<string>(onSave);
   const ref = useRef<HTMLTextAreaElement>(null);
+  // Text holding `@[..](type:id)` tokens shows as chips until the user clicks
+  // into it; the textarea always edits the raw token text.
+  const [editing, setEditing] = useState(!!autoFocus);
 
   // The row can mount before the parent decides it should take focus, so the
   // native autoFocus attribute alone misses; focus whenever the flag flips on.
   useEffect(() => {
-    if (autoFocus) ref.current?.focus();
+    if (autoFocus) {
+      setEditing(true);
+      ref.current?.focus();
+    }
   }, [autoFocus]);
 
+  // Entering edit mode mounts the textarea; focus it then.
+  useEffect(() => {
+    if (editing) ref.current?.focus();
+  }, [editing]);
+
+  const boxClass = cn(
+    "w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+    className,
+  );
+
+  if (!editing && hasMentionToken(value)) {
+    return (
+      <div
+        role="textbox"
+        tabIndex={0}
+        aria-label={ariaLabel}
+        onClick={() => setEditing(true)}
+        onFocus={() => setEditing(true)}
+        className={cn(boxClass, "cursor-text")}
+      >
+        <MentionText text={value} />
+      </div>
+    );
+  }
+
   return (
-    <textarea
+    <MentionTextarea
       ref={ref}
       value={value}
       rows={rows}
       placeholder={placeholder}
       autoFocus={autoFocus}
       aria-label={ariaLabel}
-      onChange={(e) => {
-        setValue(e.target.value);
-        schedule(e.target.value);
+      onValueChange={(v) => {
+        setValue(v);
+        schedule(v);
       }}
-      onBlur={flush}
-      className={cn(
-        "w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-        className,
-      )}
+      onBlur={() => {
+        flush();
+        setEditing(false);
+      }}
+      className={boxClass}
     />
   );
 }
