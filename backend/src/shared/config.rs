@@ -65,7 +65,14 @@ impl Config {
             database_url: env::var("DATABASE_URL").context("DATABASE_URL is required")?,
             redis_url: env::var("REDIS_URL").context("REDIS_URL is required")?,
 
-            jwt_secret: env::var("JWT_SECRET").context("JWT_SECRET is required")?,
+            jwt_secret: {
+                let secret = env::var("JWT_SECRET").context("JWT_SECRET is required")?;
+                anyhow::ensure!(
+                    secret.len() >= 32 && !secret.to_ascii_lowercase().starts_with("change_me"),
+                    "JWT_SECRET must be at least 32 bytes and must not be a CHANGE_ME placeholder"
+                );
+                secret
+            },
             access_token_ttl_secs: env::var("ACCESS_TOKEN_TTL_SECS")
                 .unwrap_or_else(|_| "900".to_owned())
                 .parse::<u64>()

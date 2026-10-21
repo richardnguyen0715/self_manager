@@ -1,7 +1,7 @@
 # Retro system — periodic reviews & retrospectives linked to any object
 
 Status: design + contract for implementation (migration 0021, module `retro`, route `/retros`).
-Research basis: Parabol (single meeting table + type discriminator, templates as prompt rows, tasks as action sink), Plane (join tables for membership, frozen `progress_snapshot`), Obsidian Periodic Notes (period key, lazy creation on open), retro-board (templates/columns), GTD weekly review. Raw notes: scratchpad `retro-research.md`.
+Research basis: Parabol (single meeting table + type discriminator, templates as prompt rows, tasks as action sink), Plane (join tables for membership, frozen `progress_snapshot`), Obsidian Periodic Notes (period key, lazy creation on open), retro-board (templates/columns), GTD weekly review.
 
 ## 1. Goals
 

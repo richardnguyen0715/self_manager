@@ -1,10 +1,9 @@
-# manage-my-life — production stack for a self-hosted server (Cloudflare Tunnel + host nginx).
+# manage-my-life — production stack for servers that already have a reverse proxy
+# (for example Cloudflare Tunnel + host nginx).
 #
-# This server already terminates TLS at Cloudflare and routes by Host through a
-# cloudflared tunnel -> host nginx (:80) -> app loopback ports. So this stack
-# runs NO reverse proxy of its own: it binds the frontend + backend to
-# 127.0.0.1:<port>, and an nginx vhost (docker/nginx/app.example.com.conf)
-# routes app.example.com to them.
+# This stack runs NO reverse proxy of its own: it binds the frontend + backend to
+# 127.0.0.1:<port>, and an nginx vhost (docker/nginx/example.com.conf)
+# routes your domain to them.
 #
 # Run from the repo root:
 #   docker compose --env-file .env -f docker/docker-compose.server.yml up -d --build

@@ -35,14 +35,3 @@ Thumbs.db
 
 # ── User-uploaded files (do not commit) ─────────────────────────
 /backend/uploads/
-
-# ── Orchestration scratch (local only) ──────────────────────────
-
-
-
-
-# ── Extracted sample-ui artifacts (keep the source zip) ─────────
-design/sample-ui/_extracted/
-
-# all orchestration scratch scripts
-.*-workflow.js

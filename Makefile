@@ -124,7 +124,7 @@ shell-db: ## Open a psql session against the running postgres container
 
 shell-redis: ## Open a redis-cli session
 	$(COMPOSE) -f $(COMPOSE_FILE) exec redis \
-	  redis-cli -a $${REDIS_PASSWORD:-redispass}
+	  redis-cli -a $${REDIS_PASSWORD}
 
 # ── Utilities ────────────────────────────────────────────────────────────────
 

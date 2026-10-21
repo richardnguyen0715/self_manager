@@ -66,7 +66,7 @@ Requires Docker with Compose v2.
 
 ```bash
 git clone https://github.com/richardnguyen0715/self_manager.git
-cd manage-my-life
+cd self_manager
 
 cp .env.example .env
 make gen-secrets        # prints strong values for POSTGRES_PASSWORD, REDIS_PASSWORD, JWT_SECRET
