@@ -1,186 +1,104 @@
 # Manage My Life
 
-A full-stack personal productivity application built as a modular monolith. The backend is a single Rust binary (Axum + SQLx + PostgreSQL + Redis) with an Agile OS domain layered on top of the legacy task/project core. The frontend is a Next.js 14 App Router SPA with feature-sliced architecture.
+A self-hosted **personal Agile OS**: Jira-style planning (goals, epics, sprints, boards, retros) combined with the life-management tools that usually live in separate apps (calendar, time blocking, habits, focus timer, docs).
 
-**Agile OS domain** (migration 0003): Goals -> Initiatives -> Epics -> Work Items -> Subtasks, Sprint planning with capacity enforcement, velocity tracking, burndown charts, sprint reviews and retrospectives. Work items supersede legacy tasks as the primary work entity; legacy `/api/tasks` endpoints remain mounted for back-compat.
+Built with a Rust (Axum) backend and a Next.js frontend. One account, one place for the work you plan and the time you actually spend.
 
----
+![Dashboard](docs/screenshots/dashboard.jpg)
 
-## Architecture
+## Features
 
-```
-manage-my-life/
-├── backend/                  Rust modular monolith (single crate)
-│   ├── src/
-│   │   ├── main.rs           Startup, router assembly, CORS, tracing
-│   │   ├── shared/           Cross-cutting concerns
-│   │   │   ├── config.rs     Environment variable loading
-│   │   │   ├── state.rs      AppState (PgPool + Redis + Config + broadcast)
-│   │   │   ├── error.rs      AppError -> IntoResponse (JSON error envelope)
-│   │   │   ├── extractors.rs AuthUser extractor (JWT bearer)
-│   │   │   ├── jwt.rs        HS512 access + refresh token encoding/decoding
-│   │   │   ├── events.rs     DomainEvent enum (broadcast channel)
-│   │   │   ├── db.rs         PgPool factory
-│   │   │   └── redis.rs      ConnectionManager factory
-│   │   └── modules/
-│   │       ├── auth/         Registration, login, JWT refresh, /me
-│   │       ├── task/         Task CRUD, subtasks, tags
-│   │       ├── project/      Project CRUD, reorder, progress
-│   │       ├── goal/         Goal CRUD, goal->project hierarchy
-│   │       ├── habit/        Habit CRUD, logging, streaks
-│   │       ├── calendar/     Calendar events, range queries
-│   │       ├── timeblock/    Time blocks, focus session lifecycle
-│   │       ├── analytics/    Daily stats, completion rate, time usage
-│   │       ├── notification/ In-app notifications, unread count
-│   │       ├── search/       Cross-entity full-text search
-│   │       ├── dashboard/    Aggregated today view
-│   │       └── realtime/     WebSocket push (domain event fan-out)
-│   └── migrations/           SQLx migration files (run at startup)
-├── frontend/                 Next.js 14 App Router
-│   └── src/
-│       ├── app/              Route pages (one per feature)
-│       ├── features/         Feature-sliced: hooks, components, stores
-│       ├── components/       Shared UI (shadcn/ui) + layout (Sidebar, Header)
-│       ├── stores/           Zustand stores (auth, ui)
-│       └── lib/              API client, utilities
-├── infra/
-│   ├── nginx/                Reverse proxy config
-│   ├── prometheus/           Metrics scrape config
-│   └── grafana/              Dashboard provisioning
-├── docker-compose.yml        Full stack: postgres, redis, backend, frontend, nginx, prometheus, grafana
-└── Makefile                  Developer convenience targets
-```
+**Planning**
+- Goals → Initiatives → Epics → Work items → Subtasks, with a portfolio **Hierarchy** view and progress roll-ups
+- **Backlog** and **sprints**: capacity enforcement, start/stop, rollover of unfinished items, velocity, burndown, sprint review and retrospective
+- **Kanban board** with custom columns, drag and drop, and a type / priority / sprint filter
+- Work items with item keys (`WI-1`), types (epic, feat, fix, docs, ...), priorities, labels, estimate systems, custom properties, attachments, links, activity log and bulk operations
+- Table view with grouping, ordering, display options, per-user **saved views**
+- `@mentions` and backlinks between work items, docs and retros
 
-### Router contract
+**Life**
+- **Calendar** with recurring events, calendar types, drag-to-create and drag-to-reschedule
+- **Time blocking** and a **focus** timer (Pomodoro / deep work) linked to tasks
+- **Habits** with streaks, heatmap, and check / count / duration types
+- **Analytics**: productivity, completion rate, focus time, velocity, time by epic
 
-Every module exposes `pub fn router() -> axum::Router<AppState>`. `main.rs` mounts them:
+**Knowledge**
+- **Docs**: spaces and pages with a rich-text editor (Tiptap), databases, comments, full-text search, and optional public pages
+- **Retros**: daily, weekly, monthly, quarterly and yearly check-ins, plus sprint and project retros, templates, carry-over actions and trends
 
-| Mount path           | Module         | Notes              |
-|----------------------|----------------|--------------------|
-| `/api/auth`          | `auth`         |                    |
-| `/api/tasks`         | `task`         | legacy             |
-| `/api/projects`      | `project`      | legacy             |
-| `/api/goals`         | `goal`         |                    |
-| `/api/habits`        | `habit`        |                    |
-| `/api/calendar`      | `calendar`     |                    |
-| `/api/timeblocks`    | `timeblock`    |                    |
-| `/api/analytics`     | `analytics`    | + velocity/burndown/time-by-epic |
-| `/api/notifications` | `notification` |                    |
-| `/api/search`        | `search`       |                    |
-| `/api/dashboard`     | `dashboard`    | + `/sprint` endpoint |
-| `/api/initiatives`   | `initiative`   | NEW                |
-| `/api/epics`         | `epic`         | NEW                |
-| `/api/sprints`       | `sprint`       | NEW                |
-| `/api/work-items`    | `work_item`    | NEW                |
-| `/api/backlog`       | `backlog`      | NEW                |
-| `/ws`                | `realtime`     |                    |
+**Platform**
+- Organizations and projects, soft delete with **Trash**, in-app notifications with snooze
+- Real-time updates over WebSocket
+- Command palette (`⌘K`) and keyboard shortcuts (`?` lists them)
 
-### Domain events
+## Screenshots
 
-`AppState.events` is a `tokio::sync::broadcast::Sender<DomainEvent>`. Modules publish events and background listeners in `analytics` and `notification` consume them without direct coupling.
+| | |
+|---|---|
+| ![Backlog](docs/screenshots/backlog.jpg) | ![Board](docs/screenshots/board.jpg) |
+| **Backlog**: sprint sections and backlog | **Board**: Kanban with custom columns |
+| ![Calendar](docs/screenshots/calendar.jpg) | ![Habits](docs/screenshots/habits.jpg) |
+| **Calendar**: week / day / month | **Habits** |
+| ![Focus](docs/screenshots/focus.jpg) | ![Analytics](docs/screenshots/analytics.jpg) |
+| **Focus** timer | **Analytics** |
+| ![Retros](docs/screenshots/retros.jpg) | |
+| **Retros & reviews** | |
 
-Legacy events: `TaskCompleted`, `HabitCompleted`, `TimeBlockFinished`, `ProjectCompleted`, `CalendarEventReminder`, `GoalCompleted`.
+> Screenshots show a fresh account, so most views are in their empty state.
 
-Agile OS events: `WorkItemCompleted` (emitted on status->done), `SprintStarted` (on activate), `SprintCompleted` (on complete with velocity).
+## Tech stack
 
----
+| Layer | Technology |
+|---|---|
+| Backend | Rust, [Axum](https://github.com/tokio-rs/axum) 0.7, [SQLx](https://github.com/launchbadge/sqlx) 0.7, Tokio |
+| Data | PostgreSQL 15, Redis 7 |
+| Auth | JWT (HS512) access + refresh tokens, Argon2id password hashing |
+| Frontend | Next.js 15 (App Router), React 19, TypeScript |
+| UI | Tailwind CSS, Radix-based components, Tiptap, dnd-kit, Recharts, cmdk |
+| State / data | Zustand, TanStack Query |
+| Ops | Docker Compose, Nginx, Caddy (auto-TLS), Prometheus, Grafana |
 
-## Tech Stack
+## Getting started
 
-**Backend**
+### Option A: Docker Compose (recommended)
 
-| Concern           | Library                                           |
-|-------------------|---------------------------------------------------|
-| HTTP framework    | Axum 0.7                                          |
-| Database          | SQLx 0.7 + PostgreSQL 15                          |
-| Cache / sessions  | Redis 7 (redis crate, ConnectionManager)          |
-| Auth              | JWT (jsonwebtoken, HS512) + Argon2id              |
-| Async runtime     | Tokio 1 (full)                                    |
-| Error handling    | thiserror + anyhow                                |
-| Validation        | validator 0.18                                    |
-| Observability     | tracing + tracing-subscriber                      |
-| Background jobs   | apalis 0.6                                        |
-| Serialization     | serde + serde_json                                |
-
-**Frontend**
-
-| Concern           | Library                        |
-|-------------------|-------------------------------|
-| Framework         | Next.js 14 (App Router)        |
-| Language          | TypeScript                     |
-| Styling           | Tailwind CSS + shadcn/ui       |
-| State             | Zustand                        |
-| Data fetching     | TanStack Query                 |
-| Charts            | Recharts                       |
-| Icons             | Lucide React                   |
-| Forms             | React Hook Form + Zod          |
-
-**Infrastructure**
-
-| Service     | Purpose                                   |
-|-------------|-------------------------------------------|
-| PostgreSQL  | Primary data store                        |
-| Redis       | Session tokens, caching, job queues       |
-| Nginx       | Reverse proxy (port 80 -> frontend + API) |
-| Prometheus  | Metrics collection (port 9090)            |
-| Grafana     | Dashboards (port 3001)                    |
-
----
-
-## How to Run
-
-### Prerequisites
-
-- Docker and Docker Compose v2
-- For local dev only: Rust 1.78+, Node.js 20+, cargo-sqlx
-
-### Full stack with Docker Compose
-
-1. Copy the example environment file and fill in required secrets:
+Requires Docker with Compose v2.
 
 ```bash
+git clone https://github.com/richardnguyen0715/self_manager.git
+cd manage-my-life
+
 cp .env.example .env
-# Edit .env -- set POSTGRES_PASSWORD, REDIS_PASSWORD, JWT_SECRET
-# Or generate them automatically:
-make gen-secrets
+make gen-secrets        # prints strong values for POSTGRES_PASSWORD, REDIS_PASSWORD, JWT_SECRET
+# paste them into .env (replace every CHANGE_ME_*)
+
+make up                 # build images and start everything
 ```
 
-2. Start all services:
+| URL | Service |
+|---|---|
+| http://localhost | App (via Nginx) |
+| http://localhost/api | REST API |
+| ws://localhost/ws | WebSocket |
+| http://localhost:3001 | Grafana |
+| http://localhost:9090 | Prometheus |
+
+Open http://localhost, register an account and start planning. Database migrations run automatically when the backend starts.
+
+### Option B: Run natively (development)
+
+Requires Rust (stable), Node.js 20+ (or Bun), and Docker for the databases.
 
 ```bash
-make up
-# or directly:
-docker compose up --build -d
-```
-
-3. Services will be available at:
-
-| URL                          | Service              |
-|------------------------------|----------------------|
-| `http://localhost`           | Frontend (via nginx) |
-| `http://localhost/api`       | REST API             |
-| `ws://localhost/ws`          | WebSocket            |
-| `http://localhost:3001`      | Grafana              |
-| `http://localhost:9090`      | Prometheus           |
-
-Migrations run automatically at backend startup via `sqlx::migrate!`.
-
-### Local development (native)
-
-Start only the infrastructure services:
-
-```bash
-make dev
-# Starts postgres (5432) and redis (6379) via Docker
+make dev                # starts only PostgreSQL (5432) and Redis (6379)
 ```
 
 Backend:
 
 ```bash
 cd backend
-cp .env.example .env  # set DATABASE_URL, REDIS_URL, JWT_SECRET
-cargo run
-# Server listens on http://localhost:8080
+cp .env.example .env    # set DATABASE_URL, REDIS_URL, JWT_SECRET
+cargo run               # http://localhost:8080
 ```
 
 Frontend:
@@ -188,182 +106,79 @@ Frontend:
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local  # set NEXT_PUBLIC_API_URL=http://localhost:8080/api
-npm run dev
-# App on http://localhost:3000
+echo "NEXT_PUBLIC_API_URL=http://localhost:8080" > .env.local
+npm run dev             # http://localhost:3000
 ```
 
----
+The backend uses compile-time checked SQL. If you build without a database, set `SQLX_OFFLINE=true` and it uses the committed `backend/.sqlx` cache. After changing a query, run `cargo sqlx prepare` against a live database to refresh it.
 
-## Make Targets
+## Configuration
 
-| Target                              | Description                                                |
-|-------------------------------------|------------------------------------------------------------|
-| `make up`                           | Build images and start all services in the background      |
-| `make down`                         | Stop containers (volumes preserved)                        |
-| `make down-v`                       | Stop containers and delete volumes (wipes database)        |
-| `make dev`                          | Start only postgres + redis for local native development   |
-| `make logs`                         | Tail all service logs                                      |
-| `make logs-backend`                 | Tail backend logs only                                     |
-| `make migrate`                      | Run pending migrations against the running postgres        |
-| `make migrate-create NAME=add_foo`  | Create a new migration file                                |
-| `make fmt`                          | cargo fmt + Prettier                                       |
-| `make lint`                         | cargo clippy + ESLint                                      |
-| `make shell-backend`                | Shell into the backend container                           |
-| `make shell-db`                     | psql session against the running postgres container        |
-| `make shell-redis`                  | redis-cli session                                          |
-| `make gen-secrets`                  | Generate strong random values for .env secrets             |
-| `make env-check`                    | Verify required .env variables are set                     |
+Copy `.env.example` (Compose) or `backend/.env.example` (native) and adjust.
 
----
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | yes | PostgreSQL connection string |
+| `REDIS_URL` | yes | Redis connection string |
+| `JWT_SECRET` | yes | HS512 signing secret, at least 32 bytes (`openssl rand -hex 64`) |
+| `POSTGRES_PASSWORD` | Compose | Password for the bundled PostgreSQL |
+| `CORS_ORIGINS` | no | Comma-separated allowed origins. Empty allows any origin, so set it in production |
+| `HOST` / `PORT` | no | Bind address, default `0.0.0.0:8080` |
+| `ACCESS_TOKEN_TTL_SECS` | no | Default `900` (15 minutes) |
+| `REFRESH_TOKEN_TTL_SECS` | no | Default `2592000` (30 days) |
+| `RUST_LOG` | no | Log filter, e.g. `manage_my_life=info,tower_http=info` |
+| `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL` | no | Public API / WebSocket URLs baked into the frontend at build time |
 
-## API Overview
+Uploads (avatars, attachments) are stored on the backend's local disk under `backend/uploads/`; mount a volume there if you deploy with containers.
 
-All authenticated endpoints require `Authorization: Bearer <access_token>`.
+## Deploying
 
-Errors are returned as:
+Two production setups are included, see [`docker/DEPLOY.md`](docker/DEPLOY.md):
 
-```json
-{ "error": "NOT_FOUND", "message": "resource not found" }
+- **Public server**: `docker/docker-compose.prod.yml` with Caddy for automatic HTTPS (`make prod-env`, edit `.env`, `make prod-up`).
+- **Behind your own reverse proxy** (for example Cloudflare Tunnel + Nginx): `docker/docker-compose.server.yml` binds to loopback ports only (`make server-up`). An Nginx vhost example is in `docker/nginx/example.com.conf`.
+
+Before exposing an instance, use unique secrets, set `CORS_ORIGINS` to your own domain, and never commit `.env` files. See [SECURITY.md](SECURITY.md).
+
+## Project structure
+
+```
+backend/
+  src/main.rs          Startup, router assembly, CORS, tracing
+  src/shared/          Config, AppState, errors, JWT, auth extractor, events
+  src/modules/         One folder per domain (work_item, sprint, goal, retro, page, ...)
+  migrations/          SQL migrations, applied at startup
+  .sqlx/               Offline query cache
+frontend/
+  src/app/             Route pages
+  src/features/        Feature-sliced hooks, components and stores
+  src/components/      Shared UI and layout
+  src/lib/             API client and utilities
+docker/                Production and server compose files, Caddy and Nginx configs
+infra/                 Nginx, Prometheus and Grafana for the dev stack
+design/                Design notes and API contracts
 ```
 
-### Auth (`/api/auth`)
+Every backend module exposes `router()`, mounted under `/api/<module>` in `main.rs`. Modules communicate through a `tokio::sync::broadcast` channel of domain events (for example `WorkItemCompleted`, `SprintCompleted`), which feeds analytics, notifications and the WebSocket.
 
-| Method | Path       | Auth | Description                        |
-|--------|------------|------|------------------------------------|
-| POST   | /register  | No   | Create account, returns token pair |
-| POST   | /login     | No   | Authenticate, returns token pair   |
-| POST   | /refresh   | No   | Rotate refresh token               |
-| POST   | /logout    | Yes  | Revoke refresh token               |
-| GET    | /me        | Yes  | Return authenticated user profile  |
+## Make targets
 
-### Tasks (`/api/tasks`)
+Run `make help` for the full list. Common ones:
 
-CRUD for tasks and subtasks. Tags managed under `/api/tasks/tags`. Task-tag associations via `POST|DELETE /:id/tags/:tag_id`.
+| Target | Description |
+|---|---|
+| `make up` / `make down` | Start / stop the full stack |
+| `make dev` | Start only PostgreSQL and Redis for native development |
+| `make logs` | Tail all service logs |
+| `make migrate` | Run pending migrations |
+| `make migrate-create NAME=add_foo` | Create a new migration |
+| `make fmt` / `make lint` | rustfmt + Prettier / clippy + ESLint |
+| `make shell-db` | `psql` into the running database |
+| `make gen-secrets` | Generate strong random secrets |
 
-### Projects (`/api/projects`)
+## Contributing
 
-CRUD + bulk reorder (`PUT /reorder`). Projects link to goals.
-
-### Goals (`/api/goals`)
-
-CRUD + reorder by position + `GET /:id/projects` to list child projects.
-
-### Habits (`/api/habits`)
-
-CRUD + archive (`POST /:id/archive`) + habit logs (`GET|POST /:id/logs`, `DELETE /:id/logs/:log_id`).
-
-### Calendar (`/api/calendar`)
-
-CRUD for calendar events. `GET /` accepts `?start=<rfc3339>&end=<rfc3339>` range query.
-
-### Time Blocks (`/api/timeblocks`)
-
-CRUD + focus session lifecycle under `/:id/focus-sessions`: start (POST), pause/resume/finish (PATCH).
-
-### Analytics (`/api/analytics`)
-
-| Method | Path              | Description                           |
-|--------|-------------------|---------------------------------------|
-| GET    | /summary          | Period summary (tasks, focus, habits) |
-| GET    | /daily            | Daily stats time series               |
-| GET    | /time-usage       | Time distribution breakdown           |
-| GET    | /completion-rate  | Task completion rate over period      |
-| POST   | /refresh          | Recompute today's stats               |
-| POST   | /refresh/:date    | Recompute stats for a specific date   |
-| GET    | /velocity         | Sprint velocity for last N sprints    |
-| GET    | /burndown         | Burndown chart for a sprint           |
-| GET    | /time-by-epic     | Focus minutes grouped by epic         |
-
-### Notifications (`/api/notifications`)
-
-List, get, create, update, delete. `POST /:id/read`, `POST /mark-all-read`, `GET /unread-count`.
-
-### Search (`/api/search`)
-
-`GET /api/search?q=<term>&kinds=task,project,habit&limit=20` -- cross-entity ILIKE search.
-
-### Dashboard (`/api/dashboard`)
-
-`GET /` -- full today snapshot (tasks, habits, events, time blocks, quick stats).
-`GET /stats` -- quick-stats counters only.
-`GET /sprint` -- sprint-centric snapshot (active sprint progress, goal progress, overdue work items, today's time blocks, habits).
-
-### Agile OS (NEW)
-
-**Initiatives** (`/api/initiatives`): CRUD + `GET /:id/epics`. Strategic buckets under a Goal.
-
-**Epics** (`/api/epics`): CRUD + `GET /:id/work-items`. Multi-sprint bodies of work with progress rollup (total/done items, completion rate, story points).
-
-**Sprints** (`/api/sprints`): CRUD + `POST /:id/activate`, `POST /:id/complete`, `GET /active`, `GET /velocity`, `GET /:id/work-items`, `GET /:id/burndown`, `GET|PUT /:id/review`, `GET|PUT /:id/retrospective`. At most one active sprint per user (409 if violated). Capacity enforcement (409 if sprint points exceeded when adding a work item).
-
-**Work Items** (`/api/work-items`): CRUD + status/points/sprint/backlog transitions + subtask management. Backlog = sprint_id IS NULL. Story points ∈ {1,3,5,8,null}.
-
-**Backlog** (`/api/backlog`): `GET /` — filtered list of unassigned work items.
-
-### WebSocket (`/ws`)
-
-Connect with `?token=<access_jwt>`. The server pushes JSON frames for every `DomainEvent` belonging to the authenticated user. Send `{"type":"ping"}` for keepalive; server replies `{"type":"pong"}`.
-
----
-
-## Frontend Routes
-
-| Route              | Feature                                                |
-|--------------------|--------------------------------------------------------|
-| `/dashboard`       | Today snapshot + active sprint progress (evolved)      |
-| `/backlog`         | NEW — Sprint sections + Backlog; drag items to sprint  |
-| `/board`           | NEW — Active sprint Kanban (To do / In progress / Done)|
-| `/sprints`         | NEW — Sprint list (planned/active/completed)           |
-| `/sprints/[id]`    | NEW — Sprint detail: Overview, Review, Retro, Burndown |
-| `/work-items`      | NEW — Filterable work item table                       |
-| `/work-items/[id]` | NEW — Work item detail: subtasks, status, details panel|
-| `/goals`           | Goal -> Initiative -> Epic hierarchy (evolved)         |
-| `/analytics`       | Charts + velocity/burndown/time-by-epic (evolved)      |
-| `/tasks`           | Task list (legacy)                                     |
-| `/kanban`          | Drag-and-drop Kanban (legacy)                          |
-| `/calendar`        | Month/week/day calendar + time grid                    |
-| `/timeblocking`    | Time block scheduler with focus timer                  |
-| `/habits`          | Habit tracker with streaks and heatmap                 |
-| `/focus`           | Focus session (Pomodoro-style)                         |
-| `/settings`        | User preferences                                       |
-| `/login`           | Login form                                             |
-| `/register`        | Registration form                                      |
-
----
-
-## Development Notes
-
-### SQLx offline mode
-
-The backend uses `sqlx::query!` macros for compile-time SQL verification. Without a running database you must either:
-
-- Set `DATABASE_URL` pointing to a reachable PostgreSQL instance, or
-- Run `cargo sqlx prepare` with a live DB to generate the `.sqlx` query cache, then set `SQLX_OFFLINE=true`.
-
-The Docker build (`docker-compose.yml`) passes `SQLX_OFFLINE=true` and expects the `.sqlx` cache to be committed. For local `cargo check` without Docker, start infra first with `make dev` and export `DATABASE_URL`.
-
-### Environment variables
-
-Required:
-
-| Variable            | Description                          |
-|---------------------|--------------------------------------|
-| `DATABASE_URL`      | PostgreSQL connection string         |
-| `REDIS_URL`         | Redis connection string              |
-| `JWT_SECRET`        | HS512 signing secret (min 32 bytes)  |
-| `POSTGRES_PASSWORD` | Used by docker-compose postgres      |
-
-Optional (sensible defaults apply):
-
-| Variable                 | Default                                         |
-|--------------------------|-------------------------------------------------|
-| `HOST`                   | `0.0.0.0`                                       |
-| `PORT`                   | `8080`                                          |
-| `ACCESS_TOKEN_TTL_SECS`  | `900` (15 min)                                  |
-| `REFRESH_TOKEN_TTL_SECS` | `2592000` (30 days)                             |
-| `CORS_ORIGINS`           | empty = any origin (set to your domain in prod) |
-| `RUST_LOG`               | `manage_my_life=info,tower_http=info,sqlx=warn` |
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and [SECURITY.md](SECURITY.md) to report vulnerabilities privately.
 
 ## License
 
