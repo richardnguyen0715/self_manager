@@ -2,7 +2,7 @@
 
 /**
  * WorkItemRow — one row in a sprint or backlog section.
- * Matches the Jira backlog row: type icon | title | status pill | story pts | due date | actions.
+ * Backlog row layout: type icon | title | status pill | story pts | due date | actions.
  */
 
 import { EstimateBadge } from "@/features/estimate";

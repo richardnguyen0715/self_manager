@@ -2,7 +2,7 @@
 
 /**
  * SprintSection — one sprint band in the backlog view.
- * Matches the Jira backlog pattern:
+ * Backlog sprint section pattern:
  *   [v] Sprint Name  <dates>  (<N> work items)   [0 | 0 | 0]  [Start sprint / Complete sprint]  [...]
  *   row row row ...
  *   [+ Create]

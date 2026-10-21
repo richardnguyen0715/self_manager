@@ -2,7 +2,7 @@
 
 /**
  * QuickAddRow — inline "+ Create" row at the bottom of each section.
- * Matches the Jira "+ Create" affordance below sprint items.
+ * Matches the "+ Create" affordance below sprint items.
  */
 
 import { useState, useRef, useEffect } from "react";
