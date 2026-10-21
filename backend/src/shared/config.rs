@@ -41,6 +41,11 @@ pub struct Config {
     // ── Resend email (optional) ───────────────────────────────────────────────
     pub resend_api_key: Option<String>,
     pub email_from: Option<String>,
+
+    // ── CORS ──────────────────────────────────────────────────────────────────
+    /// Comma-separated allowed origins (`CORS_ORIGINS`). Empty = allow any origin
+    /// (development only; set this in production).
+    pub cors_origins: Vec<String>,
 }
 
 impl Config {
@@ -80,6 +85,13 @@ impl Config {
 
             resend_api_key: env::var("RESEND_API_KEY").ok().filter(|s| !s.is_empty()),
             email_from: env::var("EMAIL_FROM").ok().filter(|s| !s.is_empty()),
+
+            cors_origins: env::var("CORS_ORIGINS")
+                .unwrap_or_default()
+                .split(',')
+                .map(|o| o.trim().to_owned())
+                .filter(|o| !o.is_empty())
+                .collect(),
         })
     }
 

@@ -362,4 +362,9 @@ Optional (sensible defaults apply):
 | `PORT`                   | `8080`                                          |
 | `ACCESS_TOKEN_TTL_SECS`  | `900` (15 min)                                  |
 | `REFRESH_TOKEN_TTL_SECS` | `2592000` (30 days)                             |
+| `CORS_ORIGINS`           | empty = any origin (set to your domain in prod) |
 | `RUST_LOG`               | `manage_my_life=info,tower_http=info,sqlx=warn` |
+
+## License
+
+[MIT](LICENSE)

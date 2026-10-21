@@ -3,6 +3,7 @@ name = "manage-my-life"
 version = "0.1.0"
 edition = "2021"
 authors = ["manage-my-life contributors"]
+license = "MIT"
 description = "Manage My Life — modular-monolith backend"
 
 [[bin]]

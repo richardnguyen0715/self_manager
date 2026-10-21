@@ -17,7 +17,7 @@ use axum::{
     Router,
 };
 use tower_http::{
-    cors::{Any, CorsLayer},
+    cors::{AllowOrigin, CorsLayer},
     services::ServeDir,
     trace::TraceLayer,
 };
@@ -65,6 +65,19 @@ async fn main() -> anyhow::Result<()> {
 
     // ── 6. AppState ───────────────────────────────────────────────────────────
     let state = AppState::new(db, redis, config.clone());
+
+    // Empty CORS_ORIGINS keeps the permissive dev default; set it in production.
+    let cors_origin = if config.cors_origins.is_empty() {
+        tracing::warn!("CORS_ORIGINS not set: allowing any origin");
+        AllowOrigin::any()
+    } else {
+        AllowOrigin::list(
+            config
+                .cors_origins
+                .iter()
+                .filter_map(|o| o.parse::<axum::http::HeaderValue>().ok()),
+        )
+    };
 
     // ── 6b. Analytics listener ────────────────────────────────────────────────
     // Consumes DomainEvents (task/habit/focus/etc.) and writes analytics_events
@@ -133,7 +146,7 @@ async fn main() -> anyhow::Result<()> {
         // ── CORS ──────────────────────────────────────────────────────────────
         .layer(
             CorsLayer::new()
-                .allow_origin(Any)
+                .allow_origin(cors_origin)
                 .allow_methods([
                     Method::GET,
                     Method::POST,
