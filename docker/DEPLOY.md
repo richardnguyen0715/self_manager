@@ -23,7 +23,7 @@ reverse-proxies to the Rust backend and Next.js frontend.
 ```bash
 ssh user@your-server
 cd Coding
-git clone https://github.com/OWNER/self_manager.git
+git clone https://github.com/richardnguyen0715/self_manager.git
 cd manage-my-life
 ```
 
